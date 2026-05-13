@@ -1,0 +1,37 @@
+{
+  "network": {
+    "wifi": {
+      "title": "Wi-Fi",
+      "secured": "Secured",
+      "saved": "Saved",
+      "connected": "Connected",
+      "connected_to": "Connected to",
+      "available_networks": "Available Networks",
+      "saved_networks": "Saved Networks",
+      "filter_ssid": "Filter SSID",
+      "connect_to": "Wi-Fi Connect",
+      "ssid": "SSID",
+      "password": "Password",
+      "empty_saved": "Leave empty to use the saved connection.",
+      "open": "Open",
+      "disabled": "Disabled"
+    },
+    "wired": {
+      "title": "Wired",
+      "connected": "Connected",
+      "interface_count": "Interface Count: ",
+      "no_interfaces": "No wired interfaces found."
+    },
+    "cancel": "Cancel",
+    "connect": "Connect"
+  },
+  "navigation": {
+    "home": "Home",
+    "admin": "Admin"
+  },
+  "remote": {
+    "title": "Remote Access",
+    "subtitle": "Connect to the Admin Panel from your phone or your PC.",
+    "ip_error": "Failed to get the primary IP address. Please try again later."
+  }
+}
