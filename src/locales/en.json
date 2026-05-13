@@ -14,7 +14,8 @@
       "password": "Password",
       "empty_saved": "Leave empty to use the saved connection.",
       "open": "Open",
-      "disabled": "Disabled"
+      "disabled": "Disabled",
+      "no_saved_networks": "No saved networks found."
     },
     "wired": {
       "title": "Wired",
