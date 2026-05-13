@@ -142,21 +142,21 @@ jobs:
             exit 1
           fi
 
-          cp -v "$DEB_FILE" "release-assets/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}.deb"
+          cp -v "$DEB_FILE" "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}.deb"
 
-          BIN_FILE="src-tauri/target/release/moondash"
+          BIN_FILE="src-tauri/target/release/streambot-touch"
 
           if [ -f "$BIN_FILE" ]; then
-            cp -v "$BIN_FILE" "release-assets/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
-            chmod +x "release-assets/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
-            file "release-assets/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}" || true
-            objdump -T "release-assets/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}" | grep GLIBC_ | sort -Vu | tail -n 30 || true
+            cp -v "$BIN_FILE" "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
+            chmod +x "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
+            file "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}" || true
+            objdump -T "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}" | grep GLIBC_ | sort -Vu | tail -n 30 || true
           fi
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-moondash-${{ matrix.osname }}-${{ matrix.arch }}
+          name: release-streambot-touch-${{ matrix.osname }}-${{ matrix.arch }}
           path: release-assets/*
           if-no-files-found: error
 
@@ -277,22 +277,22 @@ jobs:
                 exit 1
               fi
 
-              cp -v "$DEB_FILE" "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf.deb"
+              cp -v "$DEB_FILE" "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf.deb"
 
-              BIN_FILE="src-tauri/target/armv7-unknown-linux-gnueabihf/release/moondash"
+              BIN_FILE="src-tauri/target/armv7-unknown-linux-gnueabihf/release/streambot-touch"
 
               if [ -f "$BIN_FILE" ]; then
-                cp -v "$BIN_FILE" "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf"
-                chmod +x "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf"
-                file "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf" || true
-                objdump -T "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf" | grep GLIBC_ | sort -Vu | tail -n 30 || true
+                cp -v "$BIN_FILE" "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf"
+                chmod +x "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf"
+                file "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf" || true
+                objdump -T "release-assets/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf" | grep GLIBC_ | sort -Vu | tail -n 30 || true
               fi
             '
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-moondash-${{ matrix.osname }}-armhf
+          name: release-streambot-touch-${{ matrix.osname }}-armhf
           path: release-assets/*
           if-no-files-found: error
 
@@ -319,6 +319,6 @@ jobs:
           tag_name: ${{ github.event.release.tag_name }}
           files: |
             release-assets/*.deb
-            release-assets/moondash_*_amd64
-            release-assets/moondash_*_arm64
-            release-assets/moondash_*_armhf
+            release-assets/streambot-touch_*_amd64
+            release-assets/streambot-touch_*_arm64
+            release-assets/streambot-touch_*_armhf

@@ -156,7 +156,7 @@ jobs:
         run: |
           ldd --version
 
-          BIN="src-tauri/target/release/moondash"
+          BIN="src-tauri/target/release/streambot-touch"
 
           if [ -f "$BIN" ]; then
             objdump -T "$BIN" | grep GLIBC_ | sort -Vu | tail -n 30 || true
@@ -183,20 +183,20 @@ jobs:
               exit 1
             fi
 
-            cp -v "$DEB_FILE" "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}.deb"
+            cp -v "$DEB_FILE" "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}.deb"
           fi
 
-          BIN_FILE="src-tauri/target/release/moondash"
+          BIN_FILE="src-tauri/target/release/streambot-touch"
 
           if [ -f "$BIN_FILE" ]; then
-            cp -v "$BIN_FILE" "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
-            chmod +x "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
+            cp -v "$BIN_FILE" "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
+            chmod +x "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
           fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: moondash-${{ matrix.osname }}-${{ matrix.arch }}
+          name: streambot-touch-${{ matrix.osname }}-${{ matrix.arch }}
           path: dist-artifacts/${{ matrix.osname }}-${{ matrix.arch }}
           if-no-files-found: error
 
@@ -318,21 +318,21 @@ jobs:
                 exit 1
               fi
 
-              cp -v "$DEB_FILE" "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_armhf.deb"
+              cp -v "$DEB_FILE" "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf.deb"
 
-              BIN_FILE="src-tauri/target/armv7-unknown-linux-gnueabihf/release/moondash"
+              BIN_FILE="src-tauri/target/armv7-unknown-linux-gnueabihf/release/streambot-touch"
 
               if [ -f "$BIN_FILE" ]; then
-                cp -v "$BIN_FILE" "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_armhf"
-                chmod +x "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_armhf"
-                file "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_armhf" || true
-                objdump -T "$OUT_DIR/moondash_${VERSION}.${{ matrix.osname }}_armhf" | grep GLIBC_ | sort -Vu | tail -n 30 || true
+                cp -v "$BIN_FILE" "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf"
+                chmod +x "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf"
+                file "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf" || true
+                objdump -T "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_armhf" | grep GLIBC_ | sort -Vu | tail -n 30 || true
               fi
             '
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: moondash-${{ matrix.osname }}-armhf
+          name: streambot-touch-${{ matrix.osname }}-armhf
           path: dist-artifacts/${{ matrix.osname }}-armhf
           if-no-files-found: error
