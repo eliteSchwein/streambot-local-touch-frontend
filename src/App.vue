@@ -2,7 +2,6 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import Header from "./components/Header.vue";
 import Navigation from "@/components/Navigation.vue";
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import {invoke} from "@tauri-apps/api/core";
 
 const targetAddress = ref("http://localhost:8105");
