@@ -69,7 +69,7 @@ install_packages() {
     libegl-mesa0 \
     libgles2 \
     swayidle wtype \
-    Streambot Touch seatd
+    streambot-touch seatd
 
   status_msg "Emable seatd service"
   sudo systemctl enable --now seatd
