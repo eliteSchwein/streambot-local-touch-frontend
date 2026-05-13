@@ -82,7 +82,7 @@ modify_user() {
 }
 
 install_service() {
-  "$SCRIPTPATH/generateService.sh" --app_config="$MCCONFIGFILE" --service_suffix="${MCSERVICENAME#streambot_}"
+  "$SCRIPTPATH/generateService.sh" --app_config="$MCCONFIGFILE"
 }
 
 install_labwc_config() {
