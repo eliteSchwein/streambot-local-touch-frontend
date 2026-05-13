@@ -1,0 +1,57 @@
+#!/bin/bash
+set -e
+
+green=$(echo -en "\e[92m")
+yellow=$(echo -en "\e[93m")
+red=$(echo -en "\e[91m")
+default=$(echo -en "\e[39m")
+
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+MCSERVICENAME="streambottouch"
+MCCONFIGFILE="/home/$(whoami)/streambot-touch.cfg"
+
+status_msg(){ echo; echo -e "${yellow}###### $1${default}"; }
+ok_msg(){ echo -e "${green}>>>>>> $1${default}"; }
+warn_msg(){ echo -e "${red} $1${default}"; }
+
+for ARGUMENT in "$@"; do
+  KEY=$(echo "$ARGUMENT" | cut -f1 -d=)
+  VALUE=$(echo "$ARGUMENT" | cut -f2- -d=)
+
+  case "$KEY" in
+    --config_path|--app_config)
+      MCCONFIGFILE="${VALUE}"
+      ;;
+    --service_suffix)
+      if [[ "$VALUE" != "" && "$VALUE" != "moondash" ]]; then
+        MCSERVICENAME="${MCSERVICENAME}_${VALUE}"
+      fi
+      ;;
+  esac
+done
+
+if [[ ${UID} == '0' ]]; then
+  warn_msg "You can't run this script as root!"
+  exit 1
+fi
+
+install_systemd_service() {
+  status_msg "Installing Streambot Touch kiosk unit file"
+
+  MCUID="$(id -u "$USER")"
+
+  SERVICE=$(<"$SCRIPTPATH/StreambotTouch.service")
+  SERVICE=$(sed "s/MC_USER/$USER/g" <<< "$SERVICE")
+  SERVICE=$(sed "s/MC_UID/$MCUID/g" <<< "$SERVICE")
+
+  echo "$SERVICE" | sudo tee "/etc/systemd/system/$MCSERVICENAME.service" > /dev/null
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable "$MCSERVICENAME.service"
+  sudo systemctl restart "$MCSERVICENAME.service"
+
+  ok_msg "Installed and restarted $MCSERVICENAME.service"
+}
+
+install_systemd_service
