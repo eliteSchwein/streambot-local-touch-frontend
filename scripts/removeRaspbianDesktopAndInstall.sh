@@ -75,8 +75,11 @@ remove_raspbian_desktop() {
     geany \
     claws-mail \
     chromium-browser \
-    rpi-chromium-mods \
+    rpi-chromium-mods rpi-firefox-mods \
     firefox \
+    chromium \
+    mate-desktop-common \
+    rpi-imager \
     2>/dev/null || true
 
   status_msg "Cleaning unused packages"
