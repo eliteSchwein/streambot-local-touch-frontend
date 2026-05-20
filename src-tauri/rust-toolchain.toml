@@ -2,7 +2,6 @@
 channel = "stable"
 targets = [
     "x86_64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf",
     "aarch64-unknown-linux-gnu"
 ]
 profile = "default"
