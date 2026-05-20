@@ -4,7 +4,10 @@ import {formatSeconds} from "@/helper/GeneralHelper.ts";
 import eventBus from "@/eventBus.ts";
 
 defineProps({
-  alert: {}
+  alert: {
+    type: Object,
+    default: null,
+  },
 })
 
 function removeAlert(eventUuid: string) {

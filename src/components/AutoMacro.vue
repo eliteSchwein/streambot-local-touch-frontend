@@ -1,9 +1,16 @@
 <script setup lang="ts">
 
 import eventBus from "@/eventBus.ts";
-defineProps({
-  autoMacro: {}
-})
+type AutoMacro = {
+  name: string
+  enabled: boolean
+  interval: number
+  current_interval: number
+}
+
+defineProps<{
+  autoMacro: AutoMacro
+}>()
 
 function toggleAutoMacro(autoMacro: any) {
   autoMacro.enabled = !autoMacro.enabled

@@ -26,11 +26,6 @@
     "cancel": "Cancel",
     "connect": "Connect"
   },
-  "navigation": {
-    "home": "Home",
-    "songlist": "Songs",
-    "admin": "Admin"
-  },
   "remote": {
     "title": "Remote Access",
     "subtitle": "Connect to the Admin Panel from your phone or your PC.",
@@ -79,5 +74,27 @@
     "music_playlist": "Music Playlist",
     "no_song_requests": "No song requests found.",
     "no_music": "No music found."
+  },
+  "recovery": {
+    "warning": "There is no confirmation prompt before triggering these actions. Only use them if you are ABSOLUTELY sure what you are doing.",
+    "delete_auth_text": "Delete Twitch connection. After that, the bot will automatic restart.",
+    "reload_text": "Reload the bot internally. This should usually not break anything.",
+    "compress_assets_text": "Manually compress assets (images/videos). This recompresses all assets again. Please be patient, this can take a while.",
+    "auth_reset": "AUTH RESET",
+    "bot_reload": "BOT RELOAD",
+    "compress_assets": "COMPRESS ASSETS"
+  },
+  "audio": {
+    "bot_audio_mixer": "Bot Audio Mixer",
+    "yolobox_audio_mixer": "Yolobox Audio Mixer",
+    "obs_audio_mixer": "OBS Audio Mixer",
+    "volume": "Volume",
+    "delay": "Delay",
+    "balance": "Balance"
+  },
+  "power": {
+    "shutdown_question": "Shut down system?",
+    "restart": "Restart",
+    "shutdown": "Shut down"
   }
 }

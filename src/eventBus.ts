@@ -1,9 +1,12 @@
-// eventBus.js
+// eventBus.ts
+// @ts-ignore
 import emitter from 'tiny-emitter/instance'
 
+type EventCallback = (...args: any[]) => void
+
 export default {
-    $on: (...args) => emitter.on(...args),
-    $once: (...args) => emitter.once(...args),
-    $off: (...args) => emitter.off(...args),
-    $emit: (...args) => emitter.emit(...args)
+    $on: (event: string, callback: EventCallback) => emitter.on(event, callback),
+    $once: (event: string, callback: EventCallback) => emitter.once(event, callback),
+    $off: (event: string, callback?: EventCallback) => emitter.off(event, callback),
+    $emit: (event: string, ...args: any[]) => emitter.emit(event, ...args),
 }

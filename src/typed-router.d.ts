@@ -45,6 +45,34 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/audio': RouteRecordInfo<
+      '/audio',
+      '/audio',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/channelPoints': RouteRecordInfo<
+      '/channelPoints',
+      '/channelPoints',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/macros': RouteRecordInfo<
+      '/macros',
+      '/macros',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/recovery': RouteRecordInfo<
+      '/recovery',
+      '/recovery',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/songlist': RouteRecordInfo<
       '/songlist',
       '/songlist',
@@ -74,6 +102,30 @@ declare module 'vue-router/auto-routes' {
     'src/pages/admin.vue': {
       routes:
         | '/admin'
+      views:
+        | never
+    }
+    'src/pages/audio.vue': {
+      routes:
+        | '/audio'
+      views:
+        | never
+    }
+    'src/pages/channelPoints.vue': {
+      routes:
+        | '/channelPoints'
+      views:
+        | never
+    }
+    'src/pages/macros.vue': {
+      routes:
+        | '/macros'
+      views:
+        | never
+    }
+    'src/pages/recovery.vue': {
+      routes:
+        | '/recovery'
       views:
         | never
     }

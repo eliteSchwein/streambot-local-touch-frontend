@@ -12,7 +12,7 @@
 
         <template v-if="getAlerts.length === 0">
           <v-alert
-              class="mt-5"
+              class="mt-3"
               type="info"
               color="gray-darken-3"
               :text="$t('dashboard.no_alerts')"

@@ -1,29 +1,28 @@
-import {Websocket} from "websocket-ts";
-import {getRandomInt, sleep} from "@/helper/GeneralHelper";
-import {useAppStore} from "@/stores/app";
-import ConnectEvent from "@/plugins/websocketEvents/ConnectEvent";
-import MessageEvent from "@/plugins/websocketEvents/MessageEvent";
-import DisconnectEvent from "@/plugins/websocketEvents/DisconnectEvent";
+import { Websocket } from 'websocket-ts'
+import { getRandomInt, sleep } from '@/helper/GeneralHelper'
+import { useAppStore } from '@/stores/app'
+import ConnectEvent from '@/plugins/websocketEvents/ConnectEvent'
+import MessageEvent from '@/plugins/websocketEvents/MessageEvent'
+import DisconnectEvent from '@/plugins/websocketEvents/DisconnectEvent'
+
+type AppStore = ReturnType<typeof useAppStore>
 
 export default class WebsocketClient {
   url = ''
-  websocket: Websocket|undefined = undefined
-  store: useAppStore
+  websocket: Websocket | undefined = undefined
+  store: AppStore
 
-  public constructor(
-    url: string,
-    store: useAppStore
-  ) {
+  public constructor(url: string, store: AppStore) {
     this.url = url
     this.store = store
   }
 
   public setUrl(url: string) {
-    this.url = url;
+    this.url = url
   }
 
   public async disconnect() {
-    if(this.websocket) {
+    if (this.websocket) {
       this.websocket.close()
       await sleep(100)
     }
@@ -32,7 +31,7 @@ export default class WebsocketClient {
   public async connect() {
     await this.disconnect()
 
-    console.log("Connecting to Websocket")
+    console.log('Connecting to Websocket')
     this.store.setWebsocketConnecting(true)
 
     this.websocket = new Websocket(this.url)
@@ -41,11 +40,11 @@ export default class WebsocketClient {
   }
 
   public getWebsocket() {
-    return this.websocket;
+    return this.websocket
   }
 
   public getStore() {
-    return this.store;
+    return this.store
   }
 
   private registerEvents() {
@@ -56,7 +55,14 @@ export default class WebsocketClient {
 
   public send(method: string, data: any = {}) {
     try {
-      this.websocket?.send(JSON.stringify({jsonrpc: "2.0", method: method, params: data, id: getRandomInt(10_000)}))
+      this.websocket?.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method,
+            params: data,
+            id: getRandomInt(10_000),
+          }),
+      )
     } catch (error) {
       console.error('request to a websocket client failed!')
       console.error(JSON.stringify(error, Object.getOwnPropertyNames(error)))

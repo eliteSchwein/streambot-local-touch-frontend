@@ -1,6 +1,78 @@
 // Utilities
 import { defineStore } from 'pinia'
 
+type GiveawayUser = {
+  id: string
+  displayName: string
+}
+
+type GiveawayWinner = {
+  name: string
+}
+
+type Giveaway = {
+  active: boolean
+  content: string
+  interval: number
+  currentInterval: number
+  users: GiveawayUser[]
+  winner?: GiveawayWinner | null
+}
+
+type MusicCavaData = {
+  raw?: string
+}
+
+type ObsAudioDevice = {
+  inputUuid: string
+  inputName: string
+  muted: boolean
+  balance: number
+  volume: {
+    inputVolumeMul: number
+    inputVolumeDb: number
+  }
+}
+
+type ObsAudioData = Record<string, ObsAudioDevice>
+
+type YoloboxMixerDevice = {
+  id: string
+  isSelected: boolean
+  volume: number
+  delayTime?: number
+  maxDelay?: number
+  afv?: boolean
+  AFV?: boolean
+}
+
+type YoloboxData = {
+  MixerList?: YoloboxMixerDevice[]
+}
+
+type AudioDevice = {
+  muted: boolean
+  max_range: number
+  min_range: number
+  steps_range: number
+  current_volume: number
+}
+
+type AudioData = Record<string, AudioDevice>
+
+export type Alert = {
+  id: string
+  active?: boolean
+  [key: string]: any
+}
+
+export type AutoMacro = {
+  name: string
+  enabled: boolean
+  interval: number
+  current_interval: number
+}
+
 export const useAppStore = defineStore('app', {
   state: () => ({
     assets: [],
@@ -10,7 +82,8 @@ export const useAppStore = defineStore('app', {
       webserverPort: 8105
     },
     games: [],
-    alerts: [],
+    alerts: [] as Alert[],
+    autoMacros: [] as AutoMacro[],
     websocket: {
       connected: false,
       connecting: false
@@ -18,7 +91,7 @@ export const useAppStore = defineStore('app', {
     shieldMode: false,
     currentGame: {},
     channelPoints: [],
-    audioData: {},
+    audioData: {} as AudioData,
     systemInfo: {
       components: {},
       config: {},
@@ -32,13 +105,19 @@ export const useAppStore = defineStore('app', {
     testMode: false,
     voices: [],
     macros: {},
-    autoMacros: [],
     variables: {},
-    giveaway: {},
-    yoloboxData: {},
-    obsAudioData: {},
+    giveaway: {
+      active: false,
+      content: '',
+      interval: 0,
+      currentInterval: 0,
+      users: [],
+      winner: null,
+    } as Giveaway,
+    yoloboxData: {} as YoloboxData,
+    obsAudioData: {} as ObsAudioData,
     musicData: {},
-    musicCavaData: {}
+    musicCavaData: {} as MusicCavaData,
   }),
   getters: {
     getConfig: (state) => state.config,
@@ -94,7 +173,7 @@ export const useAppStore = defineStore('app', {
 
       this.$patch(state => state.games = data)
     },
-    setAlerts(alerts: []) {
+    setAlerts(alerts: Alert[]) {
       this.alerts = alerts
       this.$patch(state => state.alerts = alerts)
     },
@@ -118,7 +197,7 @@ export const useAppStore = defineStore('app', {
       this.channelPoints = channelPoints
       this.$patch(state => state.channelPoints = channelPoints)
     },
-    setAudioData(audioData: {}) {
+    setAudioData(audioData: AudioData) {
       this.audioData = audioData
       this.$patch(state => state.audioData = audioData)
     },
@@ -160,7 +239,7 @@ export const useAppStore = defineStore('app', {
       this.macros = macros
       this.$patch(state => state.macros = macros)
     },
-    setAutoMacros(autoMacros: []) {
+    setAutoMacros(autoMacros: AutoMacro[]) {
       this.autoMacros = autoMacros
       this.$patch(state => state.autoMacros = autoMacros)
     },
@@ -168,11 +247,11 @@ export const useAppStore = defineStore('app', {
       this.variables = variables
       this.$patch(state => state.variables = variables)
     },
-    setGiveaway(giveaway: {}) {
+    setGiveaway(giveaway: Giveaway) {
       this.giveaway = giveaway
       this.$patch(state => state.giveaway = giveaway)
     },
-    setYoloboxData(yoloboxData: {}) {
+    setYoloboxData(yoloboxData: YoloboxData) {
       this.yoloboxData = yoloboxData
       this.$patch(state => state.yoloboxData = yoloboxData)
     },
@@ -192,7 +271,7 @@ export const useAppStore = defineStore('app', {
       this.musicData = musicData
       this.$patch(state => state.musicData = musicData)
     },
-    setMusicCavaData(musicCavaData: any) {
+    setMusicCavaData(musicCavaData: MusicCavaData) {
       this.musicCavaData = musicCavaData
       this.$patch(state => state.musicCavaData = musicCavaData)
     },

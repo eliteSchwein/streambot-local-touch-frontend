@@ -24,7 +24,7 @@ eventBus.$on('websocket:reconnect', () => {
   void websocket.connect()
 })
 
-eventBus.$on('websocket:send', (data) => {
+eventBus.$on('websocket:send', (data: any) => {
   if(data.method === 'update') {
     updating.value = true // this doesnt seem to trigger?
   }
@@ -152,6 +152,7 @@ onBeforeUnmount(() => {
 
         <template v-else-if="ready">
           <router-view />
+          <PowerDialog />
         </template>
 
         <template v-else-if="stage === 'auth'">
@@ -232,6 +233,8 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   width: 100%;
+  overflow-y: auto;
+  max-height: calc(100vh - 71px);
 }
 
 .iframe-container {
