@@ -3,6 +3,13 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 import Header from "./components/Header.vue";
 import Navigation from "@/components/Navigation.vue";
 import {invoke} from "@tauri-apps/api/core";
+import {useAppStore} from "@/stores/app.ts";
+import WebsocketClient from "@/plugins/webSocketClient.ts";
+import eventBus from "@/eventBus.ts";
+import {sleep} from "@/helper/GeneralHelper.ts";
+
+const appOption = useAppStore()
+let websocket: WebsocketClient | undefined = undefined
 
 const targetAddress = ref("http://localhost:8105");
 
@@ -12,9 +19,17 @@ const stage = ref("Unknown");
 
 let watchdogId: number | null = null;
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+eventBus.$on('websocket:reconnect', () => {
+  if (!websocket) return
+  void websocket.connect()
+})
+
+eventBus.$on('websocket:send', (data) => {
+  if(data.method === 'update') {
+    updating.value = true // this doesnt seem to trigger?
+  }
+  websocket?.send(data.method, data.params)
+})
 
 async function fetchStatus() {
   let status = {
@@ -60,6 +75,11 @@ async function bootupSequence() {
     await sleep(250);
     status = await fetchStatus();
   }
+
+  await appOption.fetchGames()
+
+  websocket = new WebsocketClient(appOption.getWebsocket, appOption)
+  await websocket.connect()
 
   updating.value = status.updating ?? false;
   ready.value = true;

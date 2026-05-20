@@ -11,8 +11,13 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActiveAlert: typeof import('./components/ActiveAlert.vue')['default']
+    AutoMacro: typeof import('./components/AutoMacro.vue')['default']
+    Giveaway: typeof import('./components/Giveaway.vue')['default']
     Header: typeof import('./components/Header.vue')['default']
     KeyboardOverlay: typeof import('./components/overlays/KeyboardOverlay.vue')['default']
+    Macro: typeof import('./components/Macro.vue')['default']
+    MusicControls: typeof import('./components/MusicControls.vue')['default']
     Navigation: typeof import('./components/Navigation.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

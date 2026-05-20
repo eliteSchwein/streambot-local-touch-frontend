@@ -12,6 +12,10 @@ const { t } = useI18n()
       <v-icon>mdi-home-variant</v-icon>
       <span>{{ t('navigation.home') }}</span>
     </v-btn>
+    <v-btn to="/songlist">
+      <v-icon>mdi-music</v-icon>
+      <span>{{ t('navigation.songlist') }}</span>
+    </v-btn>
     <v-btn to="/admin">
       <v-icon>mdi-view-dashboard</v-icon>
       <span>{{ t('navigation.admin') }}</span>

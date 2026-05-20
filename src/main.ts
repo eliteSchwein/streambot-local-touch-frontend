@@ -4,6 +4,7 @@ import vuetify from './plugins/vuetify'
 import { i18n } from './plugins/i18n'
 import router from '@/router'
 import { invoke } from "@tauri-apps/api/core";
+import {createPinia} from "pinia";
 
 type ConsoleLevel = "log" | "warn" | "error";
 
@@ -59,6 +60,7 @@ installBackendConsoleLogging();
 const app = createApp(App)
 
 app
+    .use(createPinia())
     .use(vuetify)
     .use(router)
     .use(i18n)

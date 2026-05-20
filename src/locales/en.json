@@ -28,11 +28,56 @@
   },
   "navigation": {
     "home": "Home",
+    "songlist": "Songs",
     "admin": "Admin"
   },
   "remote": {
     "title": "Remote Access",
     "subtitle": "Connect to the Admin Panel from your phone or your PC.",
     "ip_error": "Failed to get the primary IP address. Please try again later."
+  },
+  "music": {
+    "title": "Music",
+    "song_requests": "Song Requests",
+    "no_song": "No song",
+    "unknown_artist": "Unknown artist",
+    "playlist": "Playlist",
+    "songs": "Songs"
+  },
+  "giveaway": {
+    "title": "Giveaway",
+    "winner": "Winner",
+    "active": "Active",
+    "participants": "Participants",
+    "name": "Name",
+    "content_label": "What is being raffled?",
+    "duration": "Duration",
+    "create": "Create"
+  },
+  "dashboard": {
+    "no_alerts": "There are currently no alerts!",
+    "no_auto_macros": "There are currently no automatic macros!"
+  },
+  "macro": {
+    "channel": "Channel",
+    "method": "Method",
+    "data": "Data"
+  },
+  "alert": {
+    "title": "Alert",
+    "name": "Name",
+    "value": "Value",
+    "channel": "Channel",
+    "icon": "Icon",
+    "message": "Message",
+    "sound": "Sound",
+    "video": "Video",
+    "lamp_color": "Lamp Color"
+  },
+  "music_playlist": {
+    "song_requests": "Song Requests",
+    "music_playlist": "Music Playlist",
+    "no_song_requests": "No song requests found.",
+    "no_music": "No music found."
   }
 }
