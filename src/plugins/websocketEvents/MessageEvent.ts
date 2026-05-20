@@ -67,6 +67,5 @@ export default class MessageEvent extends BaseEvent {
     await new NotifyObsAudioUpdateMessage(this.webSocketClient).handleMessage(data)
     await new NotifyAssetsUpdateMessage(this.webSocketClient).handleMessage(data)
     await new NotifyMusicUpdateMessage(this.webSocketClient).handleMessage(data)
-    await new NotifyMusicCavaMessage(this.webSocketClient).handleMessage(data)
   }
 }

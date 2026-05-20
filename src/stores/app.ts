@@ -19,10 +19,6 @@ type Giveaway = {
   winner?: GiveawayWinner | null
 }
 
-type MusicCavaData = {
-  raw?: string
-}
-
 type ObsAudioDevice = {
   inputUuid: string
   inputName: string
@@ -117,7 +113,6 @@ export const useAppStore = defineStore('app', {
     yoloboxData: {} as YoloboxData,
     obsAudioData: {} as ObsAudioData,
     musicData: {},
-    musicCavaData: {} as MusicCavaData,
   }),
   getters: {
     getConfig: (state) => state.config,
@@ -153,7 +148,6 @@ export const useAppStore = defineStore('app', {
     getAssets: (state) => state.assets,
     getStatus: (state) => state.status,
     getMusicData: (state) => state.musicData,
-    getMusicCavaData: (state) => state.musicCavaData
   },
   actions: {
     async fetchConfig() {
@@ -270,10 +264,6 @@ export const useAppStore = defineStore('app', {
     setMusicData(musicData: any) {
       this.musicData = musicData
       this.$patch(state => state.musicData = musicData)
-    },
-    setMusicCavaData(musicCavaData: MusicCavaData) {
-      this.musicCavaData = musicCavaData
-      this.$patch(state => state.musicCavaData = musicCavaData)
     },
     async fetchStatus(): Promise<any> {
       let status = 'Unknown'
