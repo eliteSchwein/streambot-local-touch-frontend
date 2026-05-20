@@ -96,5 +96,9 @@
     "shutdown_question": "System herunterfahren?",
     "restart": "Neustarten",
     "shutdown": "Herunterfahren"
+  },
+  "settings": {
+    "language": "Sprache",
+    "language_subtitle": "Wähle deine bevorzugte Sprache"
   }
 }

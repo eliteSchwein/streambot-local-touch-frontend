@@ -1,14 +1,27 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
 import WifiSettingsCard from '../cards/WifiSettingsCard.vue'
 import WiredSettingsCard from '../cards/WiredSettingsCard.vue'
+import LanguageSettingsCard from "@/components/cards/LanguageSettingsCard.vue";
+
+const { locale } = useI18n()
 
 const isOpen = ref(false)
+const language = ref('en')
 
 const panelStyle = computed(() => ({
   transform: isOpen.value ? 'translateY(0)' : 'translateY(-100%)',
   transition: 'transform 220ms ease',
 }))
+
+async function loadSettings() {
+  const settings = await invoke<{ language: string }>('get_streambot_settings')
+
+  language.value = settings.language
+  locale.value = settings.language
+}
 
 function open() {
   isOpen.value = true
@@ -21,6 +34,8 @@ function close() {
 function toggle() {
   isOpen.value = !isOpen.value
 }
+
+onMounted(loadSettings)
 
 defineExpose({
   open,
@@ -41,6 +56,7 @@ defineExpose({
 
             <v-col cols="12" sm="6" class="settings-panel__col">
               <WiredSettingsCard :panel-open="isOpen" />
+              <LanguageSettingsCard :panel-open="isOpen" />
             </v-col>
           </v-row>
         </v-container>
@@ -75,6 +91,10 @@ defineExpose({
   height: calc(100vh - 92px);
   overflow: auto;
   padding: 8px 12px 12px;
+}
+
+.settings-panel__language-row {
+  margin-bottom: 12px;
 }
 
 .settings-panel__row {

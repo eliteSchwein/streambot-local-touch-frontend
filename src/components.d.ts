@@ -17,6 +17,7 @@ declare module 'vue' {
     Giveaway: typeof import('./components/Giveaway.vue')['default']
     Header: typeof import('./components/Header.vue')['default']
     KeyboardOverlay: typeof import('./components/overlays/KeyboardOverlay.vue')['default']
+    LanguageSettingsCard: typeof import('./components/cards/LanguageSettingsCard.vue')['default']
     Macro: typeof import('./components/Macro.vue')['default']
     MusicControls: typeof import('./components/MusicControls.vue')['default']
     Navigation: typeof import('./components/Navigation.vue')['default']

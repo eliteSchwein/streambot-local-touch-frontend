@@ -96,5 +96,9 @@
     "shutdown_question": "Shut down system?",
     "restart": "Restart",
     "shutdown": "Shut down"
+  },
+  "settings": {
+    "language": "Language",
+    "language_subtitle": "Choose your preferred language"
   }
 }

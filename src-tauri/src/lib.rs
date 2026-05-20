@@ -1,4 +1,5 @@
 mod network;
+mod settings;
 
 use tauri::{AppHandle, Manager, PhysicalSize, Size};
 use tauri_plugin_cli::CliExt;
@@ -35,6 +36,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             frontend_log,
             wake_main_window,
+
+            settings::get_streambot_settings,
+            settings::set_streambot_language,
+
             network::get_network_status,
             network::get_wifi_settings,
             network::get_wired_settings,
