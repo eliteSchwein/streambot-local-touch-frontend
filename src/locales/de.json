@@ -1,1 +1,100 @@
-{}
+{
+  "network": {
+    "wifi": {
+      "title": "WLAN",
+      "secured": "Gesichert",
+      "saved": "Gespeichert",
+      "connected": "Verbunden",
+      "connected_to": "Verbunden mit",
+      "available_networks": "Verfügbare Netzwerke",
+      "saved_networks": "Gespeicherte Netzwerke",
+      "filter_ssid": "SSID filtern",
+      "connect_to": "Mit WLAN verbinden",
+      "ssid": "SSID",
+      "password": "Passwort",
+      "empty_saved": "Leer lassen, um die gespeicherte Verbindung zu verwenden.",
+      "open": "Offen",
+      "disabled": "Deaktiviert",
+      "no_saved_networks": "Keine gespeicherten Netzwerke gefunden."
+    },
+    "wired": {
+      "title": "Kabelgebunden",
+      "connected": "Verbunden",
+      "interface_count": "Anzahl der Schnittstellen: ",
+      "no_interfaces": "Keine kabelgebundenen Schnittstellen gefunden."
+    },
+    "cancel": "Abbrechen",
+    "connect": "Verbinden"
+  },
+  "remote": {
+    "title": "Fernzugriff",
+    "subtitle": "Verbinde dich von deinem Handy oder PC mit dem Admin-Panel.",
+    "ip_error": "Die primäre IP-Adresse konnte nicht ermittelt werden. Bitte versuche es später erneut."
+  },
+  "music": {
+    "title": "Musik",
+    "song_requests": "Songanfragen",
+    "no_song": "Kein Song",
+    "unknown_artist": "Unbekannter Künstler",
+    "playlist": "Wiedergabeliste",
+    "songs": "Songs"
+  },
+  "giveaway": {
+    "title": "Gewinnspiel",
+    "winner": "Gewinner",
+    "active": "Aktiv",
+    "participants": "Teilnehmer",
+    "name": "Name",
+    "content_label": "Was wird verlost?",
+    "duration": "Dauer",
+    "create": "Erstellen"
+  },
+  "dashboard": {
+    "no_alerts": "Derzeit gibt es keine Alerts!",
+    "no_auto_macros": "Derzeit gibt es keine automatischen Makros!"
+  },
+  "macro": {
+    "channel": "Kanal",
+    "method": "Methode",
+    "data": "Daten"
+  },
+  "alert": {
+    "title": "Alert",
+    "name": "Name",
+    "value": "Wert",
+    "channel": "Kanal",
+    "icon": "Icon",
+    "message": "Nachricht",
+    "sound": "Sound",
+    "video": "Video",
+    "lamp_color": "Lampenfarbe"
+  },
+  "music_playlist": {
+    "song_requests": "Songanfragen",
+    "music_playlist": "Musik-Wiedergabeliste",
+    "no_song_requests": "Keine Songanfragen gefunden.",
+    "no_music": "Keine Musik gefunden."
+  },
+  "recovery": {
+    "warning": "Es gibt keine Sicherheitsabfrage vor dem Ausführen dieser Aktionen. Nutze sie nur, wenn du dir ABSOLUT sicher bist, was du tust.",
+    "delete_auth_text": "Twitch-Verbindung löschen. Danach wird der Bot automatisch neu gestartet.",
+    "reload_text": "Den Bot intern neu laden. Dies sollte normalerweise nichts kaputt machen.",
+    "compress_assets_text": "Assets (Bilder/Videos) manuell komprimieren. Dadurch werden alle Assets erneut komprimiert. Bitte habe Geduld, das kann eine Weile dauern.",
+    "auth_reset": "AUTH ZURÜCKSETZEN",
+    "bot_reload": "BOT NEU LADEN",
+    "compress_assets": "ASSETS KOMPRESSIEREN"
+  },
+  "audio": {
+    "bot_audio_mixer": "Bot-Audio-Mixer",
+    "yolobox_audio_mixer": "Yolobox-Audio-Mixer",
+    "obs_audio_mixer": "OBS-Audio-Mixer",
+    "volume": "Lautstärke",
+    "delay": "Verzögerung",
+    "balance": "Balance"
+  },
+  "power": {
+    "shutdown_question": "System herunterfahren?",
+    "restart": "Neustarten",
+    "shutdown": "Herunterfahren"
+  }
+}
