@@ -22,7 +22,6 @@ import NotifyObsAudioUpdateMessage from '@/plugins/websocketEvents/websocketMess
 import NotifyAssetsUpdateMessage from '@/plugins/websocketEvents/websocketMessage/NotifyAssetsUpdateMessage.ts'
 import NotifyDisconnectMessage from '@/plugins/websocketEvents/websocketMessage/NotifyDisconnectMessage.ts'
 import NotifyMusicUpdateMessage from '@/plugins/websocketEvents/websocketMessage/NotifyMusicUpdateMessage.ts'
-import NotifyMusicCavaMessage from '@/plugins/websocketEvents/websocketMessage/NotifyMusicCavaMessage.ts'
 
 type JsonRpcMessage = {
   method?: string
