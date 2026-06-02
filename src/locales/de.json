@@ -82,7 +82,9 @@
     "compress_assets_text": "Assets (Bilder/Videos) manuell komprimieren. Dadurch werden alle Assets erneut komprimiert. Bitte habe Geduld, das kann eine Weile dauern.",
     "auth_reset": "AUTH ZURÜCKSETZEN",
     "bot_reload": "BOT NEU LADEN",
-    "compress_assets": "ASSETS KOMPRESSIEREN"
+    "compress_assets": "ASSETS KOMPRESSIEREN",
+    "run_speedtest": "Internettest starten",
+    "speedtest": "Internettest"
   },
   "audio": {
     "bot_audio_mixer": "Bot-Audio-Mixer",

@@ -8,6 +8,7 @@
   >
     <div
       class="mt-5 mx-5">
+      <SpeedtestCard class="mb-3"/>
       <v-alert
         :text="$t('recovery.warning')"
         type="warning"
@@ -36,8 +37,10 @@
 <script lang="ts">
 import {mapState} from "pinia";
 import {useAppStore} from "@/stores/app";
+import SpeedtestCard from "@/components/cards/SpeedtestCard.vue";
 
 export default {
+  components: {SpeedtestCard},
   computed: {
     ...mapState(useAppStore, ['getRestApi']),
   },

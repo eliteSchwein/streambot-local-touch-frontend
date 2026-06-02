@@ -82,7 +82,9 @@
     "compress_assets_text": "Manually compress assets (images/videos). This recompresses all assets again. Please be patient, this can take a while.",
     "auth_reset": "AUTH RESET",
     "bot_reload": "BOT RELOAD",
-    "compress_assets": "COMPRESS ASSETS"
+    "compress_assets": "COMPRESS ASSETS",
+    "run_speedtest": "Run Speedtest",
+    "speedtest": "Speedtest"
   },
   "audio": {
     "bot_audio_mixer": "Bot Audio Mixer",
