@@ -100,5 +100,8 @@
   "settings": {
     "language": "Sprache",
     "language_subtitle": "Wähle deine bevorzugte Sprache"
+  },
+  "dialog": {
+    "close": "Schließen"
   }
 }

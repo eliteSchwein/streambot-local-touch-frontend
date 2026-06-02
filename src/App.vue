@@ -152,7 +152,6 @@ onBeforeUnmount(() => {
 
         <template v-else-if="ready">
           <router-view />
-          <PowerDialog />
         </template>
 
         <template v-else-if="stage === 'auth'">
@@ -217,6 +216,7 @@ onBeforeUnmount(() => {
       </div>
 
       <Navigation />
+      <PowerDialog />
     </div>
   </v-app>
 </template>

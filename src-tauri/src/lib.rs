@@ -1,4 +1,5 @@
 mod network;
+mod power;
 mod settings;
 
 use tauri::{AppHandle, Manager, PhysicalSize, Size};
@@ -36,6 +37,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             frontend_log,
             wake_main_window,
+            power::reboot_system,
+            power::shutdown_system,
+            power::restart_streambot_service,
 
             settings::get_streambot_settings,
             settings::set_streambot_language,
@@ -77,6 +81,8 @@ pub fn run() {
                     }
                 }
             }
+
+            power::start_power_button_intercept(app.handle().clone());
 
             Ok(())
         })

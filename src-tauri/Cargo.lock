@@ -3335,6 +3335,7 @@ name = "streambot-touch"
 version = "0.0.4"
 dependencies = [
  "get_if_addrs",
+ "libc",
  "nmrs",
  "serde",
  "serde_json",
