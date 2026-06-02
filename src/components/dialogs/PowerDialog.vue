@@ -140,7 +140,7 @@ export default {
             >
               <div class="power-dialog__btn-content">
                 <v-icon size="18">mdi-server</v-icon>
-                <span>Restart Streambot</span>
+                <span>{{ $t('power.restart_streambot') }}</span>
               </div>
             </v-btn>
           </div>

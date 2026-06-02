@@ -95,7 +95,8 @@
   "power": {
     "shutdown_question": "System herunterfahren?",
     "restart": "Neustarten",
-    "shutdown": "Herunterfahren"
+    "shutdown": "Herunterfahren",
+    "restart_streambot": "Backend neustarten"
   },
   "settings": {
     "language": "Sprache",
