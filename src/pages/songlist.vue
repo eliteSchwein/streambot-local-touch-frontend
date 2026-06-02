@@ -5,7 +5,25 @@
         {{ songRequestEnabled ? $t('music_playlist.song_requests') : $t('music_playlist.music_playlist') }}
       </span>
 
-      <div class="d-flex align-center ga-2">
+      <div class="d-flex align-center ga-2 music-playlist-actions">
+        <v-text-field
+            v-model="searchQuery"
+            class="music-playlist-search mr-3"
+            density="compact"
+            variant="outlined"
+            prepend-inner-icon="mdi-magnify"
+            :label="$t('music_playlist.search')"
+            clearable
+            hide-details
+            readonly
+            @click="openSearchKeyboard"
+            @click:control="openSearchKeyboard"
+            @click:prepend-inner="openSearchKeyboard"
+            @click:clear="clearSearch"
+            @focus="openSearchKeyboard"
+            @pointerdown.prevent="openSearchKeyboard"
+        />
+
         <v-switch
             density="compact"
             :label="$t('music_playlist.song_requests')"
@@ -56,22 +74,40 @@
       </v-list>
     </v-card-text>
   </v-card>
+
+  <KeyboardOverlay
+      v-model="searchQuery"
+      :visible="searchKeyboardVisible"
+      :title="searchKeyboardTitle"
+      layout="default"
+      @enter="submitSearchKeyboard"
+      @close="closeSearchKeyboard"
+  />
 </template>
 
 <script lang="ts">
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
+import eventBus from '@/eventBus'
+import KeyboardOverlay from '@/components/overlays/KeyboardOverlay.vue'
 
 export default {
+  components: {
+    KeyboardOverlay,
+  },
+
   data() {
     return {
       files: [] as any[],
       loading: false,
+      searchQuery: '',
+      searchKeyboardVisible: false,
+      searchDebounce: null as ReturnType<typeof setTimeout> | null,
     }
   },
 
   computed: {
-    ...mapState(useAppStore, ['getRestApi', 'getMusicData']),
+    ...mapState(useAppStore, ['getMusicData', 'getWebsocket']),
 
     music(): any {
       return this.getMusicData ?? {}
@@ -85,15 +121,66 @@ export default {
       return this.music?.playlist ?? []
     },
 
+    normalizedSearchQuery(): string {
+      return this.searchQuery.trim().toLowerCase()
+    },
+
+    shouldSearch(): boolean {
+      return this.normalizedSearchQuery.length >= 2
+    },
+
+    searchKeyboardTitle(): string {
+      return this.$t('music_playlist.search') as string
+    },
+
+    filteredSongRequestItems(): any[] {
+      if (!this.shouldSearch) return this.songRequestItems
+
+      return this.songRequestItems.filter((item: any) => {
+        const haystack = [
+          item?.title,
+          item?.filename,
+          item?.path,
+          item?.requested_by,
+          item?.requestedBy,
+          item?.user,
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+
+        return haystack.includes(this.normalizedSearchQuery)
+      })
+    },
+
     visibleItems(): any[] {
       return this.songRequestEnabled
-          ? this.songRequestItems
+          ? this.filteredSongRequestItems
           : this.files
+    },
+  },
+
+  watch: {
+    searchQuery() {
+      this.queueSearchRefresh()
+    },
+
+    songRequestEnabled() {
+      if (!this.songRequestEnabled) {
+        this.queueSearchRefresh(0)
+      }
     },
   },
 
   async mounted() {
     await this.fetchFiles()
+  },
+
+  beforeUnmount() {
+    if (this.searchDebounce) {
+      clearTimeout(this.searchDebounce)
+      this.searchDebounce = null
+    }
   },
 
   methods: {
@@ -103,25 +190,78 @@ export default {
       }
     },
 
+    openSearchKeyboard() {
+      this.searchKeyboardVisible = true
+    },
+
+    closeSearchKeyboard() {
+      this.searchKeyboardVisible = false
+    },
+
+    submitSearchKeyboard() {
+      this.searchKeyboardVisible = false
+    },
+
+    clearSearch() {
+      this.searchQuery = ''
+      this.queueSearchRefresh(0)
+    },
+
+    queueSearchRefresh(delay = 250) {
+      if (this.searchDebounce) {
+        clearTimeout(this.searchDebounce)
+        this.searchDebounce = null
+      }
+
+      if (this.songRequestEnabled) return
+
+      this.searchDebounce = setTimeout(() => {
+        void this.fetchFiles()
+      }, delay)
+    },
+
     async fetchFiles() {
+      if (!this.getWebsocket) return
+
       this.loading = true
 
       try {
-        const request = await fetch(`${this.getRestApi}/api/music/playlist`, {
-          cache: 'no-store',
-        })
+        const params = this.shouldSearch
+            ? { search: this.searchQuery.trim() }
+            : {}
 
-        const response = await request.json()
-        this.files = response?.data?.files ?? []
+        const response = await this.requestMusicWebsocket('music_playlist', params)
+        this.files = response?.files ?? response?.data?.files ?? []
       } finally {
         this.loading = false
       }
     },
 
-    async toggleSongRequest() {
-      await fetch(`${this.getRestApi}/api/music/songrequest/toggle`, {
-        method: 'POST',
+    requestMusicWebsocket(method: string, params: Record<string, any> = {}, timeout = 10_000): Promise<any> {
+      return new Promise((resolve, reject) => {
+        eventBus.$emit('websocket:request', {
+          method,
+          params,
+          timeout,
+          resolve,
+          reject,
+        })
       })
+    },
+
+    sendMusicWebsocket(method: string, params: Record<string, any> = {}) {
+      eventBus.$emit('websocket:send', {
+        method,
+        params,
+      })
+    },
+
+    async toggleSongRequest() {
+      await this.requestMusicWebsocket('music_songrequest_toggle')
+
+      if (!this.songRequestEnabled) {
+        await this.fetchFiles()
+      }
     },
 
     async deleteVisibleItem(item: any) {
@@ -134,26 +274,14 @@ export default {
     },
 
     async deleteFile(filename: string) {
-      await fetch(`${this.getRestApi}/api/music/playlist/delete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ filename }),
-      })
-
+      await this.requestMusicWebsocket('music_delete', { filename })
       await this.fetchFiles()
     },
 
     async deleteSongRequest(item: any) {
-      const filename = this.getFilename(item)
-
-      await fetch(`${this.getRestApi}/api/music/delete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ filename }),
+      await this.requestMusicWebsocket('music_delete', {
+        filename: this.getFilename(item),
+        path: this.getItemPath(item),
       })
     },
 
@@ -188,6 +316,15 @@ export default {
 </script>
 
 <style scoped>
+.music-playlist-actions {
+  min-width: 0;
+}
+
+.music-playlist-search {
+  width: min(36vw, 360px);
+  min-width: 180px;
+}
+
 .current-song {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 8px;

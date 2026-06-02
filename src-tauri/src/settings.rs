@@ -8,7 +8,7 @@ pub struct StreambotSettings {
 
 fn settings_path() -> Result<PathBuf, String> {
     let home = env::var("HOME").map_err(|_| "HOME not found".to_string())?;
-    Ok(PathBuf::from(home).join("streambot-settings.json"))
+    Ok(PathBuf::from(home).join(".config/streambot/streambot-settings.json"))
 }
 
 fn system_language() -> String {
@@ -31,6 +31,11 @@ fn system_language() -> String {
 
 fn write_settings_file(settings: &StreambotSettings) -> Result<(), String> {
     let path = settings_path()?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())
 }

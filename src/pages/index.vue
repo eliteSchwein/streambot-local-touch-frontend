@@ -8,7 +8,7 @@
   >
     <div class="dashboard-layout mx-2">
       <div class="dashboard-layout__left">
-        <giveaway class="mt-3" />
+        <giveaway class="mt-2" />
 
         <template v-if="getAlerts.length === 0">
           <v-alert
@@ -46,7 +46,7 @@
       </div>
 
       <div class="dashboard-layout__right">
-        <MusicControls class="mt-3" />
+        <MusicControls class="mt-2" />
       </div>
     </div>
   </v-card>

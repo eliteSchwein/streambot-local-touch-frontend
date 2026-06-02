@@ -73,7 +73,8 @@
     "song_requests": "Songanfragen",
     "music_playlist": "Musik-Wiedergabeliste",
     "no_song_requests": "Keine Songanfragen gefunden.",
-    "no_music": "Keine Musik gefunden."
+    "no_music": "Keine Musik gefunden.",
+    "search": "Suche Lied"
   },
   "recovery": {
     "warning": "Es gibt keine Sicherheitsabfrage vor dem Ausführen dieser Aktionen. Nutze sie nur, wenn du dir ABSOLUT sicher bist, was du tust.",

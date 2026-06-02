@@ -26,12 +26,22 @@
       </div>
 
       <div class="music-control-buttons">
+        <v-btn
+            icon="mdi-shuffle-variant"
+            :color="isShuffleEnabled ? 'primary' : undefined"
+            @click="callMusicApi('shuffle')"
+        />
         <v-btn icon="mdi-skip-previous" @click="callMusicApi('back')" />
         <v-btn
             :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"
             @click="callMusicApi(isPlaying ? 'pause' : 'play')"
         />
         <v-btn icon="mdi-skip-next" @click="callMusicApi('next')" />
+        <v-btn
+            icon="mdi-repeat"
+            :color="isLoopEnabled ? 'primary' : undefined"
+            @click="callMusicApi('loop')"
+        />
       </div>
 
       <v-progress-linear
@@ -56,10 +66,11 @@
 <script lang="ts">
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
+import eventBus from '@/eventBus'
 
 export default {
   computed: {
-    ...mapState(useAppStore, ['getMusicData', 'getRestApi']),
+    ...mapState(useAppStore, ['getMusicData', 'getWebsocket']),
 
     music(): any {
       return this.getMusicData ?? {}
@@ -68,12 +79,35 @@ export default {
     isPlaying(): boolean {
       return this.music.status === 'playing'
     },
+
+    isShuffleEnabled(): boolean {
+      return this.music.shuffle === true
+    },
+
+    isLoopEnabled(): boolean {
+      return this.music.loop === true || this.music.loop_file === true
+    },
   },
 
   methods: {
     async callMusicApi(action: string) {
-      await fetch(`${this.getRestApi}/api/music/${action}`, {
-        cache: 'no-store',
+      if (!this.getWebsocket) return
+      await this.requestMusicWebsocket(this.getMusicWebsocketMethod(action))
+    },
+
+    getMusicWebsocketMethod(action: string): string {
+      return `music_${String(action ?? '').replace(/-/g, '_')}`
+    },
+
+    requestMusicWebsocket(method: string, params: Record<string, any> = {}, timeout = 10_000): Promise<any> {
+      return new Promise((resolve, reject) => {
+        eventBus.$emit('websocket:request', {
+          method,
+          params,
+          timeout,
+          resolve,
+          reject,
+        })
       })
     },
 
@@ -86,9 +120,7 @@ export default {
     },
 
     async toggleSongRequest() {
-      await fetch(`${this.getRestApi}/api/music/songrequest/toggle`, {
-        method: 'POST',
-      })
+      await this.requestMusicWebsocket('music_songrequest_toggle')
     },
   },
 }

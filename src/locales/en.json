@@ -73,7 +73,8 @@
     "song_requests": "Song Requests",
     "music_playlist": "Music Playlist",
     "no_song_requests": "No song requests found.",
-    "no_music": "No music found."
+    "no_music": "No music found.",
+    "search": "Search Song"
   },
   "recovery": {
     "warning": "There is no confirmation prompt before triggering these actions. Only use them if you are ABSOLUTELY sure what you are doing.",

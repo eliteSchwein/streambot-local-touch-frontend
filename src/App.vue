@@ -31,6 +31,25 @@ eventBus.$on('websocket:send', (data: any) => {
   websocket?.send(data.method, data.params)
 })
 
+eventBus.$on('websocket:request', async (data: any) => {
+  if (!websocket || typeof (websocket as any).request !== 'function') {
+    data?.reject?.(new Error('websocket request bridge is not ready'))
+    return
+  }
+
+  try {
+    const result = await (websocket as any).request(
+        data.method,
+        data.params ?? {},
+        data.timeout ?? 10_000,
+    )
+
+    data?.resolve?.(result)
+  } catch (error) {
+    data?.reject?.(error)
+  }
+})
+
 async function fetchStatus() {
   let status = {
     bootup_stage: "Unknown",
