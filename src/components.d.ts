@@ -14,14 +14,13 @@ declare module 'vue' {
     ActiveAlert: typeof import('./components/ActiveAlert.vue')['default']
     AutoMacro: typeof import('./components/AutoMacro.vue')['default']
     ChannelPoint: typeof import('./components/ChannelPoint.vue')['default']
+    ConnectionStatusCard: typeof import('./components/cards/ConnectionStatusCard.vue')['default']
     Giveaway: typeof import('./components/Giveaway.vue')['default']
     Header: typeof import('./components/Header.vue')['default']
-    KeyboardOverlay: typeof import('./components/overlays/KeyboardOverlay.vue')['default']
     LanguageSettingsCard: typeof import('./components/cards/LanguageSettingsCard.vue')['default']
     Macro: typeof import('./components/Macro.vue')['default']
     MusicControls: typeof import('./components/MusicControls.vue')['default']
     Navigation: typeof import('./components/Navigation.vue')['default']
-    ObsAudio: typeof import('./components/obs/ObsAudio.vue')['default']
     PowerDialog: typeof import('./components/dialogs/PowerDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
@@ -30,6 +29,5 @@ declare module 'vue' {
     WifiNetworkDialog: typeof import('./components/dialogs/WifiNetworkDialog.vue')['default']
     WifiSettingsCard: typeof import('./components/cards/WifiSettingsCard.vue')['default']
     WiredSettingsCard: typeof import('./components/cards/WiredSettingsCard.vue')['default']
-    YoloboxAudio: typeof import('./components/yolobox/YoloboxAudio.vue')['default']
   }
 }

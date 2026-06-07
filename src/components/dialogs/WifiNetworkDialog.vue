@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import KeyboardOverlay from '../overlays/KeyboardOverlay.vue'
 
 type WifiNetwork = {
   ssid: string
@@ -36,15 +35,6 @@ const dialogOpen = computed({
 
 const isSecured = computed(() => Boolean(props.hidden || props.network?.secured))
 const isSavedNetwork = computed(() => Boolean(props.network?.saved && !props.hidden))
-const canEditSsid = computed(() => Boolean(props.hidden))
-
-const keyboardVisible = computed(() => activeField.value !== null)
-
-const keyboardTitle = computed(() => {
-  if (activeField.value === 'ssid') return t('network.wifi.ssid')
-  if (activeField.value === 'password') return t('network.wifi.password')
-  return ''
-})
 
 const submitLabel = computed(() => {
   if (isSavedNetwork.value && !localPassword.value.trim()) {
@@ -52,21 +42,6 @@ const submitLabel = computed(() => {
   }
 
   return t('network.connect')
-})
-
-const keyboardModel = computed({
-  get: () => {
-    if (activeField.value === 'ssid') return localSsid.value
-    if (activeField.value === 'password') return localPassword.value
-    return ''
-  },
-  set: (value: string) => {
-    if (activeField.value === 'ssid') {
-      localSsid.value = value
-    } else if (activeField.value === 'password') {
-      localPassword.value = value
-    }
-  },
 })
 
 watch(
@@ -84,30 +59,6 @@ watch(
 
 function closeDialog() {
   dialogOpen.value = false
-  activeField.value = null
-}
-
-function openSsidKeyboard() {
-  if (!canEditSsid.value) return
-  activeField.value = 'ssid'
-}
-
-function openPasswordKeyboard() {
-  if (!isSecured.value) return
-  activeField.value = 'password'
-}
-
-function handleKeyboardEnter() {
-  if (activeField.value === 'ssid' && isSecured.value) {
-    activeField.value = 'password'
-    return
-  }
-
-  activeField.value = null
-  submit()
-}
-
-function closeKeyboard() {
   activeField.value = null
 }
 
@@ -141,10 +92,6 @@ function submit() {
               variant="outlined"
               density="comfortable"
               :readonly="true"
-              @click="openSsidKeyboard"
-              @click:control="openSsidKeyboard"
-              @focus="openSsidKeyboard"
-              @pointerdown.prevent="openSsidKeyboard"
           />
 
           <v-text-field
@@ -158,10 +105,6 @@ function submit() {
               :append-inner-icon="revealPassword ? 'mdi-eye-off' : 'mdi-eye'"
               :hint="isSavedNetwork ? t('network.wifi.empty_saved') : undefined"
               :persistent-hint="isSavedNetwork"
-              @click="openPasswordKeyboard"
-              @click:control="openPasswordKeyboard"
-              @focus="openPasswordKeyboard"
-              @pointerdown.prevent="openPasswordKeyboard"
               @click:append-inner.stop="revealPassword = !revealPassword"
           />
         </div>
@@ -184,15 +127,6 @@ function submit() {
       </v-card-actions>
     </v-card>
   </v-dialog>
-
-  <KeyboardOverlay
-      v-model="keyboardModel"
-      :visible="keyboardVisible"
-      :title="keyboardTitle"
-      layout="default"
-      @enter="handleKeyboardEnter"
-      @close="closeKeyboard"
-  />
 </template>
 
 <style scoped>

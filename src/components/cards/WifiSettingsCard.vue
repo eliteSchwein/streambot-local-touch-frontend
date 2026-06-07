@@ -3,7 +3,6 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
 import WifiNetworkDialog from '../dialogs/WifiNetworkDialog.vue'
-import KeyboardOverlay from '../overlays/KeyboardOverlay.vue'
 
 const props = defineProps<{
   panelOpen: boolean
@@ -32,7 +31,6 @@ const actionBusy = ref(false)
 const actionKey = ref<string | null>(null)
 const error = ref<string | null>(null)
 const availableFilter = ref('')
-const filterKeyboardVisible = ref(false)
 
 const wifi = ref<WifiSettingsState>({
   enabled: false,
@@ -69,22 +67,6 @@ const filteredScannedNetworks = computed(() => {
 })
 
 const availableListScrollable = computed(() => filteredScannedNetworks.value.length > 5)
-
-const filterKeyboardTitle = computed(() => t('network.wifi.filter_ssid'))
-
-
-function openFilterKeyboard() {
-  if (!wifi.value.enabled) return
-  filterKeyboardVisible.value = true
-}
-
-function closeFilterKeyboard() {
-  filterKeyboardVisible.value = false
-}
-
-function submitFilterKeyboard() {
-  filterKeyboardVisible.value = false
-}
 
 function sortNetworks(items: WifiNetwork[]) {
   return [...items].sort((a, b) => {
@@ -232,7 +214,6 @@ async function toggleWifiEnabled(value: boolean | null) {
     } else {
       wifi.value.scannedNetworks = []
       availableFilter.value = ''
-      closeFilterKeyboard()
     }
   } catch (err) {
     wifi.value.enabled = previous
@@ -336,10 +317,6 @@ watch(
           void refreshAvailableNetworks(true)
         }
       }
-
-      if (!isOpen) {
-        closeFilterKeyboard()
-      }
     },
 )
 
@@ -426,11 +403,6 @@ onMounted(() => {
                   readonly
                   prepend-inner-icon="mdi-magnify"
                   :label="t('network.wifi.filter_ssid')"
-                  @click="openFilterKeyboard"
-                  @click:control="openFilterKeyboard"
-                  @click:prepend-inner="openFilterKeyboard"
-                  @focus="openFilterKeyboard"
-                  @pointerdown.prevent="openFilterKeyboard"
               />
             </v-col>
           </v-row>
@@ -616,15 +588,6 @@ onMounted(() => {
       :network="selectedNetwork"
       :hidden="hiddenMode"
       @submit="submitDialog"
-  />
-
-  <KeyboardOverlay
-      v-model="availableFilter"
-      :visible="filterKeyboardVisible"
-      :title="filterKeyboardTitle"
-      layout="default"
-      @enter="submitFilterKeyboard"
-      @close="closeFilterKeyboard"
   />
 </template>
 

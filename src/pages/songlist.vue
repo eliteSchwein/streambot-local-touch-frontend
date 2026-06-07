@@ -16,12 +16,6 @@
             clearable
             hide-details
             readonly
-            @click="openSearchKeyboard"
-            @click:control="openSearchKeyboard"
-            @click:prepend-inner="openSearchKeyboard"
-            @click:clear="clearSearch"
-            @focus="openSearchKeyboard"
-            @pointerdown.prevent="openSearchKeyboard"
         />
 
         <v-switch
@@ -74,34 +68,20 @@
       </v-list>
     </v-card-text>
   </v-card>
-
-  <KeyboardOverlay
-      v-model="searchQuery"
-      :visible="searchKeyboardVisible"
-      :title="searchKeyboardTitle"
-      layout="default"
-      @enter="submitSearchKeyboard"
-      @close="closeSearchKeyboard"
-  />
 </template>
 
 <script lang="ts">
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import eventBus from '@/eventBus'
-import KeyboardOverlay from '@/components/overlays/KeyboardOverlay.vue'
 
 export default {
-  components: {
-    KeyboardOverlay,
-  },
 
   data() {
     return {
       files: [] as any[],
       loading: false,
       searchQuery: '',
-      searchKeyboardVisible: false,
       searchDebounce: null as ReturnType<typeof setTimeout> | null,
     }
   },
@@ -127,10 +107,6 @@ export default {
 
     shouldSearch(): boolean {
       return this.normalizedSearchQuery.length >= 2
-    },
-
-    searchKeyboardTitle(): string {
-      return this.$t('music_playlist.search') as string
     },
 
     filteredSongRequestItems(): any[] {
@@ -188,23 +164,6 @@ export default {
       if (!this.songRequestEnabled) {
         await this.fetchFiles()
       }
-    },
-
-    openSearchKeyboard() {
-      this.searchKeyboardVisible = true
-    },
-
-    closeSearchKeyboard() {
-      this.searchKeyboardVisible = false
-    },
-
-    submitSearchKeyboard() {
-      this.searchKeyboardVisible = false
-    },
-
-    clearSearch() {
-      this.searchQuery = ''
-      this.queueSearchRefresh(0)
     },
 
     queueSearchRefresh(delay = 250) {

@@ -85,7 +85,14 @@
     "bot_reload": "BOT RELOAD",
     "compress_assets": "COMPRESS ASSETS",
     "run_speedtest": "Run Speedtest",
-    "speedtest": "Speedtest"
+    "speedtest": "Speedtest",
+    "tools": "Tools",
+    "connections": {
+      "title": "Connections",
+      "not_connected": "Not connected",
+      "connected": "Connected",
+      "auth": "Auth"
+    }
   },
   "audio": {
     "bot_audio_mixer": "Bot Audio Mixer",
@@ -93,7 +100,9 @@
     "obs_audio_mixer": "OBS Audio Mixer",
     "volume": "Volume",
     "delay": "Delay",
-    "balance": "Balance"
+    "balance": "Balance",
+    "name": "Name",
+    "outputs": "Outputs"
   },
   "power": {
     "shutdown_question": "Shut down system?",

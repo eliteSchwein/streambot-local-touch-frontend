@@ -1,57 +1,47 @@
 <template>
-  <v-expansion-panels class="speedtest-card" variant="accordion">
-    <v-expansion-panel>
-      <v-expansion-panel-title>
-        {{ $t('recovery.speedtest') }}
-      </v-expansion-panel-title>
+  <div class="speedtest-card__content">
+    <div class="speedtest-card__grid">
+      <div class="speedtest-card__metric">
+        <div class="speedtest-card__label">Ping</div>
+        <div class="speedtest-card__value">{{ pingText }}</div>
+      </div>
 
-      <v-expansion-panel-text>
-        <div class="speedtest-card__content">
-          <div class="speedtest-card__grid">
-            <div class="speedtest-card__metric">
-              <div class="speedtest-card__label">Ping</div>
-              <div class="speedtest-card__value">{{ pingText }}</div>
-            </div>
+      <div class="speedtest-card__metric">
+        <div class="speedtest-card__label">Download</div>
+        <div class="speedtest-card__value">{{ downloadText }}</div>
+      </div>
 
-            <div class="speedtest-card__metric">
-              <div class="speedtest-card__label">Download</div>
-              <div class="speedtest-card__value">{{ downloadText }}</div>
-            </div>
+      <div class="speedtest-card__metric">
+        <div class="speedtest-card__label">Upload</div>
+        <div class="speedtest-card__value">{{ uploadText }}</div>
+      </div>
+    </div>
 
-            <div class="speedtest-card__metric">
-              <div class="speedtest-card__label">Upload</div>
-              <div class="speedtest-card__value">{{ uploadText }}</div>
-            </div>
-          </div>
+    <v-progress-linear
+        v-if="running"
+        indeterminate
+        class="speedtest-card__progress"
+    />
 
-          <v-progress-linear
-              v-if="running"
-              indeterminate
-              class="speedtest-card__progress"
-          />
+    <v-alert
+        v-if="error"
+        type="error"
+        density="compact"
+        class="speedtest-card__error"
+    >
+      {{ error }}
+    </v-alert>
 
-          <v-alert
-              v-if="error"
-              type="error"
-              density="compact"
-              class="speedtest-card__error"
-          >
-            {{ error }}
-          </v-alert>
-
-          <v-btn
-              block
-              color="primary"
-              :loading="running"
-              :disabled="running"
-              @click="runSpeedtest"
-          >
-            {{ $t('recovery.run_speedtest') }}
-          </v-btn>
-        </div>
-      </v-expansion-panel-text>
-    </v-expansion-panel>
-  </v-expansion-panels>
+    <v-btn
+        block
+        color="primary"
+        :loading="running"
+        :disabled="running"
+        @click="runSpeedtest"
+    >
+      {{ $t('recovery.run_speedtest') }}
+    </v-btn>
+  </div>
 </template>
 
 <script lang="ts">

@@ -52,9 +52,64 @@ type AudioDevice = {
   min_range: number
   steps_range: number
   current_volume: number
+  default_volume?: number
+  pipewire_sink?: boolean | string
+  sink_name?: string
+  linked_output?: string
+  actual_linked_output?: string
+  audio_output?: string
+  output?: string
+  linked_outputs?: string[]
+  actual_linked_outputs?: string[]
+  audio_outputs?: string[]
+  [key: string]: any
 }
 
 type AudioData = Record<string, AudioDevice>
+
+type AudioOutput = {
+  id?: string | number
+  index?: string | number
+  name?: string
+  node_name?: string
+  nodeName?: string
+  description?: string
+  display_name?: string
+  displayName?: string
+  volume?: number
+  muted?: boolean
+  is_default?: boolean
+  default?: boolean
+  isDefault?: boolean
+  active?: boolean
+  state?: string
+  linked_interfaces?: string[]
+  active_interfaces?: string[]
+  interfaces?: string[]
+  [key: string]: any
+}
+
+type AudioOutputs = Record<string, AudioOutput> | AudioOutput[] | {
+  outputs?: AudioOutput[]
+  sinks?: AudioOutput[]
+  data?: AudioOutput[]
+  [key: string]: any
+}
+
+type ConnectionItem = {
+  type: string
+  label?: string
+  connected?: boolean
+  authenticated?: boolean
+  available?: boolean
+  authAvailable?: boolean
+  status?: string
+  username?: string
+  displayName?: string
+  [key: string]: any
+}
+
+type ConnectionData = Record<string, ConnectionItem>
 
 export type Alert = {
   id: string
@@ -88,6 +143,7 @@ export const useAppStore = defineStore('app', {
     currentGame: {},
     channelPoints: [],
     audioData: {} as AudioData,
+    audioOutputs: {} as AudioOutputs,
     systemInfo: {
       components: {},
       config: {},
@@ -95,6 +151,16 @@ export const useAppStore = defineStore('app', {
     throttled: false,
     scene: {},
     connections: {},
+    connectionData: {
+      twitch: {
+        type: 'twitch',
+        label: 'Twitch',
+        connected: false,
+        authenticated: false,
+        available: true,
+        authAvailable: true,
+      },
+    } as ConnectionData,
     backendConfig: '',
     parsedBackendConfig: {},
     obsSceneData: [],
@@ -130,10 +196,25 @@ export const useAppStore = defineStore('app', {
     isShieldActive: (state) => state.shieldMode,
     getChannelPoints: (state) => state.channelPoints,
     getAudioData: (state) => state.audioData,
+    getAudioOutput: (state) => state.audioOutputs,
+    getAudioOutputs: (state) => state.audioOutputs,
     getSystemInfo: (state) => state.systemInfo,
     isThrottled: (state) => state.throttled,
     getScene: (state) => state.scene,
     getConnections: (state) => state.connections,
+    getConnectionData: (state) => state.connectionData,
+    getAvailableConnections: (state) => Object.values(state.connectionData),
+    getConnectionByType: (state) => {
+      return (type: string) => state.connectionData[String(type).toLowerCase()]
+    },
+    getConnectionAuthUrl: (state) => {
+      return (type: string, returnTo: string = window.location.href) => {
+        const encodedType = encodeURIComponent(String(type).toLowerCase())
+        const encodedReturnTo = encodeURIComponent(returnTo)
+
+        return `http://${location.hostname}:${state.config.webserverPort}/api/connection/auth?type=${encodedType}&returnTo=${encodedReturnTo}`
+      }
+    },
     getBackendConfig: (state) => state.backendConfig,
     getParsedBackendConfig: (state) => state.parsedBackendConfig,
     getObsSceneData: (state) => state.obsSceneData,
@@ -195,6 +276,14 @@ export const useAppStore = defineStore('app', {
       this.audioData = audioData
       this.$patch(state => state.audioData = audioData)
     },
+    setAudioOutput(audioOutputs: AudioOutputs) {
+      this.audioOutputs = audioOutputs
+      this.$patch(state => state.audioOutputs = audioOutputs)
+    },
+    setAudioOutputs(audioOutputs: AudioOutputs) {
+      this.audioOutputs = audioOutputs
+      this.$patch(state => state.audioOutputs = audioOutputs)
+    },
     setThrottled(throttled: boolean) {
       this.throttled = throttled
       this.$patch(state => state.throttled = throttled)
@@ -210,6 +299,96 @@ export const useAppStore = defineStore('app', {
     setConnections(connections: {}) {
       this.connections = connections
       this.$patch(state => state.connections = connections)
+    },
+    normalizeConnectionData(data: any): ConnectionData {
+      const source = data?.connections ?? data
+      const normalized: ConnectionData = {}
+
+      if (Array.isArray(source)) {
+        for (const item of source) {
+          const type = String(item?.type ?? '').toLowerCase()
+          if (!type) continue
+
+          normalized[type] = this.normalizeConnectionItem(type, item)
+        }
+
+        return normalized
+      }
+
+      if (source && typeof source === 'object') {
+        for (const [rawType, value] of Object.entries(source)) {
+          const type = String((value as any)?.type ?? rawType).toLowerCase()
+          if (!type) continue
+
+          normalized[type] = this.normalizeConnectionItem(type, value)
+        }
+      }
+
+      return normalized
+    },
+    normalizeConnectionItem(type: string, data: any): ConnectionItem {
+      const item = data && typeof data === 'object' ? data : {}
+      const authenticated = Boolean(item.authenticated ?? item.connected ?? false)
+      const connected = Boolean(item.connected ?? authenticated)
+
+      return {
+        ...item,
+        type,
+        label: item.label ?? this.formatConnectionLabel(type),
+        connected,
+        authenticated,
+        available: item.available ?? true,
+        authAvailable: item.authAvailable ?? true,
+      }
+    },
+    formatConnectionLabel(type: string): string {
+      if (!type) return 'Unknown'
+
+      return type.charAt(0).toUpperCase() + type.slice(1)
+    },
+    setConnectionData(data: any) {
+      const normalized = this.normalizeConnectionData(data)
+
+      this.connectionData = {
+        ...this.connectionData,
+        ...normalized,
+      }
+
+      this.$patch(state => state.connectionData = this.connectionData)
+    },
+    setConnection(type: string, data: any) {
+      const normalizedType = String(type).toLowerCase()
+      if (!normalizedType) return
+
+      this.connectionData[normalizedType] = this.normalizeConnectionItem(normalizedType, data)
+      this.$patch(state => state.connectionData = this.connectionData)
+    },
+    async fetchConnectionData(): Promise<ConnectionData> {
+      try {
+        const request = await fetch(`${this.getRestApi}/api/connection`, { cache: "no-store" })
+
+        if (!request.ok) {
+          console.warn(`connection data request failed: ${request.status}`)
+          return this.connectionData
+        }
+
+        const contentType = request.headers.get('content-type') ?? ''
+        const rawResponse = await request.text()
+
+        if (!contentType.includes('application/json')) {
+          console.warn('connection data request did not return JSON')
+          return this.connectionData
+        }
+
+        const response = JSON.parse(rawResponse)
+        const data = response?.data ?? response
+
+        this.setConnectionData(data)
+      } catch (error) {
+        console.warn(error)
+      }
+
+      return this.connectionData
     },
     setBackendConfig(config: string, parsedConfig: any) {
       this.backendConfig = config

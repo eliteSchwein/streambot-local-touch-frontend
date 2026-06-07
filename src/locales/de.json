@@ -85,7 +85,14 @@
     "bot_reload": "BOT NEU LADEN",
     "compress_assets": "ASSETS KOMPRESSIEREN",
     "run_speedtest": "Internettest starten",
-    "speedtest": "Internettest"
+    "speedtest": "Internettest",
+    "tools": "Werkzeuge",
+    "connections": {
+      "title": "Verbindungen",
+      "not_connected": "Nicht verbunden",
+      "connected": "Verbunden",
+      "auth": "Verbinden"
+    }
   },
   "audio": {
     "bot_audio_mixer": "Bot-Audio-Mixer",
@@ -93,7 +100,9 @@
     "obs_audio_mixer": "OBS-Audio-Mixer",
     "volume": "Lautstärke",
     "delay": "Verzögerung",
-    "balance": "Balance"
+    "balance": "Balance",
+    "name": "Name",
+    "outputs": "Ausgänge"
   },
   "power": {
     "shutdown_question": "System herunterfahren?",

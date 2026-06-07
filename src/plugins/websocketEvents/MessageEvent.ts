@@ -22,6 +22,9 @@ import NotifyObsAudioUpdateMessage from '@/plugins/websocketEvents/websocketMess
 import NotifyAssetsUpdateMessage from '@/plugins/websocketEvents/websocketMessage/NotifyAssetsUpdateMessage.ts'
 import NotifyDisconnectMessage from '@/plugins/websocketEvents/websocketMessage/NotifyDisconnectMessage.ts'
 import NotifyMusicUpdateMessage from '@/plugins/websocketEvents/websocketMessage/NotifyMusicUpdateMessage.ts'
+import NotifyConnectionUpdateMessage from "@/plugins/websocketEvents/websocketMessage/NotifyConnectionUpdateMessage.ts";
+import NotifyAudioOutputUpdateMessage
+  from "@/plugins/websocketEvents/websocketMessage/NotifyAudioOutputUpdateMessage.ts";
 
 type JsonRpcMessage = {
   method?: string
@@ -66,5 +69,7 @@ export default class MessageEvent extends BaseEvent {
     await new NotifyObsAudioUpdateMessage(this.webSocketClient).handleMessage(data)
     await new NotifyAssetsUpdateMessage(this.webSocketClient).handleMessage(data)
     await new NotifyMusicUpdateMessage(this.webSocketClient).handleMessage(data)
+    await new NotifyConnectionUpdateMessage(this.webSocketClient).handleMessage(data)
+    await new NotifyAudioOutputUpdateMessage(this.webSocketClient).handleMessage(data)
   }
 }
