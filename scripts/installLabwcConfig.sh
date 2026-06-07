@@ -7,6 +7,7 @@ red=$(echo -en "\e[91m")
 default=$(echo -en "\e[39m")
 
 MCCONFIGFILE="/home/$(whoami)/streambot-touch.cfg"
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 status_msg(){ echo; echo -e "${yellow}###### $1${default}"; }
 ok_msg(){ echo -e "${green}>>>>>> $1${default}"; }
@@ -89,191 +90,49 @@ EOF_SCRIPT
 
 chmod +x "$HOME/.local/bin/streambot-touch-squeekboard"
 
-# Custom wide US International layout. This is the default globe picker entry.
-cat > "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" <<'EOF_LAYOUT_US'
----
-outlines:
-  default: { width: 44, height: 46 }
-  small: { width: 36, height: 46 }
-  wide: { width: 72, height: 46 }
-  space: { width: 220, height: 46 }
-  action: { width: 64, height: 46 }
+# Install keyboard layouts from ./keyboard_layouts instead of embedding them
+# in this installer. This keeps the script flexible: add/edit YAML files there
+# and re-run the installer.
+LAYOUT_SOURCE_DIR="$SCRIPTPATH/keyboard_layouts"
+LAYOUT_TARGET_DIR="$HOME/.local/share/squeekboard/keyboards"
 
-views:
-  base:
-    - "q w e r t y u i o p"
-    - "a s d f g h j k l"
-    - "shift z x c v b n m backspace"
-    - "symbols comma space period enter"
-  shift:
-    - "Q W E R T Y U I O P"
-    - "A S D F G H J K L"
-    - "shift Z X C V B N M backspace"
-    - "symbols comma space period enter"
-  symbols:
-    - "1 2 3 4 5 6 7 8 9 0"
-    - "exclam at hash dollar percent caret amp asterisk parenleft parenright"
-    - "minus underscore plus equal slash backslash colon semicolon quote doublequote"
-    - "base comma space period enter"
+if [[ ! -d "$LAYOUT_SOURCE_DIR" ]]; then
+  warn_msg "Missing keyboard layout folder: $LAYOUT_SOURCE_DIR"
+  warn_msg "Create it next to this script and put your *.yaml layouts in there."
+  exit 1
+fi
 
-buttons:
-  shift:
-    action: locking
-    keysym: Shift_L
-    outline: action
-  symbols:
-    action: set_view
-    view: symbols
-    label: "123#!"
-    outline: action
-  base:
-    action: set_view
-    view: base
-    label: "ABC"
-    outline: action
-  backspace:
-    keysym: BackSpace
-    label: "⌫"
-    outline: action
-  enter:
-    keysym: Return
-    label: "Enter"
-    outline: action
-  space:
-    keysym: space
-    label: "Space"
-    outline: space
-  comma:
-    text: ","
-    label: ","
-    outline: small
-  period:
-    text: "."
-    label: "."
-    outline: small
-  exclam: { text: "!", label: "!" }
-  at: { text: "@", label: "@" }
-  hash: { text: "#", label: "#" }
-  dollar: { text: "$", label: "$" }
-  percent: { text: "%", label: "%" }
-  caret: { text: "^", label: "^" }
-  amp: { text: "&", label: "&" }
-  asterisk: { text: "*", label: "*" }
-  parenleft: { text: "(", label: "(" }
-  parenright: { text: ")", label: ")" }
-  minus: { text: "-", label: "-" }
-  underscore: { text: "_", label: "_" }
-  plus: { text: "+", label: "+" }
-  equal: { text: "=", label: "=" }
-  slash: { text: "/", label: "/" }
-  backslash: { text: "\\", label: "\\" }
-  colon: { text: ":", label: ":" }
-  semicolon: { text: ";", label: ";" }
-  quote: { text: "'", label: "'" }
-  doublequote: { text: '"', label: '"' }
-EOF_LAYOUT_US
+if ! find "$LAYOUT_SOURCE_DIR" -maxdepth 1 -type f -name '*.yaml' | grep -q .; then
+  warn_msg "No *.yaml keyboard layouts found in: $LAYOUT_SOURCE_DIR"
+  exit 1
+fi
 
-# Custom wide German QWERTZ layout. This is the second globe picker entry.
-cat > "$HOME/.local/share/squeekboard/keyboards/de.yaml" <<'EOF_LAYOUT_DE'
----
-outlines:
-  default: { width: 44, height: 46 }
-  small: { width: 36, height: 46 }
-  wide: { width: 72, height: 46 }
-  space: { width: 220, height: 46 }
-  action: { width: 64, height: 46 }
+status_msg "Installing squeekboard keyboard layouts from $LAYOUT_SOURCE_DIR"
+mkdir -p "$LAYOUT_TARGET_DIR"
+find "$LAYOUT_TARGET_DIR" -maxdepth 1 -type f -name '*.yaml' -delete
+cp "$LAYOUT_SOURCE_DIR"/*.yaml "$LAYOUT_TARGET_DIR"/
 
-views:
-  base:
-    - "q w e r t z u i o p udiaeresis"
-    - "a s d f g h j k l odiaeresis adiaeresis"
-    - "shift y x c v b n m ssharp backspace"
-    - "symbols comma space period enter"
-  shift:
-    - "Q W E R T Z U I O P Udiaeresis"
-    - "A S D F G H J K L Odiaeresis Adiaeresis"
-    - "shift Y X C V B N M question backspace"
-    - "symbols comma space period enter"
-  symbols:
-    - "1 2 3 4 5 6 7 8 9 0"
-    - "exclam doublequote section dollar percent amp slash parenleft parenright equal"
-    - "at hash plus minus underscore colon semicolon question backslash pipe"
-    - "base comma space period enter"
+# Required picker layouts. Keep US International as default and German as option.
+if [[ ! -f "$LAYOUT_TARGET_DIR/us+intl.yaml" ]]; then
+  warn_msg "Missing required layout: keyboard_layouts/us+intl.yaml"
+  exit 1
+fi
 
-buttons:
-  shift:
-    action: locking
-    keysym: Shift_L
-    outline: action
-  symbols:
-    action: set_view
-    view: symbols
-    label: "123#!"
-    outline: action
-  base:
-    action: set_view
-    view: base
-    label: "ABC"
-    outline: action
-  backspace:
-    keysym: BackSpace
-    label: "⌫"
-    outline: action
-  enter:
-    keysym: Return
-    label: "Enter"
-    outline: action
-  space:
-    keysym: space
-    label: "Space"
-    outline: space
-  comma:
-    text: ","
-    label: ","
-    outline: small
-  period:
-    text: "."
-    label: "."
-    outline: small
-  udiaeresis: { text: "ü", label: "ü" }
-  odiaeresis: { text: "ö", label: "ö" }
-  adiaeresis: { text: "ä", label: "ä" }
-  Udiaeresis: { text: "Ü", label: "Ü" }
-  Odiaeresis: { text: "Ö", label: "Ö" }
-  Adiaeresis: { text: "Ä", label: "Ä" }
-  ssharp: { text: "ß", label: "ß" }
-  exclam: { text: "!", label: "!" }
-  at: { text: "@", label: "@" }
-  hash: { text: "#", label: "#" }
-  section: { text: "§", label: "§" }
-  dollar: { text: "$", label: "$" }
-  percent: { text: "%", label: "%" }
-  amp: { text: "&", label: "&" }
-  slash: { text: "/", label: "/" }
-  parenleft: { text: "(", label: "(" }
-  parenright: { text: ")", label: ")" }
-  minus: { text: "-", label: "-" }
-  underscore: { text: "_", label: "_" }
-  plus: { text: "+", label: "+" }
-  equal: { text: "=", label: "=" }
-  backslash: { text: "\\", label: "\\" }
-  pipe: { text: "|", label: "|" }
-  colon: { text: ":", label: ":" }
-  semicolon: { text: ";", label: ";" }
-  question: { text: "?", label: "?" }
-  doublequote: { text: '"', label: '"' }
-EOF_LAYOUT_DE
+if [[ ! -f "$LAYOUT_TARGET_DIR/de.yaml" ]]; then
+  warn_msg "Missing required layout: keyboard_layouts/de.yaml"
+  exit 1
+fi
 
 # Compatibility aliases for how squeekboard may resolve XKB names / old config.
-cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/squeekboard/keyboards/us.yaml"
-cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/squeekboard/keyboards/streambot.yaml"
-cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/squeekboard/keyboards/streambot-us.yaml"
-cp "$HOME/.local/share/squeekboard/keyboards/de.yaml" "$HOME/.local/share/squeekboard/keyboards/streambot-de.yaml"
+cp "$LAYOUT_TARGET_DIR/us+intl.yaml" "$LAYOUT_TARGET_DIR/us.yaml"
+cp "$LAYOUT_TARGET_DIR/us+intl.yaml" "$LAYOUT_TARGET_DIR/streambot.yaml"
+cp "$LAYOUT_TARGET_DIR/us+intl.yaml" "$LAYOUT_TARGET_DIR/streambot-us.yaml"
+cp "$LAYOUT_TARGET_DIR/de.yaml" "$LAYOUT_TARGET_DIR/streambot-de.yaml"
 
 # Blacklist / shadow broken special keyboards. Some squeekboard versions still
 # expose these through the globe picker or internal layout switching. By placing
-# sane local files with the same names, selecting one falls back to the normal
-# US International keyboard instead of the broken emoji/emote/terminal boards.
+# sane local files with the same names, selecting one falls back to US International
+# instead of the broken emoji/emote/terminal boards.
 for blocked_layout in \
   emoji \
   emojis \
@@ -284,8 +143,7 @@ for blocked_layout in \
   us+terminal \
   us-terminal
 do
-  cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" \
-    "$HOME/.local/share/squeekboard/keyboards/${blocked_layout}.yaml"
+  cp "$LAYOUT_TARGET_DIR/us+intl.yaml" "$LAYOUT_TARGET_DIR/${blocked_layout}.yaml"
 done
 
 cat > "$HOME/.config/labwc/autostart" <<EOF_AUTOSTART
@@ -320,4 +178,4 @@ cat > "$HOME/.config/labwc/rc.xml" <<'EOF_RC'
 </openbox_config>
 EOF_RC
 
-ok_msg "labwc + squeekboard config repaired"
+ok_msg "labwc + squeekboard config installed"

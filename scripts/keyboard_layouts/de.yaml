@@ -1,0 +1,87 @@
+---
+outlines:
+  default: { width: 44, height: 46 }
+  small: { width: 36, height: 46 }
+  wide: { width: 72, height: 46 }
+  space: { width: 220, height: 46 }
+  action: { width: 64, height: 46 }
+
+views:
+  base:
+    - "q w e r t z u i o p udiaeresis"
+    - "a s d f g h j k l odiaeresis adiaeresis"
+    - "shift y x c v b n m ssharp backspace"
+    - "symbols comma space period enter"
+  shift:
+    - "Q W E R T Z U I O P Udiaeresis"
+    - "A S D F G H J K L Odiaeresis Adiaeresis"
+    - "shift Y X C V B N M question backspace"
+    - "symbols comma space period enter"
+  symbols:
+    - "1 2 3 4 5 6 7 8 9 0"
+    - "exclam doublequote section dollar percent amp slash parenleft parenright equal"
+    - "at hash plus minus underscore colon semicolon question backslash pipe"
+    - "base comma space period enter"
+
+buttons:
+  shift:
+    action: locking
+    keysym: Shift_L
+    outline: action
+  symbols:
+    action: set_view
+    view: symbols
+    label: "123#!"
+    outline: action
+  base:
+    action: set_view
+    view: base
+    label: "ABC"
+    outline: action
+  backspace:
+    keysym: BackSpace
+    label: "⌫"
+    outline: action
+  enter:
+    keysym: Return
+    label: "Enter"
+    outline: action
+  space:
+    keysym: space
+    label: "Space"
+    outline: space
+  comma:
+    text: ","
+    label: ","
+    outline: small
+  period:
+    text: "."
+    label: "."
+    outline: small
+  udiaeresis: { text: "ü", label: "ü" }
+  odiaeresis: { text: "ö", label: "ö" }
+  adiaeresis: { text: "ä", label: "ä" }
+  Udiaeresis: { text: "Ü", label: "Ü" }
+  Odiaeresis: { text: "Ö", label: "Ö" }
+  Adiaeresis: { text: "Ä", label: "Ä" }
+  ssharp: { text: "ß", label: "ß" }
+  exclam: { text: "!", label: "!" }
+  at: { text: "@", label: "@" }
+  hash: { text: "#", label: "#" }
+  section: { text: "§", label: "§" }
+  dollar: { text: "$", label: "$" }
+  percent: { text: "%", label: "%" }
+  amp: { text: "&", label: "&" }
+  slash: { text: "/", label: "/" }
+  parenleft: { text: "(", label: "(" }
+  parenright: { text: ")", label: ")" }
+  minus: { text: "-", label: "-" }
+  underscore: { text: "_", label: "_" }
+  plus: { text: "+", label: "+" }
+  equal: { text: "=", label: "=" }
+  backslash: { text: "\\", label: "\\" }
+  pipe: { text: "|", label: "|" }
+  colon: { text: ":", label: ":" }
+  semicolon: { text: ";", label: ";" }
+  question: { text: "?", label: "?" }
+  doublequote: { text: '"', label: '"' }
