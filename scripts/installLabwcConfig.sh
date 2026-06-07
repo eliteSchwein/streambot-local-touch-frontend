@@ -39,7 +39,7 @@ cat > "$HOME/.local/bin/streambot-touch-squeekboard" <<'EOF_SCRIPT'
 set -eu
 
 export GDK_BACKEND="${GDK_BACKEND:-wayland}"
-export SQUEEKBOARD_LAYOUT="${SQUEEKBOARD_LAYOUT:-streambot}"
+export SQUEEKBOARD_LAYOUT="${SQUEEKBOARD_LAYOUT:-streambot-de}"
 
 # Enable GNOME/GTK a11y OSK integration when gsettings is available.
 if command -v gsettings >/dev/null 2>&1; then
@@ -47,7 +47,7 @@ if command -v gsettings >/dev/null 2>&1; then
 
   # Keep the input source list minimal. This avoids extra/broken choices in
   # squeekboard's globe/layout selector on kiosk installs.
-  gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us')]" 2>/dev/null || true
+  gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'de')]" 2>/dev/null || true
   gsettings set org.gnome.desktop.input-sources current 0 2>/dev/null || true
 fi
 
@@ -78,9 +78,9 @@ EOF_SCRIPT
 
 chmod +x "$HOME/.local/bin/streambot-touch-squeekboard"
 
-# Custom wide layout for Streambot Touch. It exposes letters, numbers and common
-# symbols without relying on a phone-only layout.
-cat > "$HOME/.local/share/squeekboard/keyboards/streambot.yaml" <<'EOF_LAYOUT'
+# Custom wide German layout for Streambot Touch. It exposes QWERTZ, umlauts,
+# numbers and common symbols without relying on a phone-only layout.
+cat > "$HOME/.local/share/squeekboard/keyboards/streambot-de.yaml" <<'EOF_LAYOUT'
 ---
 outlines:
   default: { width: 44, height: 46 }
@@ -91,19 +91,19 @@ outlines:
 
 views:
   base:
-    - "q w e r t y u i o p"
-    - "a s d f g h j k l"
-    - "shift z x c v b n m backspace"
+    - "q w e r t z u i o p udiaeresis"
+    - "a s d f g h j k l odiaeresis adiaeresis"
+    - "shift y x c v b n m ssharp backspace"
     - "symbols comma space period enter"
   shift:
-    - "Q W E R T Y U I O P"
-    - "A S D F G H J K L"
-    - "shift z x c v b n m backspace"
+    - "Q W E R T Z U I O P Udiaeresis"
+    - "A S D F G H J K L Odiaeresis Adiaeresis"
+    - "shift Y X C V B N M question backspace"
     - "symbols comma space period enter"
   symbols:
     - "1 2 3 4 5 6 7 8 9 0"
-    - "exclam at hash dollar percent caret amp asterisk parenleft parenright"
-    - "minus underscore plus equal slash backslash colon semicolon quote doublequote"
+    - "exclam doublequote section dollar percent amp slash parenleft parenright equal"
+    - "at hash plus minus underscore colon semicolon question backslash pipe"
     - "base comma space period enter"
 
 buttons:
@@ -134,39 +134,50 @@ buttons:
     label: "Space"
     outline: space
   comma:
-    keysym: comma
+    text: ","
     label: ","
     outline: small
   period:
-    keysym: period
+    text: "."
     label: "."
     outline: small
+  udiaeresis: { text: "ü", label: "ü" }
+  odiaeresis: { text: "ö", label: "ö" }
+  adiaeresis: { text: "ä", label: "ä" }
+  Udiaeresis: { text: "Ü", label: "Ü" }
+  Odiaeresis: { text: "Ö", label: "Ö" }
+  Adiaeresis: { text: "Ä", label: "Ä" }
+  ssharp: { text: "ß", label: "ß" }
   exclam: { text: "!", label: "!" }
   at: { text: "@", label: "@" }
   hash: { text: "#", label: "#" }
+  section: { text: "§", label: "§" }
   dollar: { text: "$", label: "$" }
   percent: { text: "%", label: "%" }
-  caret: { text: "^", label: "^" }
   amp: { text: "&", label: "&" }
-  asterisk: { text: "*", label: "*" }
+  slash: { text: "/", label: "/" }
   parenleft: { text: "(", label: "(" }
   parenright: { text: ")", label: ")" }
   minus: { text: "-", label: "-" }
   underscore: { text: "_", label: "_" }
   plus: { text: "+", label: "+" }
   equal: { text: "=", label: "=" }
-  slash: { text: "/", label: "/" }
   backslash: { text: "\\", label: "\\" }
+  pipe: { text: "|", label: "|" }
   colon: { text: ":", label: ":" }
   semicolon: { text: ";", label: ";" }
-  quote: { text: "'", label: "'" }
+  question: { text: "?", label: "?" }
   doublequote: { text: '"', label: '"' }
 EOF_LAYOUT
+
+# Also provide the old layout name as alias, so existing config keeps working.
+cp "$HOME/.local/share/squeekboard/keyboards/streambot-de.yaml" \
+   "$HOME/.local/share/squeekboard/keyboards/streambot.yaml"
 
 # Squeekboard can expose an "Emote"/emoji entry through the globe selector.
 # On this kiosk that layout is not useful and can be broken, so override it with
 # the same stable Streambot keyboard instead of letting users land on a bad view.
-cp "$HOME/.local/share/squeekboard/keyboards/streambot.yaml" \
+cp "$HOME/.local/share/squeekboard/keyboards/streambot-de.yaml" \
    "$HOME/.local/share/squeekboard/keyboards/emoji.yaml"
 
 cat > "$HOME/.config/labwc/autostart" <<EOF_AUTOSTART
@@ -175,7 +186,7 @@ export GDK_BACKEND=wayland
 export GTK_IM_MODULE=wayland
 export QT_IM_MODULE=wayland
 export XMODIFIERS=@im=wayland
-export SQUEEKBOARD_LAYOUT=streambot
+export SQUEEKBOARD_LAYOUT=streambot-de
 
 swayidle -w \\
   timeout 2 'wtype -M alt -M logo -k h -m logo -m alt' &
