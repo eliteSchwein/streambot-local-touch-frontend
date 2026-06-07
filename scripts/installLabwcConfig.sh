@@ -45,9 +45,15 @@ if command -v gsettings >/dev/null 2>&1; then
   gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled true 2>/dev/null || true
 
   # Globe picker entries. First entry is the default.
+  # Keep the OSK picker limited to these two real layouts:
   # us+intl = US International, de = German QWERTZ.
   gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us+intl'), ('xkb', 'de')]" 2>/dev/null || true
   gsettings set org.gnome.desktop.input-sources current 0 2>/dev/null || true
+
+  # Clear cached / remembered extra sources where available, so broken built-in
+  # emoji/emote/terminal layouts do not come back through the globe picker.
+  gsettings set org.gnome.desktop.input-sources mru-sources "[('xkb', 'us+intl'), ('xkb', 'de')]" 2>/dev/null || true
+  gsettings set org.gnome.desktop.input-sources show-all-sources false 2>/dev/null || true
 fi
 
 start_squeekboard() {
@@ -258,9 +264,23 @@ cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/s
 cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/squeekboard/keyboards/streambot-us.yaml"
 cp "$HOME/.local/share/squeekboard/keyboards/de.yaml" "$HOME/.local/share/squeekboard/keyboards/streambot-de.yaml"
 
-# Keep the broken emoji/emote target from becoming a bad dead-end if it still
-# appears on some squeekboard builds.
-cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/squeekboard/keyboards/emoji.yaml"
+# Blacklist / shadow broken special keyboards. Some squeekboard versions still
+# expose these through the globe picker or internal layout switching. By placing
+# sane local files with the same names, selecting one falls back to the normal
+# US International keyboard instead of the broken emoji/emote/terminal boards.
+for blocked_layout in \
+  emoji \
+  emojis \
+  emote \
+  emotes \
+  terminal \
+  terminal-us \
+  us+terminal \
+  us-terminal
+do
+  cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" \
+    "$HOME/.local/share/squeekboard/keyboards/${blocked_layout}.yaml"
+done
 
 cat > "$HOME/.config/labwc/autostart" <<EOF_AUTOSTART
 #!/bin/sh
