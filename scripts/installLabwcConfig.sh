@@ -44,30 +44,35 @@ export SQUEEKBOARD_LAYOUT="${SQUEEKBOARD_LAYOUT:-streambot}"
 # Enable GNOME/GTK a11y OSK integration when gsettings is available.
 if command -v gsettings >/dev/null 2>&1; then
   gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled true 2>/dev/null || true
+
+  # Keep the input source list minimal. This avoids extra/broken choices in
+  # squeekboard's globe/layout selector on kiosk installs.
+  gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us')]" 2>/dev/null || true
+  gsettings set org.gnome.desktop.input-sources current 0 2>/dev/null || true
 fi
 
-# Start squeekboard once.
-if ! pgrep -x squeekboard >/dev/null 2>&1; then
-  squeekboard >/tmp/streambot-touch-squeekboard.log 2>&1 &
-fi
-
-# Keep it visible. Squeekboard exposes this DBus API on Phosh/Squeekboard setups.
-# If the DBus call is not available, the loop silently falls back to just keeping
-# the daemon running.
-while true; do
+start_squeekboard() {
   if ! pgrep -x squeekboard >/dev/null 2>&1; then
     squeekboard >/tmp/streambot-touch-squeekboard.log 2>&1 &
     sleep 1
   fi
+}
 
-  if command -v gdbus >/dev/null 2>&1; then
-    gdbus call --session \
-      --dest sm.puri.OSK0 \
-      --object-path /sm/puri/OSK0 \
-      --method sm.puri.OSK0.SetVisible true >/dev/null 2>&1 || true
-  fi
+start_squeekboard
 
-  sleep 2
+# Do NOT force SetVisible=true here. Squeekboard should stay running in the
+# background and let the compositor / focused GTK input decide visibility.
+# Start hidden so it does not cover the kiosk until an input field is focused.
+if command -v gdbus >/dev/null 2>&1; then
+  gdbus call --session \
+    --dest sm.puri.OSK0 \
+    --object-path /sm/puri/OSK0 \
+    --method sm.puri.OSK0.SetVisible false >/dev/null 2>&1 || true
+fi
+
+while true; do
+  start_squeekboard
+  sleep 5
 done
 EOF_SCRIPT
 
@@ -158,10 +163,18 @@ buttons:
   doublequote: { text: '"', label: '"' }
 EOF_LAYOUT
 
+# Squeekboard can expose an "Emote"/emoji entry through the globe selector.
+# On this kiosk that layout is not useful and can be broken, so override it with
+# the same stable Streambot keyboard instead of letting users land on a bad view.
+cp "$HOME/.local/share/squeekboard/keyboards/streambot.yaml" \
+   "$HOME/.local/share/squeekboard/keyboards/emoji.yaml"
+
 cat > "$HOME/.config/labwc/autostart" <<EOF_AUTOSTART
 #!/bin/sh
 export GDK_BACKEND=wayland
 export GTK_IM_MODULE=wayland
+export QT_IM_MODULE=wayland
+export XMODIFIERS=@im=wayland
 export SQUEEKBOARD_LAYOUT=streambot
 
 swayidle -w \\
@@ -169,7 +182,7 @@ swayidle -w \\
 
 exec sh -c 'sleep 0.25; wtype -M alt -M logo -k h -m logo -m alt' &
 
-# Start and keep the on-screen keyboard active.
+# Start squeekboard in auto-show mode. It appears when a text input is focused.
 exec "$HOME/.local/bin/streambot-touch-squeekboard" &
 
 exec /usr/bin/streambot-touch --app-config "$MCCONFIGFILE"
