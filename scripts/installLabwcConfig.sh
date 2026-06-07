@@ -33,12 +33,20 @@ status_msg "Installing labwc autostart, squeekboard and config"
 mkdir -p "$HOME/.config/labwc"
 mkdir -p "$HOME/.local/bin"
 mkdir -p "$HOME/.local/share/squeekboard/keyboards"
+mkdir -p "$HOME/.local/share/streambot-touch-squeekboard-data/squeekboard/keyboards"
+mkdir -p "$HOME/.local/share/streambot-touch-squeekboard-home"
 
 cat > "$HOME/.local/bin/streambot-touch-squeekboard" <<'EOF_SCRIPT'
 #!/bin/sh
 set -eu
 
 export GDK_BACKEND="${GDK_BACKEND:-wayland}"
+
+# Important: do not let squeekboard scan the system keyboard directory.
+# Otherwise built-in layouts like emoji/emote/terminal can still appear in the
+# globe picker even when GNOME input-sources only contains us+intl and de.
+export XDG_DATA_HOME="$HOME/.local/share/streambot-touch-squeekboard-home"
+export XDG_DATA_DIRS="$HOME/.local/share/streambot-touch-squeekboard-data"
 
 # Enable GNOME/GTK a11y OSK integration when gsettings is available.
 if command -v gsettings >/dev/null 2>&1; then
@@ -167,6 +175,9 @@ buttons:
   doublequote: { text: '"', label: '"' }
 EOF_LAYOUT_US
 
+cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" \
+  "$HOME/.local/share/streambot-touch-squeekboard-data/squeekboard/keyboards/us+intl.yaml"
+
 # Custom wide German QWERTZ layout. This is the second globe picker entry.
 cat > "$HOME/.local/share/squeekboard/keyboards/de.yaml" <<'EOF_LAYOUT_DE'
 ---
@@ -264,6 +275,12 @@ cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/s
 cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" "$HOME/.local/share/squeekboard/keyboards/streambot-us.yaml"
 cp "$HOME/.local/share/squeekboard/keyboards/de.yaml" "$HOME/.local/share/squeekboard/keyboards/streambot-de.yaml"
 
+# Private keyboard directory used by the squeekboard wrapper. This prevents the
+# built-in system keyboards from being discovered/listed.
+for allowed_layout in us+intl us streambot streambot-us de streambot-de; do
+  cp "$HOME/.local/share/squeekboard/keyboards/${allowed_layout}.yaml"     "$HOME/.local/share/streambot-touch-squeekboard-data/squeekboard/keyboards/${allowed_layout}.yaml"
+done
+
 # Blacklist / shadow broken special keyboards. Some squeekboard versions still
 # expose these through the globe picker or internal layout switching. By placing
 # sane local files with the same names, selecting one falls back to the normal
@@ -280,6 +297,8 @@ for blocked_layout in \
 do
   cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" \
     "$HOME/.local/share/squeekboard/keyboards/${blocked_layout}.yaml"
+  cp "$HOME/.local/share/squeekboard/keyboards/us+intl.yaml" \
+    "$HOME/.local/share/streambot-touch-squeekboard-data/squeekboard/keyboards/${blocked_layout}.yaml"
 done
 
 cat > "$HOME/.config/labwc/autostart" <<EOF_AUTOSTART
