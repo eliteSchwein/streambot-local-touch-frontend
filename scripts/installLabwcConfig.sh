@@ -294,4 +294,4 @@ cat > "$HOME/.config/labwc/rc.xml" <<'EOF_RC'
 </openbox_config>
 EOF_RC
 
-ok_msg "labwc + squeekboard config installed (US International default + German globe picker)"
+ok_msg "labwc + squeekboard config installed"
