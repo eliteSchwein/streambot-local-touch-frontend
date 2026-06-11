@@ -169,12 +169,28 @@ chmod +x "$HOME/.config/labwc/autostart"
 cat > "$HOME/.config/labwc/rc.xml" <<'EOF_RC'
 <?xml version="1.0"?>
 <openbox_config>
-	<keyboard>
-		<keybind key="A-W-h">
+  <keyboard>
+    <keybind key="A-W-h">
       <action name="HideCursor" />
       <action name="WarpCursor" x="-1" y="-1" />
-		</keybind>
-	</keyboard>
+    </keybind>
+
+    <keybind key="XF86AudioNext">
+      <action name="Execute" command="playerctl next" />
+    </keybind>
+
+    <keybind key="XF86AudioPause">
+      <action name="Execute" command="playerctl play-pause" />
+    </keybind>
+
+    <keybind key="XF86AudioPlay">
+      <action name="Execute" command="playerctl play-pause" />
+    </keybind>
+
+    <keybind key="XF86AudioPrev">
+      <action name="Execute" command="playerctl previous" />
+    </keybind>
+  </keyboard>
 </openbox_config>
 EOF_RC
 
