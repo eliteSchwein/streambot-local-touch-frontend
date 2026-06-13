@@ -95,10 +95,20 @@ install_labwc_config() {
   fi
 }
 
+install_networkmanager_polkit() {
+  if [[ -x "$SCRIPTPATH/installNetworkManagerPolkit.sh" ]]; then
+    "$SCRIPTPATH/installNetworkManagerPolkit.sh"
+  else
+    warn_msg "installNetworkManagerPolkit.sh not found or not executable."
+    exit 1
+  fi
+}
+
 questions
 setup_custom_apt_repo
 install_packages
 modify_user
+install_networkmanager_polkit
 install_labwc_config
 install_service
 
