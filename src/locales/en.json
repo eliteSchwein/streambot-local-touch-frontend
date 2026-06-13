@@ -6,6 +6,7 @@
       "saved": "Saved",
       "connected": "Connected",
       "connected_to": "Connected to",
+      "disconnected": "Disconnected",
       "available_networks": "Available Networks",
       "saved_networks": "Saved Networks",
       "filter_ssid": "Filter SSID",
@@ -20,6 +21,7 @@
     "wired": {
       "title": "Wired",
       "connected": "Connected",
+      "disconnected": "Disconnected",
       "interface_count": "Interface Count: ",
       "no_interfaces": "No wired interfaces found."
     },

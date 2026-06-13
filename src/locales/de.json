@@ -6,6 +6,7 @@
       "saved": "Gespeichert",
       "connected": "Verbunden",
       "connected_to": "Verbunden mit",
+      "disconnected": "Nicht verbunden",
       "available_networks": "Verfügbare Netzwerke",
       "saved_networks": "Gespeicherte Netzwerke",
       "filter_ssid": "SSID filtern",
@@ -20,6 +21,7 @@
     "wired": {
       "title": "Kabelgebunden",
       "connected": "Verbunden",
+      "disconnected": "Nicht verbunden",
       "interface_count": "Anzahl der Schnittstellen: ",
       "no_interfaces": "Keine kabelgebundenen Schnittstellen gefunden."
     },
