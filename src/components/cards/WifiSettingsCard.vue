@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
 import WifiNetworkDialog from '../dialogs/WifiNetworkDialog.vue'
 
 const props = defineProps<{
@@ -15,15 +15,8 @@ type WifiNetwork = {
   signalPercent: number | null
 }
 
-type WifiSettingsState = {
-  enabled: boolean
-  connectedSsid: string | null
-  connectedIp: string | null
-  savedNetworks: WifiNetwork[]
-  scannedNetworks: WifiNetwork[]
-}
-
 const { t } = useI18n()
+const appStore = useAppStore()
 
 const loading = ref(false)
 const scanning = ref(false)
@@ -32,13 +25,7 @@ const actionKey = ref<string | null>(null)
 const error = ref<string | null>(null)
 const availableFilter = ref('')
 
-const wifi = ref<WifiSettingsState>({
-  enabled: false,
-  connectedSsid: null,
-  connectedIp: null,
-  savedNetworks: [],
-  scannedNetworks: [],
-})
+const wifi = computed(() => appStore.getWifiSettings)
 
 const dialogOpen = ref(false)
 const hiddenMode = ref(false)
@@ -53,7 +40,7 @@ const statusText = computed(() => {
         : t('network.wifi.connected_to', { ssid: wifi.value.connectedSsid })
   }
 
-  return t('network.wifi.not_connected')
+  return t('network.wifi.disconnected')
 })
 
 const filteredScannedNetworks = computed(() => {
@@ -67,56 +54,6 @@ const filteredScannedNetworks = computed(() => {
 })
 
 const availableListScrollable = computed(() => filteredScannedNetworks.value.length > 5)
-
-function sortNetworks(items: WifiNetwork[]) {
-  return [...items].sort((a, b) => {
-    const signalDiff = (b.signalPercent ?? -1) - (a.signalPercent ?? -1)
-    if (signalDiff !== 0) return signalDiff
-
-    return a.ssid.localeCompare(b.ssid, undefined, { sensitivity: 'base' })
-  })
-}
-
-function dedupeNetworks(items: WifiNetwork[]) {
-  const bySsid = new Map<string, WifiNetwork>()
-
-  for (const item of items) {
-    const ssid = item.ssid.trim()
-    if (!ssid) continue
-
-    const normalized: WifiNetwork = {
-      ...item,
-      ssid,
-    }
-
-    const existing = bySsid.get(ssid)
-
-    if (!existing) {
-      bySsid.set(ssid, normalized)
-      continue
-    }
-
-    const existingSignal = existing.signalPercent ?? -1
-    const nextSignal = normalized.signalPercent ?? -1
-    const preferred = nextSignal > existingSignal ? normalized : existing
-
-    bySsid.set(ssid, {
-      ...preferred,
-      saved: existing.saved || normalized.saved,
-      secured: existing.secured || normalized.secured,
-    })
-  }
-
-  return sortNetworks([...bySsid.values()])
-}
-
-function applyWifiState(state: WifiSettingsState) {
-  wifi.value = {
-    ...state,
-    savedNetworks: dedupeNetworks(state.savedNetworks),
-    scannedNetworks: dedupeNetworks(state.scannedNetworks),
-  }
-}
 
 function signalIcon(signalPercent: number | null, secured: boolean) {
   if (secured) return 'mdi-wifi-lock'
@@ -163,8 +100,7 @@ async function loadWifiSettings() {
   await nextTick()
 
   try {
-    const state = await invoke<WifiSettingsState>('get_wifi_settings')
-    applyWifiState(state)
+    await appStore.loadWifiSettings()
   } catch (err) {
     error.value = String(err)
   } finally {
@@ -173,10 +109,7 @@ async function loadWifiSettings() {
 }
 
 async function refreshAvailableNetworks(silent = false) {
-  if (!wifi.value.enabled) {
-    wifi.value.scannedNetworks = []
-    return
-  }
+  if (!wifi.value.enabled) return
 
   if (!silent) {
     scanning.value = true
@@ -186,8 +119,7 @@ async function refreshAvailableNetworks(silent = false) {
   error.value = null
 
   try {
-    const scannedNetworks = await invoke<WifiNetwork[]>('scan_wifi_networks')
-    wifi.value.scannedNetworks = dedupeNetworks(scannedNetworks)
+    await appStore.scanWifiNetworks()
   } catch (err) {
     error.value = String(err)
   } finally {
@@ -199,24 +131,19 @@ async function refreshAvailableNetworks(silent = false) {
 
 async function toggleWifiEnabled(value: boolean | null) {
   const enabled = Boolean(value)
-  const previous = wifi.value.enabled
 
-  wifi.value.enabled = enabled
   error.value = null
   await nextTick()
 
   try {
-    await invoke('set_wifi_enabled', { enabled })
-    await loadWifiSettings()
+    await appStore.setWifiEnabled(enabled)
 
     if (enabled) {
       await refreshAvailableNetworks(true)
     } else {
-      wifi.value.scannedNetworks = []
       availableFilter.value = ''
     }
   } catch (err) {
-    wifi.value.enabled = previous
     error.value = String(err)
   }
 }
@@ -239,12 +166,7 @@ async function connectSavedNetwork(network: WifiNetwork) {
   await nextTick()
 
   try {
-    await invoke('connect_to_wifi', {
-      ssid: network.ssid,
-      password: null,
-    })
-
-    await loadWifiSettings()
+    await appStore.connectToWifi(network.ssid, null)
 
     if (wifi.value.enabled) {
       await refreshAvailableNetworks(true)
@@ -262,11 +184,7 @@ async function forgetSavedNetwork(network: WifiNetwork) {
   await nextTick()
 
   try {
-    await invoke('forget_saved_wifi', {
-      ssid: network.ssid,
-    })
-
-    await loadWifiSettings()
+    await appStore.forgetSavedWifi(network.ssid)
 
     if (wifi.value.enabled) {
       await refreshAvailableNetworks(true)
@@ -289,13 +207,13 @@ async function submitDialog(payload: { ssid: string; password: string }) {
   await nextTick()
 
   try {
-    await invoke(hiddenMode.value ? 'connect_hidden_wifi' : 'connect_to_wifi', {
-      ssid,
-      password,
-    })
+    if (hiddenMode.value) {
+      await appStore.connectHiddenWifi(ssid, password)
+    } else {
+      await appStore.connectToWifi(ssid, password)
+    }
 
     dialogOpen.value = false
-    await loadWifiSettings()
 
     if (wifi.value.enabled) {
       await refreshAvailableNetworks(true)
@@ -319,10 +237,6 @@ watch(
       }
     },
 )
-
-onMounted(() => {
-  void loadWifiSettings()
-})
 </script>
 
 <template>

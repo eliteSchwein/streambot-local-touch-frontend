@@ -16,7 +16,8 @@
       "empty_saved": "Leave empty to use the saved connection.",
       "open": "Open",
       "disabled": "Disabled",
-      "no_saved_networks": "No saved networks found."
+      "no_saved_networks": "No saved networks found.",
+      "no_networks": "No networks found."
     },
     "wired": {
       "title": "Wired",
@@ -118,5 +119,17 @@
   },
   "dialog": {
     "close": "Close"
+  },
+  "boot": {
+    "title": {
+      "start": "Bot starting",
+      "update": "Bot updating"
+    },
+    "text": {
+      "start": "Please wait while services initialize...",
+      "update": "Please wait while the system is updating..."
+    },
+    "stage": "Stage",
+    "unknown": "Unknown"
   }
 }

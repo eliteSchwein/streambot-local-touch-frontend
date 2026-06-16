@@ -16,7 +16,8 @@
       "empty_saved": "Leer lassen, um die gespeicherte Verbindung zu verwenden.",
       "open": "Offen",
       "disabled": "Deaktiviert",
-      "no_saved_networks": "Keine gespeicherten Netzwerke gefunden."
+      "no_saved_networks": "Keine gespeicherten Netzwerke gefunden.",
+      "no_networks": "Keine Netzwerke gefunden."
     },
     "wired": {
       "title": "Kabelgebunden",
@@ -118,5 +119,17 @@
   },
   "dialog": {
     "close": "Schließen"
+  },
+  "boot": {
+    "title": {
+      "start": "Bot fährt hoch",
+      "update": "Bot aktualisiert sich"
+    },
+    "text": {
+      "start": "Bitte warten bis die Dienste gestartet wurden...",
+      "update": "Bitte warten bis das System geupdated wurde..."
+    },
+    "stage": "Schritt",
+    "unknown": "Unbekannt"
   }
 }

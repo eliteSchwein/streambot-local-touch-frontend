@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
 
 const props = defineProps<{
   panelOpen: boolean
@@ -13,20 +13,15 @@ type WiredInterface = {
   ip: string | null
 }
 
-type WiredSettingsState = {
-  interfaces: WiredInterface[]
-}
-
 const { t } = useI18n()
+const appStore = useAppStore()
 
 const loading = ref(false)
 const actionBusy = ref(false)
 const actionKey = ref<string | null>(null)
 const error = ref<string | null>(null)
 
-const wired = ref<WiredSettingsState>({
-  interfaces: [],
-})
+const wired = computed(() => appStore.getWiredSettings)
 
 function setBusy(key: string) {
   actionBusy.value = true
@@ -58,7 +53,7 @@ async function loadWiredSettings() {
   await nextTick()
 
   try {
-    wired.value = await invoke<WiredSettingsState>('get_wired_settings')
+    await appStore.loadWiredSettings()
   } catch (err) {
     error.value = String(err)
   } finally {
@@ -68,22 +63,14 @@ async function loadWiredSettings() {
 
 async function toggleInterface(item: WiredInterface, value: boolean | null) {
   const enabled = Boolean(value)
-  const previous = item.connected
 
-  item.connected = enabled
   setBusy(item.interfaceName)
   error.value = null
   await nextTick()
 
   try {
-    await invoke('set_wired_interface_enabled', {
-      interfaceName: item.interfaceName,
-      enabled,
-    })
-
-    await loadWiredSettings()
+    await appStore.setWiredInterfaceEnabled(item.interfaceName, enabled)
   } catch (err) {
-    item.connected = previous
     error.value = String(err)
   } finally {
     clearBusy()
@@ -98,10 +85,6 @@ watch(
       }
     },
 )
-
-onMounted(() => {
-  void loadWiredSettings()
-})
 </script>
 
 <template>

@@ -95,7 +95,9 @@ onUnmounted(() => {
     <div class="header-content">
       <div class="header-title-slot">
         <div class="header-title">
+          <!---
           Notifications Placeholder or something
+          -->
         </div>
       </div>
 

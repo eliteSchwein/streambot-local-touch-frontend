@@ -1,44 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import QrcodeVue from 'qrcode.vue'
+import { useAppStore } from '@/stores/app'
 
 const { t } = useI18n()
+const appStore = useAppStore()
 
-const remoteIp = ref<string | null>(null)
-const error = ref<string | null>(null)
-
-let intervalId: number | null = null
+const remoteIp = computed(() => appStore.getPrimaryIp)
+const error = computed(() => appStore.getPrimaryIpError)
 
 const targetAddress = computed(() => {
   return remoteIp.value
       ? `http://${remoteIp.value}:8105/commander`
       : 'http://—:8105/commander'
-})
-
-async function refreshRemoteIp() {
-  try {
-    remoteIp.value = await invoke<string>('get_primary_ip_address')
-    error.value = null
-  } catch (err) {
-    remoteIp.value = null
-    error.value = String(err)
-  }
-}
-
-onMounted(() => {
-  void refreshRemoteIp()
-
-  intervalId = window.setInterval(() => {
-    void refreshRemoteIp()
-  }, 5000)
-})
-
-onUnmounted(() => {
-  if (intervalId !== null) {
-    window.clearInterval(intervalId)
-  }
 })
 </script>
 

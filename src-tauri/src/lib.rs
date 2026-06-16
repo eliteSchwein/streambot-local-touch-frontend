@@ -2,7 +2,8 @@ mod network;
 mod power;
 mod settings;
 
-use tauri::{AppHandle, Manager, PhysicalSize, Size};
+use std::{thread, time::Duration};
+use tauri::{AppHandle, Emitter, Manager, PhysicalSize, Size};
 use tauri_plugin_cli::CliExt;
 
 #[tauri::command]
@@ -27,6 +28,24 @@ fn wake_main_window(app: AppHandle) -> Result<(), String> {
     window.set_focus().map_err(|error| error.to_string())?;
 
     Ok(())
+}
+
+
+fn start_network_change_watcher(app: AppHandle) {
+    thread::spawn(move || {
+        let mut last_snapshot = String::new();
+
+        loop {
+            let snapshot = network::get_network_change_snapshot_blocking();
+
+            if snapshot != last_snapshot {
+                last_snapshot = snapshot;
+                let _ = app.emit("network-changed", ());
+            }
+
+            thread::sleep(Duration::from_secs(2));
+        }
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -83,6 +102,7 @@ pub fn run() {
             }
 
             power::start_power_button_intercept(app.handle().clone());
+            start_network_change_watcher(app.handle().clone());
 
             Ok(())
         })

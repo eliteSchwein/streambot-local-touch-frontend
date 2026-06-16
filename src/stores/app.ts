@@ -1,5 +1,7 @@
 // Utilities
 import { defineStore } from 'pinia'
+import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 type GiveawayUser = {
   id: string
@@ -111,6 +113,77 @@ type ConnectionItem = {
 
 type ConnectionData = Record<string, ConnectionItem>
 
+type WifiNetwork = {
+  ssid: string
+  secured: boolean
+  saved: boolean
+  signalPercent: number | null
+}
+
+type WifiSettingsState = {
+  enabled: boolean
+  connectedSsid: string | null
+  connectedIp: string | null
+  savedNetworks: WifiNetwork[]
+  scannedNetworks: WifiNetwork[]
+}
+
+type WiredInterface = {
+  interfaceName: string
+  connected: boolean
+  ip: string | null
+}
+
+type WiredSettingsState = {
+  interfaces: WiredInterface[]
+}
+
+function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+function sortWifiNetworks(items: WifiNetwork[]): WifiNetwork[] {
+  return [...items].sort((a, b) => {
+    const signalDiff = (b.signalPercent ?? -1) - (a.signalPercent ?? -1)
+    if (signalDiff !== 0) return signalDiff
+
+    return a.ssid.localeCompare(b.ssid, undefined, { sensitivity: 'base' })
+  })
+}
+
+function dedupeWifiNetworks(items: WifiNetwork[]): WifiNetwork[] {
+  const bySsid = new Map<string, WifiNetwork>()
+
+  for (const item of items) {
+    const ssid = item.ssid.trim()
+    if (!ssid) continue
+
+    const normalized: WifiNetwork = {
+      ...item,
+      ssid,
+    }
+
+    const existing = bySsid.get(ssid)
+
+    if (!existing) {
+      bySsid.set(ssid, normalized)
+      continue
+    }
+
+    const existingSignal = existing.signalPercent ?? -1
+    const nextSignal = normalized.signalPercent ?? -1
+    const preferred = nextSignal > existingSignal ? normalized : existing
+
+    bySsid.set(ssid, {
+      ...preferred,
+      saved: existing.saved || normalized.saved,
+      secured: existing.secured || normalized.secured,
+    })
+  }
+
+  return sortWifiNetworks([...bySsid.values()])
+}
+
 export type Alert = {
   id: string
   active?: boolean
@@ -179,6 +252,21 @@ export const useAppStore = defineStore('app', {
     yoloboxData: {} as YoloboxData,
     obsAudioData: {} as ObsAudioData,
     musicData: {},
+    networkListener: null as UnlistenFn | null,
+    networkRefreshBusy: false,
+    networkRefreshQueued: false,
+    primaryIp: null as string | null,
+    primaryIpError: null as string | null,
+    wifiSettings: {
+      enabled: false,
+      connectedSsid: null,
+      connectedIp: null,
+      savedNetworks: [],
+      scannedNetworks: [],
+    } as WifiSettingsState,
+    wiredSettings: {
+      interfaces: [],
+    } as WiredSettingsState,
   }),
   getters: {
     getConfig: (state) => state.config,
@@ -229,8 +317,159 @@ export const useAppStore = defineStore('app', {
     getAssets: (state) => state.assets,
     getStatus: (state) => state.status,
     getMusicData: (state) => state.musicData,
+    getPrimaryIp: (state) => state.primaryIp,
+    getPrimaryIpError: (state) => state.primaryIpError,
+    getWifiSettings: (state) => state.wifiSettings,
+    getWiredSettings: (state) => state.wiredSettings,
+    isNetworkRefreshBusy: (state) => state.networkRefreshBusy,
   },
   actions: {
+
+    setPrimaryIp(ip: string | null) {
+      this.primaryIp = ip
+      this.$patch(state => state.primaryIp = ip)
+    },
+    setPrimaryIpError(error: string | null) {
+      this.primaryIpError = error
+      this.$patch(state => state.primaryIpError = error)
+    },
+    setWifiSettings(settings: WifiSettingsState) {
+      const normalized = {
+        ...settings,
+        savedNetworks: dedupeWifiNetworks(settings.savedNetworks ?? []),
+        scannedNetworks: dedupeWifiNetworks(settings.scannedNetworks ?? []),
+      }
+
+      this.wifiSettings = normalized
+      this.$patch(state => state.wifiSettings = normalized)
+    },
+    setWiredSettings(settings: WiredSettingsState) {
+      this.wiredSettings = settings
+      this.$patch(state => state.wiredSettings = settings)
+    },
+    async loadPrimaryIpAddress() {
+      if (!isTauriRuntime()) return null
+
+      try {
+        const ip = await invoke<string>('get_primary_ip_address')
+        this.setPrimaryIp(ip)
+        this.setPrimaryIpError(null)
+        return ip
+      } catch (error) {
+        this.setPrimaryIp(null)
+        this.setPrimaryIpError(String(error))
+        return null
+      }
+    },
+    async loadWifiSettings() {
+      if (!isTauriRuntime()) return this.wifiSettings
+
+      const settings = await invoke<WifiSettingsState>('get_wifi_settings')
+      this.setWifiSettings(settings)
+      return settings
+    },
+    async loadWiredSettings() {
+      if (!isTauriRuntime()) return this.wiredSettings
+
+      const settings = await invoke<WiredSettingsState>('get_wired_settings')
+      this.setWiredSettings(settings)
+      return settings
+    },
+    async refreshNetworkState() {
+      if (!isTauriRuntime()) return
+
+      if (this.networkRefreshBusy) {
+        this.networkRefreshQueued = true
+        return
+      }
+
+      this.networkRefreshBusy = true
+
+      try {
+        await Promise.allSettled([
+          this.loadPrimaryIpAddress(),
+          this.loadWifiSettings(),
+          this.loadWiredSettings(),
+        ])
+      } finally {
+        this.networkRefreshBusy = false
+
+        if (this.networkRefreshQueued) {
+          this.networkRefreshQueued = false
+          void this.refreshNetworkState()
+        }
+      }
+    },
+    async startNetworkListener() {
+      if (this.networkListener || !isTauriRuntime()) return
+
+      await this.refreshNetworkState()
+
+      this.networkListener = await listen('network-changed', () => {
+        void this.refreshNetworkState()
+      })
+    },
+    stopNetworkListener() {
+      if (this.networkListener) {
+        this.networkListener()
+        this.networkListener = null
+      }
+    },
+    async setWifiEnabled(enabled: boolean) {
+      if (!isTauriRuntime()) return
+
+      await invoke('set_wifi_enabled', { enabled })
+      await this.refreshNetworkState()
+    },
+    async scanWifiNetworks() {
+      if (!isTauriRuntime()) return [] as WifiNetwork[]
+
+      const scannedNetworks = dedupeWifiNetworks(await invoke<WifiNetwork[]>('scan_wifi_networks'))
+
+      this.setWifiSettings({
+        ...this.wifiSettings,
+        scannedNetworks,
+      })
+
+      await this.loadWifiSettings()
+      return scannedNetworks
+    },
+    async connectToWifi(ssid: string, password?: string | null) {
+      if (!isTauriRuntime()) return
+
+      await invoke('connect_to_wifi', {
+        ssid,
+        password: password || null,
+      })
+
+      await this.refreshNetworkState()
+    },
+    async connectHiddenWifi(ssid: string, password?: string | null) {
+      if (!isTauriRuntime()) return
+
+      await invoke('connect_hidden_wifi', {
+        ssid,
+        password: password || null,
+      })
+
+      await this.refreshNetworkState()
+    },
+    async forgetSavedWifi(ssid: string) {
+      if (!isTauriRuntime()) return
+
+      await invoke('forget_saved_wifi', { ssid })
+      await this.refreshNetworkState()
+    },
+    async setWiredInterfaceEnabled(interfaceName: string, enabled: boolean) {
+      if (!isTauriRuntime()) return
+
+      await invoke('set_wired_interface_enabled', {
+        interfaceName,
+        enabled,
+      })
+
+      await this.refreshNetworkState()
+    },
     async fetchConfig() {
       const request = await fetch(`/config.json`, { cache: "no-store" })
       const config = await request.json()
@@ -445,7 +684,7 @@ export const useAppStore = defineStore('app', {
       this.$patch(state => state.musicData = musicData)
     },
     async fetchStatus(): Promise<any> {
-      let status = 'Unknown'
+      let status = ''
       try {
         status = (await (await fetch(`${this.getRestApi}/api/status`, { cache: "no-store" })).json()).data
       } catch (error) {

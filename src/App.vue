@@ -8,6 +8,7 @@ import WebsocketClient from "@/plugins/webSocketClient.ts";
 import eventBus from "@/eventBus.ts";
 import {sleep} from "@/helper/GeneralHelper.ts";
 import {useTouchFix} from "@/composables/useTouchFix.ts";
+import {useI18n} from "vue-i18n";
 
 const appOption = useAppStore()
 let websocket: WebsocketClient | undefined = undefined
@@ -16,9 +17,11 @@ const targetAddress = ref("http://localhost:8105");
 
 const ready = ref(false);
 const updating = ref(false);
-const stage = ref("Unknown");
+const stage = ref("");
 
 let watchdogId: number | null = null;
+
+const { t } = useI18n()
 
 useTouchFix()
 
@@ -55,7 +58,7 @@ eventBus.$on('websocket:request', async (data: any) => {
 
 async function fetchStatus() {
   let status = {
-    bootup_stage: "Unknown",
+    bootup_stage: "",
     ready: false,
     updating: false,
   };
@@ -67,31 +70,26 @@ async function fetchStatus() {
 
     const json = await response.json();
     status = {
-      bootup_stage: json?.data?.bootup_stage ?? "Unknown",
+      bootup_stage: json?.data?.bootup_stage ?? "",
       ready: json?.data?.ready ?? false,
       updating: json?.data?.updating ?? false,
     };
   } catch (e) {
-    console.warn(e);
+    console.debug(e);
   }
 
   return status;
 }
 
-function startTwitchAuth() {
-  const returnTo = encodeURIComponent(window.location.href);
-  window.location.href = `${targetAddress.value}/commander?returnTo=${returnTo}`;
-}
-
 async function bootupSequence() {
-  stage.value = "Unknown";
+  stage.value = "";
   ready.value = false;
 
   let status = await fetchStatus();
   updating.value = status.updating ?? false;
 
   while (!status.ready) {
-    stage.value = status.bootup_stage ?? "Unknown";
+    stage.value = status.bootup_stage ?? "";
     updating.value = status.updating ?? false;
 
     await sleep(250);
@@ -133,10 +131,13 @@ async function wakeMainWindow() {
 
 onMounted(async () => {
   await wakeMainWindow()
+  await appOption.startNetworkListener()
   await init();
 });
 
 onBeforeUnmount(() => {
+  appOption.stopNetworkListener()
+
   if (watchdogId !== null) {
     clearInterval(watchdogId);
   }
@@ -159,9 +160,9 @@ onBeforeUnmount(() => {
                   <div class="d-flex align-center justify-space-between">
                     <div class="d-flex align-center ga-4">
                       <div>
-                        <div class="text-h5 font-weight-bold">Bot Updating</div>
+                        <div class="text-h5 font-weight-bold">{{t('boot.title.update')}}</div>
                         <div class="text-body-2 text-medium-emphasis">
-                          Please wait while the system is updating…
+                          {{t('boot.text.update')}}
                         </div>
                       </div>
                     </div>
@@ -176,34 +177,6 @@ onBeforeUnmount(() => {
           <router-view />
         </template>
 
-        <template v-else-if="stage === 'auth'">
-          <v-card color="transparent" rounded="0" flat class="boot-root">
-            <v-layout class="boot-layout">
-              <div class="boot-bg" aria-hidden="true" />
-
-              <v-card class="boot-card" rounded="xl" elevation="12">
-                <v-card-text class="pa-8 pa-md-10">
-                  <div class="text-h5 font-weight-bold mb-2">Twitch Login Required</div>
-                  <div class="text-body-2 text-medium-emphasis mb-6">
-                    Continue the login flow in this window.
-                  </div>
-
-                  <v-btn color="primary" @click="startTwitchAuth">
-                    Continue to Twitch Login
-                  </v-btn>
-
-                  <div class="mt-6 text-body-2">
-                    <span class="text-medium-emphasis">Stage:</span>
-                    <span class="font-weight-medium ms-2">
-                      {{ stage || "Unknown" }}
-                    </span>
-                  </div>
-                </v-card-text>
-              </v-card>
-            </v-layout>
-          </v-card>
-        </template>
-
         <template v-else>
           <v-card color="transparent" rounded="0" flat class="boot-root">
             <v-layout class="boot-layout">
@@ -214,9 +187,9 @@ onBeforeUnmount(() => {
                   <div class="d-flex align-center justify-space-between mb-6">
                     <div class="d-flex align-center ga-4">
                       <div>
-                        <div class="text-h5 font-weight-bold">Bot starting</div>
+                        <div class="text-h5 font-weight-bold">{{t('boot.title.start')}}</div>
                         <div class="text-body-2 text-medium-emphasis">
-                          Please wait while services initialize…
+                          {{t('boot.text.start')}}
                         </div>
                       </div>
                     </div>
@@ -224,9 +197,9 @@ onBeforeUnmount(() => {
 
                   <div class="d-flex align-center ga-4">
                     <div class="text-body-2">
-                      <span class="text-medium-emphasis">Stage:</span>
+                      <span class="text-medium-emphasis">{{t('boot.stage')}}:</span>
                       <span class="font-weight-medium ms-2">
-                        {{ stage || "Unknown" }}
+                        {{ stage || t('boot.unknown') }}
                       </span>
                     </div>
                   </div>

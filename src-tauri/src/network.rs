@@ -1001,6 +1001,37 @@ async fn dispatch_blocking<R: Send + 'static>(
         .map_err(|e| e.to_string())?
 }
 
+pub fn get_primary_ip_address_blocking() -> Result<String, String> {
+    get_primary_ip_address_inner()
+}
+
+pub fn get_wifi_settings_blocking() -> Result<WifiSettings, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    runtime.block_on(get_wifi_settings_inner())
+}
+
+pub fn get_wired_settings_blocking() -> Result<WiredSettings, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    runtime.block_on(get_wired_settings_inner())
+}
+
+pub fn get_network_change_snapshot_blocking() -> String {
+    format!(
+        "{:?}|{:?}|{:?}",
+        get_primary_ip_address_blocking(),
+        get_wifi_settings_blocking(),
+        get_wired_settings_blocking(),
+    )
+}
+
 #[tauri::command]
 pub async fn get_network_status() -> Result<NetworkStatus, String> {
     let tx = worker().sender()?;
