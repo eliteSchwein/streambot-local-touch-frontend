@@ -7,6 +7,7 @@ import {useAppStore} from "@/stores/app.ts";
 import WebsocketClient from "@/plugins/webSocketClient.ts";
 import eventBus from "@/eventBus.ts";
 import {sleep} from "@/helper/GeneralHelper.ts";
+import {useTouchFix} from "@/composables/useTouchFix.ts";
 
 const appOption = useAppStore()
 let websocket: WebsocketClient | undefined = undefined
@@ -18,6 +19,8 @@ const updating = ref(false);
 const stage = ref("Unknown");
 
 let watchdogId: number | null = null;
+
+useTouchFix()
 
 eventBus.$on('websocket:reconnect', () => {
   if (!websocket) return
