@@ -214,7 +214,10 @@ export const useAppStore = defineStore('app', {
     },
     shieldMode: false,
     currentGame: {},
-    channelPoints: [],
+    channelPoints: {
+      all: [],
+      active: []
+    },
     audioData: {} as AudioData,
     audioOutputs: {} as AudioOutputs,
     systemInfo: {
@@ -507,7 +510,7 @@ export const useAppStore = defineStore('app', {
       this.shieldMode = shieldMode
       this.$patch(state => state.shieldMode = shieldMode)
     },
-    setChannelPoints(channelPoints: []) {
+    setChannelPoints(channelPoints: any) {
       this.channelPoints = channelPoints
       this.$patch(state => state.channelPoints = channelPoints)
     },

@@ -59,7 +59,8 @@
   "macro": {
     "channel": "Kanal",
     "method": "Methode",
-    "data": "Daten"
+    "data": "Daten",
+    "search": "Suche Makro"
   },
   "alert": {
     "title": "Alert",

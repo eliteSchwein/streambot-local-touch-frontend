@@ -7,7 +7,7 @@
     max-width="100%"
   >
     <v-row class="mx-3 my-2">
-      <template v-for="(channelPoint) in getChannelPoints">
+      <template v-for="(channelPoint) in getChannelPoints?.all">
         <ChannelPoint :channelPoint="channelPoint"></ChannelPoint>
       </template>
     </v-row>
