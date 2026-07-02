@@ -95,7 +95,14 @@
       "title": "Connections",
       "not_connected": "Not connected",
       "connected": "Connected",
-      "auth": "Auth"
+      "auth": "Auth",
+      "reauth": "Re-auth",
+      "authenticated_not_connected": "Not connected",
+      "primary_auth_missing": "Missing primary connection",
+      "authenticated": "Authenticated",
+      "optional_auth_missing": "Missing optional connection",
+      "twitch_control": "Twitch Control",
+      "twitch_message": "Twitch Message"
     }
   },
   "audio": {

@@ -9,6 +9,7 @@ import eventBus from "@/eventBus.ts";
 import {sleep} from "@/helper/GeneralHelper.ts";
 import {useTouchFix} from "@/composables/useTouchFix.ts";
 import {useI18n} from "vue-i18n";
+import {clearTauriCookies} from "@/helper/TauriCookieHelper.ts";
 
 const appOption = useAppStore()
 let websocket: WebsocketClient | undefined = undefined
@@ -130,9 +131,10 @@ async function wakeMainWindow() {
 }
 
 onMounted(async () => {
+  await clearTauriCookies()
   await wakeMainWindow()
   await appOption.startNetworkListener()
-  await init();
+  await init()
 });
 
 onBeforeUnmount(() => {

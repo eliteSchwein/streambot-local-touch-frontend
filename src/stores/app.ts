@@ -260,6 +260,7 @@ export const useAppStore = defineStore('app', {
     networkRefreshQueued: false,
     primaryIp: null as string | null,
     primaryIpError: null as string | null,
+    integrations: {},
     wifiSettings: {
       enabled: false,
       connectedSsid: null,
@@ -272,6 +273,7 @@ export const useAppStore = defineStore('app', {
     } as WiredSettingsState,
   }),
   getters: {
+    getIntegrations: (state) => state.integrations,
     getConfig: (state) => state.config,
     getWebsocket: (state) => {
       return `ws://${location.hostname}:${state.config.websocketPort}`
@@ -327,7 +329,10 @@ export const useAppStore = defineStore('app', {
     isNetworkRefreshBusy: (state) => state.networkRefreshBusy,
   },
   actions: {
-
+    setIntegrations(integrations: any) {
+      this.integrations = integrations
+      this.$patch(state => state.integrations = integrations)
+    },
     setPrimaryIp(ip: string | null) {
       this.primaryIp = ip
       this.$patch(state => state.primaryIp = ip)

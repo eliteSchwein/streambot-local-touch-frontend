@@ -95,7 +95,14 @@
       "title": "Verbindungen",
       "not_connected": "Nicht verbunden",
       "connected": "Verbunden",
-      "auth": "Verbinden"
+      "auth": "Verbinden",
+      "reauth": "Neuverbinden",
+      "authenticated_not_connected": "Nicht verbunden",
+      "primary_auth_missing": "Primäre Verbindung fehlt",
+      "authenticated": "Angemeldet",
+      "optional_auth_missing": "Optionale Verbindung fehlt",
+      "twitch_control": "Twitch Kontrolle",
+      "twitch_message": "Twitch Nachrichten"
     }
   },
   "audio": {
