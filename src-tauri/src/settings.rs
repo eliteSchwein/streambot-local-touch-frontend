@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::{env, fs, path::PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,7 +30,26 @@ fn system_language() -> String {
         .to_lowercase()
 }
 
-fn write_settings_file(settings: &StreambotSettings) -> Result<(), String> {
+fn read_settings_json() -> Result<Value, String> {
+    let path = settings_path()?;
+
+    if !path.exists() {
+        return Ok(json!({
+            "language": system_language()
+        }));
+    }
+
+    let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+
+    match serde_json::from_str::<Value>(&raw) {
+        Ok(Value::Object(settings)) => Ok(Value::Object(settings)),
+        _ => Ok(json!({
+            "language": system_language()
+        })),
+    }
+}
+
+fn write_settings_json(settings: &Value) -> Result<(), String> {
     let path = settings_path()?;
 
     if let Some(parent) = path.parent() {
@@ -37,35 +57,30 @@ fn write_settings_file(settings: &StreambotSettings) -> Result<(), String> {
     }
 
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| e.to_string())
+    fs::write(path, format!("{}\n", json)).map_err(|e| e.to_string())
+}
+
+fn settings_response(settings: &Value) -> StreambotSettings {
+    let language = settings
+        .get("language")
+        .and_then(Value::as_str)
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(system_language);
+
+    StreambotSettings { language }
 }
 
 #[tauri::command]
 pub fn get_streambot_settings() -> Result<StreambotSettings, String> {
-    let path = settings_path()?;
+    let mut settings = read_settings_json()?;
 
-    if !path.exists() {
-        let settings = StreambotSettings {
-            language: system_language(),
-        };
+    let language = settings_response(&settings).language;
+    settings["language"] = json!(language.clone());
 
-        write_settings_file(&settings)?;
-        return Ok(settings);
-    }
+    write_settings_json(&settings)?;
 
-    let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-
-    match serde_json::from_str::<StreambotSettings>(&raw) {
-        Ok(settings) => Ok(settings),
-        Err(_) => {
-            let settings = StreambotSettings {
-                language: system_language(),
-            };
-
-            write_settings_file(&settings)?;
-            Ok(settings)
-        }
-    }
+    Ok(StreambotSettings { language })
 }
 
 #[tauri::command]
@@ -76,9 +91,10 @@ pub fn set_streambot_language(language: String) -> Result<StreambotSettings, Str
         return Err("language is required".to_string());
     }
 
-    let settings = StreambotSettings { language };
+    let mut settings = read_settings_json()?;
+    settings["language"] = json!(language.clone());
 
-    write_settings_file(&settings)?;
+    write_settings_json(&settings)?;
 
-    Ok(settings)
+    Ok(StreambotSettings { language })
 }
