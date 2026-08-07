@@ -35,7 +35,6 @@
     "ip_error": "Failed to get the primary IP address. Please try again later."
   },
   "music": {
-    "title": "Music",
     "song_requests": "Song Requests",
     "no_song": "No song",
     "unknown_artist": "Unknown artist",

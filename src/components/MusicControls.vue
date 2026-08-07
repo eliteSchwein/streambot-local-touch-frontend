@@ -1,100 +1,90 @@
 <template>
-  <v-card
-      class="music-controls"
-      color="grey-darken-3"
-      rounded
-  >
-    <v-card-title>
-      {{ $t('music.title') }}
-    </v-card-title>
-
-    <v-card-text class="pt-0">
-      <div class="music-player">
-        <div class="music-player__header">
-          <div class="music-player__track">
-            <div class="text-subtitle-1 font-weight-bold text-truncate">
-              {{ music.title || $t('music.no_song') }}
-            </div>
-
-            <div class="text-body-2 text-medium-emphasis text-truncate">
-              {{ music.artist || $t('music.unknown_artist') }}
-            </div>
+  <div class="music-controls">
+    <div class="music-player">
+      <div class="music-player__header">
+        <div class="music-player__track">
+          <div class="text-subtitle-1 font-weight-bold text-truncate">
+            {{ music.title || $t('music.no_song') }}
           </div>
 
-          <v-switch
-              class="music-player__song-requests"
-              density="compact"
-              :label="$t('music.song_requests')"
-              :model-value="music?.songrequest?.enabled ?? false"
-              @click="toggleSongRequest"
-              hide-details
-          />
+          <div class="text-body-2 text-medium-emphasis text-truncate">
+            {{ music.artist || $t('music.unknown_artist') }}
+          </div>
         </div>
 
-        <div class="music-player__controls">
+        <v-switch
+            class="music-player__song-requests"
+            density="compact"
+            :label="$t('music.song_requests')"
+            :model-value="music?.songrequest?.enabled ?? false"
+            @click="toggleSongRequest"
+            hide-details
+        />
+      </div>
+
+      <div class="music-player__controls">
+        <div
+            class="music-player__visualizer"
+            aria-hidden="true"
+        >
           <div
-              class="music-player__visualizer"
-              aria-hidden="true"
-          >
-            <div
-                v-for="(value, index) in smoothedCavaValues"
-                :key="index"
-                class="music-player__visualizer-bar"
-                :style="{ height: getCavaBarHeight(value) }"
-            />
-          </div>
-
-          <v-btn
-              icon="mdi-shuffle-variant"
-              size="40"
-              :color="isShuffleEnabled ? 'primary' : undefined"
-              @click="callMusicApi('shuffle')"
-          />
-
-          <v-btn
-              icon="mdi-skip-previous"
-              size="40"
-              @click="callMusicApi('back')"
-          />
-
-          <v-btn
-              class="music-player__main-button"
-              :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"
-              color="primary"
-              size="46"
-              @click="callMusicApi(isPlaying ? 'pause' : 'play')"
-          />
-
-          <v-btn
-              icon="mdi-skip-next"
-              size="40"
-              @click="callMusicApi('next')"
-          />
-
-          <v-btn
-              icon="mdi-repeat"
-              size="40"
-              :color="isLoopEnabled ? 'primary' : undefined"
-              @click="callMusicApi('loop')"
+              v-for="(value, index) in smoothedCavaValues"
+              :key="index"
+              class="music-player__visualizer-bar"
+              :style="{ height: getCavaBarHeight(value) }"
           />
         </div>
 
-        <div class="music-player__progress">
-          <v-progress-linear
-              :model-value="music.progress_percentage ?? 0"
-              color="primary"
-              height="7"
-              rounded
-          />
+        <v-btn
+            icon="mdi-shuffle-variant"
+            size="40"
+            :color="isShuffleEnabled ? 'primary' : undefined"
+            @click="callMusicApi('shuffle')"
+        />
 
-          <div class="d-flex justify-space-between text-caption text-medium-emphasis mt-1">
-            <span>{{ formatTime(music.position) }}</span>
-            <span>{{ formatTime(music.duration) }}</span>
-          </div>
+        <v-btn
+            icon="mdi-skip-previous"
+            size="40"
+            @click="callMusicApi('back')"
+        />
+
+        <v-btn
+            class="music-player__main-button"
+            :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"
+            color="primary"
+            size="46"
+            @click="callMusicApi(isPlaying ? 'pause' : 'play')"
+        />
+
+        <v-btn
+            icon="mdi-skip-next"
+            size="40"
+            @click="callMusicApi('next')"
+        />
+
+        <v-btn
+            icon="mdi-repeat"
+            size="40"
+            :color="isLoopEnabled ? 'primary' : undefined"
+            @click="callMusicApi('loop')"
+        />
+      </div>
+
+      <div class="music-player__progress">
+        <v-progress-linear
+            :model-value="music.progress_percentage ?? 0"
+            color="primary"
+            height="7"
+            rounded
+        />
+
+        <div class="d-flex justify-space-between text-caption text-medium-emphasis mt-1">
+          <span>{{ formatTime(music.position) }}</span>
+          <span>{{ formatTime(music.duration) }}</span>
         </div>
       </div>
-    </v-card-text>
-  </v-card>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
@@ -342,29 +332,20 @@ export default defineComponent({
 <style scoped>
 .music-controls {
   width: 100%;
-  overflow: hidden;
 }
 
 .music-player {
   position: relative;
   padding: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.music-player::before {
-  content: "";
-  position: absolute;
-  top: -80px;
-  right: -70px;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: rgba(var(--v-theme-primary), 0.10);
-  filter: blur(42px);
-  pointer-events: none;
+  background: linear-gradient(
+      205deg,
+      rgba(var(--v-theme-primary), 0.16) 0%,
+      rgba(var(--v-theme-primary), 0.07) 38%,
+      rgba(255, 255, 255, 0.035) 72%,
+      rgba(255, 255, 255, 0.02) 100%
+  );
 }
 
 .music-player__header,

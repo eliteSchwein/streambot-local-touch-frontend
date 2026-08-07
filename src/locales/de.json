@@ -35,7 +35,6 @@
     "ip_error": "Die primäre IP-Adresse konnte nicht ermittelt werden. Bitte versuche es später erneut."
   },
   "music": {
-    "title": "Musik",
     "song_requests": "Songanfragen",
     "no_song": "Kein Song",
     "unknown_artist": "Unbekannter Künstler",
