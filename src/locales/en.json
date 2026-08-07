@@ -78,7 +78,11 @@
     "music_playlist": "Music Playlist",
     "no_song_requests": "No song requests found.",
     "no_music": "No music found.",
-    "search": "Search Song"
+    "search": "Search Song",
+    "delete_title": "Delete song",
+    "delete_question": "Are you sure you want to delete \"{song}\"?",
+    "cancel": "Cancel",
+    "delete": "Delete"
   },
   "recovery": {
     "warning": "There is no confirmation prompt before triggering these actions. Only use them if you are ABSOLUTELY sure what you are doing.",

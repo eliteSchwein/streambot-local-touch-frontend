@@ -78,7 +78,11 @@
     "music_playlist": "Musik-Wiedergabeliste",
     "no_song_requests": "Keine Songanfragen gefunden.",
     "no_music": "Keine Musik gefunden.",
-    "search": "Suche Lied"
+    "search": "Suche Lied",
+    "delete_title": "Song löschen",
+    "delete_question": "Möchtest du \"{song}\" wirklich löschen?",
+    "cancel": "Abbrechen",
+    "delete": "Löschen"
   },
   "recovery": {
     "warning": "Es gibt keine Sicherheitsabfrage vor dem Ausführen dieser Aktionen. Nutze sie nur, wenn du dir ABSOLUT sicher bist, was du tust.",

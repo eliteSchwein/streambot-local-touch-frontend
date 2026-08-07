@@ -56,17 +56,35 @@
             :class="{ 'current-song': isCurrentSong(item) }"
         >
           <template #append>
-            <v-btn
-                icon="mdi-delete"
-                size="small"
-                variant="text"
-                color="red"
-                @click="deleteVisibleItem(item)"
-            />
+            <div class="d-flex align-center ga-1">
+              <v-btn
+                  v-if="!isCurrentSong(item)"
+                  icon="mdi-play"
+                  size="small"
+                  variant="text"
+                  color="primary"
+                  @click="playVisibleItem(item)"
+              />
+
+              <v-btn
+                  icon="mdi-delete"
+                  size="small"
+                  variant="text"
+                  color="red"
+                  @click="openDeleteDialog(item)"
+              />
+            </div>
           </template>
         </v-list-item>
       </v-list>
     </v-card-text>
+
+    <SongDeleteDialog
+        v-model="deleteDialog"
+        :song="deleteTarget"
+        :loading="deleting"
+        @confirm="confirmDelete"
+    />
   </v-card>
 </template>
 
@@ -74,8 +92,12 @@
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import eventBus from '@/eventBus'
+import SongDeleteDialog from '@/components/dialogs/SongDeleteDialog.vue'
 
 export default {
+  components: {
+    SongDeleteDialog,
+  },
 
   data() {
     return {
@@ -83,6 +105,9 @@ export default {
       loading: false,
       searchQuery: '',
       searchDebounce: null as ReturnType<typeof setTimeout> | null,
+      deleteDialog: false,
+      deleteTarget: null as any,
+      deleting: false,
     }
   },
 
@@ -220,6 +245,38 @@ export default {
 
       if (!this.songRequestEnabled) {
         await this.fetchFiles()
+      }
+    },
+
+    playVisibleItem(item: any) {
+      if (!this.getWebsocket || this.isCurrentSong(item)) return
+
+      const path = this.getItemPath(item)
+      const filename = path || this.getFilename(item)
+
+      this.sendMusicWebsocket('music_play_song', {
+        ...item,
+        filename,
+        path,
+      })
+    },
+
+    openDeleteDialog(item: any) {
+      this.deleteTarget = item
+      this.deleteDialog = true
+    },
+
+    async confirmDelete() {
+      if (!this.deleteTarget || this.deleting) return
+
+      this.deleting = true
+
+      try {
+        await this.deleteVisibleItem(this.deleteTarget)
+        this.deleteDialog = false
+        this.deleteTarget = null
+      } finally {
+        this.deleting = false
       }
     },
 

@@ -5,6 +5,7 @@ import Navigation from "@/components/Navigation.vue";
 import {invoke} from "@tauri-apps/api/core";
 import {useAppStore} from "@/stores/app.ts";
 import WebsocketClient from "@/plugins/webSocketClient.ts";
+import {setWebsocketClient} from "@/plugins/websocketInstance.ts";
 import eventBus from "@/eventBus.ts";
 import {sleep} from "@/helper/GeneralHelper.ts";
 import {useTouchFix} from "@/composables/useTouchFix.ts";
@@ -26,36 +27,37 @@ const { t } = useI18n()
 
 useTouchFix()
 
-eventBus.$on('websocket:reconnect', () => {
+function handleWebsocketReconnect() {
   if (!websocket) return
   void websocket.connect()
-})
+}
 
-eventBus.$on('websocket:send', (data: any) => {
-  if(data.method === 'update') {
-    updating.value = true // this doesnt seem to trigger?
+function handleWebsocketSend(data: any) {
+  if (data.method === 'update') {
+    updating.value = true
   }
-  websocket?.send(data.method, data.params)
-})
 
-eventBus.$on('websocket:request', async (data: any) => {
-  if (!websocket || typeof (websocket as any).request !== 'function') {
+  websocket?.send(data.method, data.params)
+}
+
+async function handleWebsocketRequest(data: any) {
+  if (!websocket) {
     data?.reject?.(new Error('websocket request bridge is not ready'))
     return
   }
 
   try {
-    const result = await (websocket as any).request(
-        data.method,
-        data.params ?? {},
-        data.timeout ?? 10_000,
+    const result = await websocket.request(
+      data.method,
+      data.params ?? {},
+      data.timeout ?? 10_000,
     )
 
     data?.resolve?.(result)
   } catch (error) {
     data?.reject?.(error)
   }
-})
+}
 
 async function fetchStatus() {
   let status = {
@@ -100,6 +102,7 @@ async function bootupSequence() {
   await appOption.fetchGames()
 
   websocket = new WebsocketClient(appOption.getWebsocket, appOption)
+  setWebsocketClient(websocket)
   await websocket.connect()
 
   updating.value = status.updating ?? false;
@@ -131,6 +134,10 @@ async function wakeMainWindow() {
 }
 
 onMounted(async () => {
+  eventBus.$on('websocket:reconnect', handleWebsocketReconnect)
+  eventBus.$on('websocket:send', handleWebsocketSend)
+  eventBus.$on('websocket:request', handleWebsocketRequest)
+
   await clearTauriCookies()
   await wakeMainWindow()
   await appOption.startNetworkListener()
@@ -138,10 +145,23 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  eventBus.$off('websocket:reconnect', handleWebsocketReconnect)
+  eventBus.$off('websocket:send', handleWebsocketSend)
+  eventBus.$off('websocket:request', handleWebsocketRequest)
+
   appOption.stopNetworkListener()
 
   if (watchdogId !== null) {
-    clearInterval(watchdogId);
+    clearInterval(watchdogId)
+    watchdogId = null
+  }
+
+  const activeWebsocket = websocket
+  websocket = undefined
+  setWebsocketClient(undefined)
+
+  if (activeWebsocket) {
+    void activeWebsocket.disconnect()
   }
 });
 </script>

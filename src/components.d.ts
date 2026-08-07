@@ -25,6 +25,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SettingsPanel: typeof import('./components/panels/SettingsPanel.vue')['default']
+    SongDeleteDialog: typeof import('./components/dialogs/SongDeleteDialog.vue')['default']
     SpeedtestCard: typeof import('./components/cards/SpeedtestCard.vue')['default']
     WifiNetworkDialog: typeof import('./components/dialogs/WifiNetworkDialog.vue')['default']
     WifiSettingsCard: typeof import('./components/cards/WifiSettingsCard.vue')['default']

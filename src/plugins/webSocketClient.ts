@@ -17,6 +17,7 @@ export default class WebsocketClient {
   websocket: Websocket | undefined = undefined
   store: AppStore
   pendingRequests: Record<number, PendingRequest> = {}
+  messageListeners: Record<string, Set<(data: any) => void>> = {}
 
   public constructor(url: string, store: AppStore) {
     this.url = url
@@ -62,6 +63,34 @@ export default class WebsocketClient {
     void new MessageEvent(this).register()
   }
 
+  public onMessage(method: string, listener: (data: any) => void) {
+    if (!this.messageListeners[method]) {
+      this.messageListeners[method] = new Set()
+    }
+
+    this.messageListeners[method].add(listener)
+  }
+
+  public offMessage(method: string, listener: (data: any) => void) {
+    const listeners = this.messageListeners[method]
+    if (!listeners) return
+
+    listeners.delete(listener)
+
+    if (listeners.size === 0) {
+      delete this.messageListeners[method]
+    }
+  }
+
+  public emitMessage(method: string, data: any) {
+    const listeners = this.messageListeners[method]
+    if (!listeners) return
+
+    for (const listener of listeners) {
+      listener(data)
+    }
+  }
+
   public send(method: string, data: any = {}) {
     try {
       this.websocket?.send(
@@ -69,7 +98,7 @@ export default class WebsocketClient {
             jsonrpc: '2.0',
             method,
             params: data,
-            id: getRandomInt(10_000),
+            id: getRandomInt(100_000),
           }),
       )
     } catch (error) {
@@ -85,7 +114,7 @@ export default class WebsocketClient {
         return
       }
 
-      const id = getRandomInt(10_000)
+      const id = getRandomInt(100_000)
       const timeout = window.setTimeout(() => {
         delete this.pendingRequests[id]
         reject(new Error(`${method} websocket request timed out`))
@@ -136,7 +165,7 @@ export default class WebsocketClient {
 
   private handleRequestMessage(event: any) {
     const message = this.parseMessage(event)
-    if (!message?.id) return
+    if (message?.id === undefined || message?.id === null) return
 
     const pending = this.pendingRequests[message.id]
     if (!pending) return
