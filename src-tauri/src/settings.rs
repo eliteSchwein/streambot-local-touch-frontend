@@ -76,9 +76,16 @@ pub fn get_streambot_settings() -> Result<StreambotSettings, String> {
     let mut settings = read_settings_json()?;
 
     let language = settings_response(&settings).language;
-    settings["language"] = json!(language.clone());
 
-    write_settings_json(&settings)?;
+    let changed = settings
+        .get("language")
+        .and_then(Value::as_str)
+        != Some(language.as_str());
+
+    if changed {
+        settings["language"] = json!(language.clone());
+        write_settings_json(&settings)?;
+    }
 
     Ok(StreambotSettings { language })
 }
@@ -92,9 +99,16 @@ pub fn set_streambot_language(language: String) -> Result<StreambotSettings, Str
     }
 
     let mut settings = read_settings_json()?;
-    settings["language"] = json!(language.clone());
 
-    write_settings_json(&settings)?;
+    let changed = settings
+        .get("language")
+        .and_then(Value::as_str)
+        != Some(language.as_str());
+
+    if changed {
+        settings["language"] = json!(language.clone());
+        write_settings_json(&settings)?;
+    }
 
     Ok(StreambotSettings { language })
 }
