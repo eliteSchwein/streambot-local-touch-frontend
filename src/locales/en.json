@@ -86,12 +86,6 @@
   },
   "recovery": {
     "warning": "There is no confirmation prompt before triggering these actions. Only use them if you are ABSOLUTELY sure what you are doing.",
-    "delete_auth_text": "Delete Twitch connection. After that, the bot will automatic restart.",
-    "reload_text": "Reload the bot internally. This should usually not break anything.",
-    "compress_assets_text": "Manually compress assets (images/videos). This recompresses all assets again. Please be patient, this can take a while.",
-    "auth_reset": "AUTH RESET",
-    "bot_reload": "BOT RELOAD",
-    "compress_assets": "COMPRESS ASSETS",
     "run_speedtest": "Run Speedtest",
     "speedtest": "Speedtest",
     "tools": "Tools",
@@ -143,5 +137,8 @@
     },
     "stage": "Stage",
     "unknown": "Unknown"
+  },
+  "header": {
+    "saving_please_wait": "Saving, please wait"
   }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import Header from "./components/Header.vue";
+import SavingDialog from "@/components/dialogs/SavingDialog.vue";
 import Navigation from "@/components/Navigation.vue";
 import {invoke} from "@tauri-apps/api/core";
 import {useAppStore} from "@/stores/app.ts";
@@ -48,9 +49,9 @@ async function handleWebsocketRequest(data: any) {
 
   try {
     const result = await websocket.request(
-      data.method,
-      data.params ?? {},
-      data.timeout ?? 10_000,
+        data.method,
+        data.params ?? {},
+        data.timeout ?? 10_000,
     )
 
     data?.resolve?.(result)
@@ -234,6 +235,7 @@ onBeforeUnmount(() => {
 
       <Navigation />
       <PowerDialog />
+      <SavingDialog />
     </div>
   </v-app>
 </template>

@@ -24,6 +24,7 @@ declare module 'vue' {
     PowerDialog: typeof import('./components/dialogs/PowerDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SavingDialog: typeof import('./components/dialogs/SavingDialog.vue')['default']
     SettingsPanel: typeof import('./components/panels/SettingsPanel.vue')['default']
     SongDeleteDialog: typeof import('./components/dialogs/SongDeleteDialog.vue')['default']
     SpeedtestCard: typeof import('./components/cards/SpeedtestCard.vue')['default']

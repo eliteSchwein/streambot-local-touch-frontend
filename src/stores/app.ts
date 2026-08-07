@@ -271,6 +271,9 @@ export const useAppStore = defineStore('app', {
     wiredSettings: {
       interfaces: [],
     } as WiredSettingsState,
+    reloadUpdate: {
+      finished: true,
+    },
   }),
   getters: {
     getIntegrations: (state) => state.integrations,
@@ -327,6 +330,7 @@ export const useAppStore = defineStore('app', {
     getWifiSettings: (state) => state.wifiSettings,
     getWiredSettings: (state) => state.wiredSettings,
     isNetworkRefreshBusy: (state) => state.networkRefreshBusy,
+    getReloadUpdate: (state) => state.reloadUpdate,
   },
   actions: {
     setIntegrations(integrations: any) {
@@ -690,6 +694,12 @@ export const useAppStore = defineStore('app', {
     setMusicData(musicData: any) {
       this.musicData = musicData
       this.$patch(state => state.musicData = musicData)
+    },
+    setReloadUpdate(reloadUpdate: any) {
+      this.reloadUpdate = {
+        finished: reloadUpdate?.finished === true,
+      }
+      this.$patch(state => state.reloadUpdate = this.reloadUpdate)
     },
     async fetchStatus(): Promise<any> {
       let status = ''
