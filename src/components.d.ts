@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ActiveAlert: typeof import('./components/ActiveAlert.vue')['default']
+    AdminSettingsCard: typeof import('./components/cards/AdminSettingsCard.vue')['default']
     AutoMacro: typeof import('./components/AutoMacro.vue')['default']
     ChannelPoint: typeof import('./components/ChannelPoint.vue')['default']
     ConnectionStatusCard: typeof import('./components/cards/ConnectionStatusCard.vue')['default']

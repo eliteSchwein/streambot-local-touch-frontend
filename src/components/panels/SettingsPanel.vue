@@ -4,7 +4,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
 import WifiSettingsCard from '../cards/WifiSettingsCard.vue'
 import WiredSettingsCard from '../cards/WiredSettingsCard.vue'
-import LanguageSettingsCard from "@/components/cards/LanguageSettingsCard.vue";
+import LanguageSettingsCard from '@/components/cards/LanguageSettingsCard.vue'
+import AdminSettingsCard from '@/components/cards/AdminSettingsCard.vue'
 
 const { locale } = useI18n()
 
@@ -51,12 +52,13 @@ defineExpose({
         <v-container fluid class="pa-0">
           <v-row no-gutters class="settings-panel__row">
             <v-col cols="12" sm="6" class="settings-panel__col">
+              <WiredSettingsCard :panel-open="isOpen" class="mb-3" />
               <WifiSettingsCard :panel-open="isOpen" />
             </v-col>
 
             <v-col cols="12" sm="6" class="settings-panel__col">
-              <WiredSettingsCard :panel-open="isOpen" />
-              <LanguageSettingsCard :panel-open="isOpen" />
+              <LanguageSettingsCard :panel-open="isOpen" class="mb-3" />
+              <AdminSettingsCard />
             </v-col>
           </v-row>
         </v-container>
@@ -90,7 +92,7 @@ defineExpose({
 .settings-panel__content {
   height: calc(100vh - 92px);
   overflow: auto;
-  padding: 8px 12px 12px;
+  padding: 10px 12px 12px;
 }
 
 .settings-panel__language-row {

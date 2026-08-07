@@ -129,7 +129,6 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .language-card {
-  margin-top: 16px;
   box-shadow: var(--v-shadow-3);
 }
 </style>
