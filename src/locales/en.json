@@ -116,7 +116,7 @@
     "shutdown_question": "Shut down system?",
     "restart": "Restart",
     "shutdown": "Shut down",
-    "restart_streambot": "Restart Backend"
+    "restart_streambot": "Restart Bot"
   },
   "settings": {
     "language": "Language",
