@@ -200,59 +200,54 @@ Rectangle {
                     usedBytes - categorizedBytes
                 )
 
-            Item {
+            Row {
                 anchors.fill: parent
+                spacing: 0
 
-                // The bar itself is clipped by usageBar's rounded shape.
-                // This keeps the first colored segment rounded on the left
-                // instead of exposing a square edge.
-                Row {
-                    anchors.fill: parent
-                    spacing: 0
+                Repeater {
+                    model: usageBar.segments
 
-                    Repeater {
-                        model: usageBar.segments
+                    delegate: Item {
+                        required property var modelData
+                        required property int index
 
-                        delegate: Rectangle {
-                            required property var modelData
-
-                            width:
-                                usageBar.totalBytes > 0
-                                ? usageBar.width
-                                    * Math.min(
-                                        1,
-                                        Number(modelData[1] ?? 0)
-                                        / usageBar.totalBytes
-                                    )
-                                : 0
-
-                            height: usageBar.height
-                            color: modelData[2]
-
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: 300
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
                         width:
                             usageBar.totalBytes > 0
                             ? usageBar.width
                                 * Math.min(
                                     1,
-                                    usageBar.uncategorizedUsedBytes
+                                    Number(modelData[1] ?? 0)
                                     / usageBar.totalBytes
                                 )
                             : 0
 
                         height: usageBar.height
+                        clip: true
 
-                        // Used disk space not covered by the configured
-                        // StreamDing folders.
-                        color: Md3Theme.primary
+                        // Only the very first segment gets a rounded left edge.
+                        // The child is intentionally at least one bar-height
+                        // wide and then clipped by this rectangular delegate,
+                        // which keeps its right edge square.
+                        Rectangle {
+                            visible: parent.width > 0
+
+                            x: 0
+                            y: 0
+
+                            width:
+                                index === 0
+                                ? Math.max(parent.width, usageBar.height)
+                                : parent.width
+
+                            height: parent.height
+
+                            radius:
+                                index === 0
+                                ? usageBar.radius
+                                : 0
+
+                            color: modelData[2]
+                        }
 
                         Behavior on width {
                             NumberAnimation {
@@ -262,32 +257,49 @@ Rectangle {
                     }
                 }
 
-                // Explicit rounded cap on the left because Qt's clip on a
-                // rounded Rectangle does not always clip child content to
-                // the radius on this rendering path.
-                Rectangle {
-                    visible:
-                        usageBar.usedBytes > 0
+                Item {
+                    width:
+                        usageBar.totalBytes > 0
+                        ? usageBar.width
+                            * Math.min(
+                                1,
+                                usageBar.uncategorizedUsedBytes
+                                / usageBar.totalBytes
+                            )
+                        : 0
 
-                    anchors {
-                        left: parent.left
-                        top: parent.top
-                        bottom: parent.bottom
+                    height: usageBar.height
+                    clip: true
+
+                    Rectangle {
+                        visible: parent.width > 0
+
+                        x: 0
+                        y: 0
+
+                        width:
+                            usageBar.segments.length === 0
+                            ? Math.max(parent.width, usageBar.height)
+                            : parent.width
+
+                        height: parent.height
+
+                        radius:
+                            usageBar.segments.length === 0
+                            ? usageBar.radius
+                            : 0
+
+                        // Normal filesystem usage that is not one of the
+                        // StreamDing-managed folders is intentionally gray,
+                        // matching the admin panel.
+                        color: "#9E9E9E"
                     }
 
-                    width:
-                        Math.min(
-                            usageBar.height,
-                            parent.width
-                        )
-
-                    radius:
-                        usageBar.radius
-
-                    color:
-                        usageBar.segments.length > 0
-                        ? usageBar.segments[0][2]
-                        : Md3Theme.primary
+                    Behavior on width {
+                        NumberAnimation {
+                            duration: 300
+                        }
+                    }
                 }
             }
         }
