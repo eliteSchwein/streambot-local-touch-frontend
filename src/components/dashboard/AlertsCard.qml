@@ -10,14 +10,7 @@ Md3Card {
     required property var store
     required property var websocket
 
-    title:
-        i18n.text("alerts")
-        + (
-            store.alertQueue.length > 0
-            ? " · " + store.alertQueue.length
-            : ""
-        )
-
+    title: ""
     Item {
         Layout.fillWidth: true
         Layout.fillHeight: true

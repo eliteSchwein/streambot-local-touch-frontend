@@ -22,7 +22,8 @@ Item {
 
             AlertsCard {
                 Layout.fillWidth: true
-                Layout.preferredHeight: parent.height * 0.28
+                Layout.fillHeight: true
+                Layout.preferredHeight: parent.height * 0.66
 
                 i18n: root.i18n
                 store: root.store
@@ -32,18 +33,11 @@ Item {
             AutoMacrosCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.preferredHeight: parent.height * 0.34
 
                 i18n: root.i18n
                 store: root.store
                 websocket: root.websocket
-            }
-
-            RotateSceneCard {
-                Layout.fillWidth: true
-                Layout.preferredHeight: parent.height * 0.26
-
-                i18n: root.i18n
-                store: root.store
             }
         }
 

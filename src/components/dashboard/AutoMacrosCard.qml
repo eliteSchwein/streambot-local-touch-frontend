@@ -10,7 +10,7 @@ Md3Card {
     required property var store
     required property var websocket
 
-    title: i18n.text("auto_macros")
+    title: ""
 
     Item {
         Layout.fillWidth: true
@@ -36,7 +36,7 @@ Md3Card {
             spacing: 6
             model: root.store.autoMacros
 
-            delegate: Rectangle {
+            delegate: Item {
                 id: macroRow
 
                 required property var modelData
@@ -44,120 +44,144 @@ Md3Card {
                 width: macroList.width
                 height: 48
 
-                radius: Md3Theme.radiusMedium
-                color: Md3Theme.surfaceContainerHighest
+                readonly property real progress: {
+                    if (!modelData.enabled)
+                        return 0
 
-                Text {
-                    anchors {
-                        left: parent.left
-                        leftMargin: 12
-                        right: macroSwitch.left
-                        rightMargin: 10
-                        verticalCenter: parent.verticalCenter
-                    }
-
-                    // Leave a little room for the bottom progress strip.
-                    anchors.verticalCenterOffset: -2
-
-                    text: modelData.name
-                    color: Md3Theme.surfaceContent
-
-                    font.pixelSize: 11
-                    font.weight: Font.Medium
-
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                }
-
-                Md3Switch {
-                    id: macroSwitch
-
-                    anchors {
-                        right: parent.right
-                        rightMargin: 9
-                        verticalCenter: parent.verticalCenter
-                    }
-
-                    anchors.verticalCenterOffset: -2
-
-                    checked: modelData.enabled === true
-
-                    // notify_auto_macros_update arrives every second and the
-                    // JS-array model is rebound. Do not replay the thumb
-                    // animation on each server update.
-                    animated: false
-
-                    onClicked: {
-                        root.websocket.sendRpc(
-                            "toggle_auto_macro",
-                            {
-                                name: modelData.name,
-                                enable: !modelData.enabled
-                            }
+                    const interval =
+                        Math.max(
+                            1,
+                            Number(modelData.interval ?? 1)
                         )
-                    }
+
+                    const remaining =
+                        Math.max(
+                            0,
+                            Math.min(
+                                interval,
+                                Number(
+                                    modelData.current_interval
+                                    ?? interval
+                                )
+                            )
+                        )
+
+                    return remaining / interval
                 }
 
-                // Same position/meaning as the old Vuetify
-                // v-progress-linear location="bottom" absolute.
+                // Base card surface.
+                Rectangle {
+                    anchors.fill: parent
+
+                    radius: Md3Theme.radiusMedium
+                    color: Md3Theme.surfaceContainerHighest
+                }
+
+                // Whole-row progress background.
                 Rectangle {
                     anchors {
                         left: parent.left
-                        right: parent.right
+                        top: parent.top
                         bottom: parent.bottom
                     }
 
-                    height: 4
+                    width:
+                        parent.width
+                        * macroRow.progress
 
-                    color:
+                    radius: Md3Theme.radiusMedium
+
+                    // Keep it subtle so text/switch remain readable.
+                    color: Md3Theme.surfaceContainerHigh
+
+                    opacity:
                         modelData.enabled
-                        ? Md3Theme.surfaceContainerHigh
-                        : "transparent"
+                        ? 0.95
+                        : 0
 
-                    Rectangle {
-                        anchors {
-                            left: parent.left
-                            top: parent.top
-                            bottom: parent.bottom
+                    Behavior on width {
+                        NumberAnimation {
+                            duration: 950
+                            easing.type: Easing.Linear
                         }
+                    }
 
-                        radius: 2
-
-                        color: Md3Theme.outline
-
-                        width: {
-                            if (!modelData.enabled)
-                                return 0
-
-                            const interval =
-                                Math.max(
-                                    1,
-                                    Number(modelData.interval ?? 1)
-                                )
-
-                            const remaining =
-                                Math.max(
-                                    0,
-                                    Math.min(
-                                        interval,
-                                        Number(
-                                            modelData.current_interval
-                                            ?? interval
-                                        )
-                                    )
-                                )
-
-                            // Exactly the old touch behavior:
-                            // 100 / interval * current_interval.
-                            return parent.width
-                                * remaining / interval
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 180
+                            easing.type: Easing.OutCubic
                         }
+                    }
+                }
 
-                        Behavior on width {
-                            NumberAnimation {
-                                duration: 180
-                                easing.type: Easing.Linear
-                            }
+                // Slight primary accent over the progress area.
+                Rectangle {
+                    anchors {
+                        left: parent.left
+                        top: parent.top
+                        bottom: parent.bottom
+                    }
+
+                    width:
+                        parent.width
+                        * macroRow.progress
+
+                    radius: Md3Theme.radiusMedium
+                    color: Md3Theme.primary
+                    opacity:
+                        modelData.enabled
+                        ? 0.10
+                        : 0
+
+                    Behavior on width {
+                        NumberAnimation {
+                            duration: 950
+                            easing.type: Easing.Linear
+                        }
+                    }
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 180
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 9
+                    spacing: 8
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignVCenter
+
+                        text: modelData.name
+                        color: Md3Theme.surfaceContent
+
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    Md3Switch {
+                        Layout.alignment: Qt.AlignVCenter
+
+                        checked: modelData.enabled === true
+                        animated: false
+
+                        onClicked: {
+                            root.websocket.sendRpc(
+                                "toggle_auto_macro",
+                                {
+                                    name: modelData.name,
+                                    enable: !modelData.enabled
+                                }
+                            )
                         }
                     }
                 }
