@@ -86,7 +86,11 @@ QtObject {
             break
 
         case "notify_system_storage_update":
-            systemStorage = params && typeof params === "object" ? params : null
+            systemStorage = normalizeSystemStorage(params)
+            console.log(
+                "[system-storage] update:",
+                JSON.stringify(systemStorage)
+            )
             break
 
         case "notify_alert_query":
@@ -111,6 +115,88 @@ QtObject {
             if (params && String(params.target) === "music_preview")
                 parseCava(String(params.raw ?? ""))
             break
+        }
+    }
+
+    function firstNumber(values) {
+        for (const value of values) {
+            if (
+                value === undefined
+                || value === null
+                || value === ""
+            ) {
+                continue
+            }
+
+            const numberValue = Number(value)
+
+            if (Number.isFinite(numberValue))
+                return numberValue
+        }
+
+        return null
+    }
+
+    function normalizeSystemStorage(value) {
+        if (
+            !value
+            || typeof value !== "object"
+        ) {
+            return null
+        }
+
+        // Mirrors the old Vue StorageCard normalization.
+        // `data` is additionally supported because several backend responses
+        // use the standard { data, status } envelope.
+        const raw =
+            value.content
+            ?? value.storage
+            ?? value.info
+            ?? value.data
+            ?? value
+
+        if (
+            !raw
+            || typeof raw !== "object"
+        ) {
+            return null
+        }
+
+        const used = firstNumber([
+            raw.used,
+            raw.storageUsed,
+            raw.usedBytes,
+            raw.disk?.used,
+            raw.root?.used
+        ])
+
+        const free = firstNumber([
+            raw.free,
+            raw.storageFree,
+            raw.freeBytes,
+            raw.available,
+            raw.disk?.free,
+            raw.root?.free
+        ])
+
+        const total = firstNumber([
+            raw.total,
+            raw.storageTotal,
+            raw.totalBytes,
+            raw.disk?.total,
+            raw.root?.total
+        ])
+
+        return {
+            ...raw,
+            used: used ?? 0,
+            free: free ?? 0,
+            total: total ?? 0,
+            folders:
+                raw.folders
+                ?? raw.directories
+                ?? raw.paths
+                ?? ({})
         }
     }
 

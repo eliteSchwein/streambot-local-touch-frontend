@@ -212,7 +212,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "update"
+                        icon: "server"
                         selected: appRoot.currentPage === 4
                         badge: dashboardStore.updatesAvailable
 

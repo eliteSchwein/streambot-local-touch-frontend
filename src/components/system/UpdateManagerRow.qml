@@ -28,7 +28,14 @@ Rectangle {
         anchors.margins:6
         spacing:8
 
-        MdiIcon { name:manager.type==="git"?"git":"package-variant"; size:18 }
+        MdiIcon {
+            name:
+                root.manager.type === "git"
+                ? "git"
+                : "package-variant"
+
+            size: 18
+        }
 
         ColumnLayout {
             Layout.fillWidth:true

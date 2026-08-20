@@ -25,19 +25,122 @@ Rectangle {
         return total>0 ? Math.max(0,Math.min(1,used/total)) : 0
     }
 
+    function firstNumber(values) {
+        for (const value of values) {
+            if (
+                value === undefined
+                || value === null
+                || value === ""
+            ) {
+                continue
+            }
+
+            const n = Number(value)
+
+            if (Number.isFinite(n))
+                return n
+        }
+
+        return 0
+    }
+
     function rows() {
-        const f=storage?.folders??({})
+        const s = storage ?? ({})
+        const f = s.folders ?? ({})
+
         return [
-            ["system_media_used",f.assets??0],
-            ["system_asset_config_used",f.asset_configs??0],
-            ["system_overlay_used",f.overlays??0],
-            ["system_music_used",f.music??0],
-            ["system_macro_used",f.macros??0],
-            ["system_auto_macro_used",f.auto_macros??0],
-            ["system_channel_point_used",f.channel_points??0],
-            ["system_command_used",f.commands??0],
-            ["system_ollama_used",f.ollama??0]
-        ].filter(r=>Number(r[1])>0)
+            [
+                "system_media_used",
+                firstNumber([
+                    f.media,
+                    f.assets,
+                    s.mediaUsed,
+                    s.assetUsed,
+                    s.assetsUsed
+                ])
+            ],
+            [
+                "system_asset_config_used",
+                firstNumber([
+                    f.asset_configs,
+                    f.assetConfigs,
+                    s.assetConfigUsed,
+                    s.assetConfigsUsed
+                ])
+            ],
+            [
+                "system_overlay_used",
+                firstNumber([
+                    f.overlays,
+                    f.overlay,
+                    s.overlayUsed,
+                    s.overlaysUsed
+                ])
+            ],
+            [
+                "system_music_used",
+                firstNumber([
+                    f.music,
+                    s.musicUsed
+                ])
+            ],
+            [
+                "system_macro_used",
+                firstNumber([
+                    f.macros,
+                    f.macro,
+                    s.macroUsed,
+                    s.macrosUsed
+                ])
+            ],
+            [
+                "system_auto_macro_used",
+                firstNumber([
+                    f.auto_macros,
+                    f.autoMacros,
+                    f.auto_macro,
+                    s.autoMacroUsed,
+                    s.autoMacrosUsed
+                ])
+            ],
+            [
+                "system_channel_point_used",
+                firstNumber([
+                    f.channel_points,
+                    f.channelPoints,
+                    f.channel_points_configs,
+                    s.channelPointUsed,
+                    s.channelPointsUsed
+                ])
+            ],
+            [
+                "system_command_used",
+                firstNumber([
+                    f.commands,
+                    f.commands_configs,
+                    s.commands,
+                    s.commandUsed,
+                    s.commandsUsed
+                ])
+            ],
+            [
+                "system_rotating_scene_used",
+                firstNumber([
+                    f.rotating_scenes,
+                    f.rotatingScenes,
+                    f.rotating_scene,
+                    s.rotatingSceneUsed,
+                    s.rotatingScenesUsed
+                ])
+            ],
+            [
+                "system_ollama_used",
+                firstNumber([
+                    f.ollama,
+                    s.ollamaUsed
+                ])
+            ]
+        ].filter(row => Number(row[1]) > 0)
     }
 
     ColumnLayout {
@@ -45,16 +148,12 @@ Rectangle {
         anchors.margins: 12
         spacing: 8
 
-        RowLayout {
+        Text {
             Layout.fillWidth: true
-            MdiIcon { name:"harddisk"; size:19 }
-            Text {
-                Layout.fillWidth:true
-                text:root.i18n.text("system_storage")
-                color:Md3Theme.surfaceContent
-                font.pixelSize:13
-                font.weight:Font.DemiBold
-            }
+            text: root.i18n.text("system_storage")
+            color: Md3Theme.surfaceContent
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
         }
 
         Rectangle {
