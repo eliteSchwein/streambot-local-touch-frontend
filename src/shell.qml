@@ -87,7 +87,8 @@ ShellRoot {
                     anchors.centerIn: parent
 
                     Md3NavButton {
-                        icon: "⌂"selected: true
+                        icon: "⌂"
+                        selected: true
                     }
                 }
             }
