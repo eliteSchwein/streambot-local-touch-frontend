@@ -2,7 +2,7 @@
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION is required}"
-DISTRO="${DISTRO:-debian}"
+DISTRO="${DISTRO:-trixie}"
 ARCH="${ARCH:-all}"
 OUT_DIR="${OUT_DIR:-dist-artifacts}"
 
@@ -11,6 +11,7 @@ PACKAGE_ROOT="$(mktemp -d)"
 cleanup() {
     rm -rf "$PACKAGE_ROOT"
 }
+
 trap cleanup EXIT
 
 mkdir -p \
@@ -24,7 +25,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: quickshell
+Depends: quickshell, qml6-module-qtwebsockets
 Maintainer: Thomas Ludwig
 Description: Streambot Touch Quickshell interface
  Touch interface for Streambot using Quickshell.
@@ -47,6 +48,18 @@ dpkg-deb \
     "$PACKAGE_ROOT" \
     "$OUTPUT"
 
-echo "Built $OUTPUT"
+echo
+echo "Built:"
+echo "$OUTPUT"
+
+echo
+echo "Package info:"
 dpkg-deb --info "$OUTPUT"
+
+echo
+echo "Package contents:"
 dpkg-deb --contents "$OUTPUT"
+
+echo
+echo "Dependencies:"
+dpkg-deb -f "$OUTPUT" Depends
