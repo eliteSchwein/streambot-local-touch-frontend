@@ -4,16 +4,50 @@ import QtQuick.Layouts
 import Quickshell
 
 import "components"
+import "services"
 
 ShellRoot {
     id: root
 
-    readonly property string configPath:
-        Quickshell.env("STREAMBOT_TOUCH_CONFIG") ?? ""
+    Config {
+        id: config
+    }
+
+    WsClient {
+        id: websocket
+
+        url: config.websocketUrl
+
+        onConnectedChangedState: connected => {
+            console.log(
+                "[websocket] state:",
+                connected ? "connected" : "disconnected"
+            )
+        }
+
+        onJsonReceived: data => {
+            console.log(
+                "[websocket] json:",
+                JSON.stringify(data)
+            )
+        }
+
+        onMessageReceived: message => {
+            console.log(
+                "[websocket] raw:",
+                message
+            )
+        }
+
+        onSocketError: error => {
+            console.warn(
+                "[websocket]",
+                error
+            )
+        }
+    }
 
     PanelWindow {
-        id: window
-
         anchors {
             top: true
             bottom: true
@@ -21,47 +55,42 @@ ShellRoot {
             right: true
         }
 
-        focusable: true
         color: "#121212"
 
-        Rectangle {
-            anchors.fill: parent
-            color: "#121212"
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 16
 
-            ColumnLayout {
-                anchors.centerIn: parent
-                spacing: 24
+            Text {
+                text: websocket.connected
+                    ? "WebSocket connected"
+                    : "WebSocket disconnected"
 
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "Streambot Touch"
-                    color: "white"
-                    font.pixelSize: 42
-                    font.bold: true
+                color: "white"
+            }
+
+            Text {
+                text: config.websocketUrl
+                color: "#aaaaaa"
+            }
+
+            Button {
+                text: "Send test"
+                enabled: websocket.connected
+
+                onClicked: {
+                    websocket.sendJson({
+                        type: "test",
+                        source: "streambot-touch"
+                    })
                 }
+            }
 
-                StatusCard {
-                    Layout.alignment: Qt.AlignHCenter
-                    title: "Quickshell"
-                    value: "It works!"
-                }
+            Button {
+                text: "Reconnect"
 
-                StatusCard {
-                    Layout.alignment: Qt.AlignHCenter
-                    title: "Config"
-                    value: root.configPath !== ""
-                        ? root.configPath
-                        : "No config specified"
-                }
-
-                Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "Test button"
-
-                    onClicked: {
-                        console.log("Button pressed")
-                        console.log("Config:", root.configPath)
-                    }
+                onClicked: {
+                    websocket.reconnect()
                 }
             }
         }

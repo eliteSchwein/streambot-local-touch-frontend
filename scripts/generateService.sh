@@ -9,7 +9,7 @@ default=$(echo -en "\e[39m")
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 MCSERVICENAME="streambottouch"
-MCCONFIGFILE="/home/$(whoami)/streambot-touch.cfg"
+MCCONFIGFILE="/home/$(whoami)/.config/streambot/streambot-touch.cfg"
 
 status_msg(){ echo; echo -e "${yellow}###### $1${default}"; }
 ok_msg(){ echo -e "${green}>>>>>> $1${default}"; }
