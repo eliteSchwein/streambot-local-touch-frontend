@@ -109,7 +109,7 @@ ShellRoot {
 
                 i18n: i18n
                 store: dashboardStore
-                restUrl: config.restUrl
+                websocket: websocket
             }
 
             Rectangle {
@@ -145,7 +145,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "code-braces"
+                        icon: "dialpad"
                         selected: appRoot.currentPage === 2
 
                         onClicked:

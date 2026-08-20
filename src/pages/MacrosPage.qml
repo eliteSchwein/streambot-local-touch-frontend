@@ -9,7 +9,7 @@ Item {
 
     required property var i18n
     required property var store
-    required property string restUrl
+    required property var websocket
 
     property string searchQuery: ""
 
@@ -31,9 +31,6 @@ Item {
             if (
                 query !== ""
                 && !String(name)
-                    .toLowerCase()
-                    .includes(query)
-                && !JSON.stringify(macro)
                     .toLowerCase()
                     .includes(query)
             ) {
@@ -63,42 +60,21 @@ Item {
 
         spacing: 8
 
-        // Search only; no pointless page header.
-        RowLayout {
+        Md3TextField {
+            id: searchField
+
             Layout.fillWidth: true
             Layout.preferredHeight: 44
 
-            spacing: 8
+            placeholderText:
+                root.i18n.text(
+                    "macro_search"
+                )
 
-            Rectangle {
-                Layout.preferredWidth: 40
-                Layout.preferredHeight: 40
+            text: root.searchQuery
 
-                radius: 20
-                color: Md3Theme.surfaceContainer
-
-                MdiIcon {
-                    anchors.centerIn: parent
-
-                    name: "magnify"
-                    size: 19
-                }
-            }
-
-            Md3TextField {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 44
-
-                placeholderText:
-                    root.i18n.text(
-                        "macro_search"
-                    )
-
-                text: root.searchQuery
-
-                onTextChanged:
-                    root.searchQuery = text
-            }
+            onTextChanged:
+                root.searchQuery = text
         }
 
         Item {
@@ -149,11 +125,8 @@ Item {
                     macro:
                         modelData.macro
 
-                    restUrl:
-                        root.restUrl
-
-                    i18n:
-                        root.i18n
+                    websocket:
+                        root.websocket
                 }
             }
         }

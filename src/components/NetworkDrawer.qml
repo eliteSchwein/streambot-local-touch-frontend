@@ -74,7 +74,7 @@ Item {
             right: parent.right
         }
 
-        height: root.open ? 0 : 44
+        height: root.open ? 0 : 8
         z: 20
 
         DragHandler {
@@ -86,17 +86,13 @@ Item {
                 if (active) {
                     startY = centroid.position.y
                 } else if (
-                    centroid.position.y - startY > 36
+                    centroid.position.y - startY > 28
                 ) {
                     root.open = true
                 }
             }
         }
 
-        TapHandler {
-            enabled: !KeyboardController.visible
-            onTapped: root.open = true
-        }
     }
 
     Rectangle {

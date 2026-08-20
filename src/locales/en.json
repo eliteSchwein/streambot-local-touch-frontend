@@ -79,7 +79,5 @@
   "macros": "Macros",
   "macro_search": "Search macros",
   "macro_no_results": "No macros found",
-  "macro_tasks": "%1 tasks",
-  "macro_task": "1 task",
   "macro_run_failed": "Macro failed"
 }

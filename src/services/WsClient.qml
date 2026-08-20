@@ -28,6 +28,7 @@ QtObject {
     signal connectionChanged(bool connected)
     signal messageReceived(string message)
     signal jsonReceived(var data)
+    signal rpcResponse(int id, var data)
     signal socketError(string error)
 
     function send(message) {
@@ -141,7 +142,25 @@ QtObject {
             root.messageReceived(message)
 
             try {
-                root.jsonReceived(JSON.parse(message))
+                const data = JSON.parse(message)
+
+                // JSON-RPC response: do not treat it like a notification.
+                if (
+                    data
+                    && data.id !== undefined
+                    && (
+                        data.result !== undefined
+                        || data.error !== undefined
+                        || data.params !== undefined
+                    )
+                ) {
+                    root.rpcResponse(
+                        Number(data.id),
+                        data
+                    )
+                }
+
+                root.jsonReceived(data)
             } catch (error) {
             }
         }

@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Io
 
 import "../md3"
 
@@ -9,12 +8,12 @@ Rectangle {
 
     required property string name
     required property var macro
-    required property string restUrl
-    required property var i18n
+    required property var websocket
 
     property string runState: "idle"
+    property int requestId: -1
 
-    implicitHeight: 58
+    implicitHeight: 54
 
     radius: Md3Theme.radiusMedium
     color: Md3Theme.surfaceContainer
@@ -22,91 +21,90 @@ Rectangle {
     border.width: 1
     border.color: Md3Theme.outlineVariant
 
-    readonly property int taskCount:
-        Array.isArray(macro.tasks)
-        ? macro.tasks.length
-        : 0
-
-    function taskCountText() {
-        if (taskCount === 1)
-            return i18n.text("macro_task")
-
-        return i18n
-            .text("macro_tasks")
-            .replace("%1", taskCount)
-    }
-
     function triggerMacro() {
         if (
             runState === "loading"
-            || !restUrl
+            || !websocket.connected
         ) {
             return
         }
 
         runState = "loading"
 
-        triggerProcess.command = [
-            "curl",
-            "-sS",
-            "-o",
-            "/dev/null",
-            "-w",
-            "HTTP:%{http_code}",
-            "-X",
-            "POST",
-            "-H",
-            "Content-Type: application/json",
-            "--data-raw",
-            JSON.stringify({
-                macro: root.name
-            }),
-            root.restUrl + "/api/macro"
-        ]
-
-        triggerProcess.running = true
-    }
-
-    Process {
-        id: triggerProcess
-
-        running: false
-
-        stdout: SplitParser {
-            onRead: line => {
-                const match =
-                    String(line)
-                        .match(/HTTP:(\d+)/)
-
-                if (!match)
-                    return
-
-                const code =
-                    Number(match[1])
-
-                root.runState =
-                    code >= 200 && code < 300
-                    ? "success"
-                    : "error"
-
-                resetTimer.restart()
+        requestId = websocket.sendRpc(
+            "macro",
+            {
+                macro: name
             }
+        )
+
+        if (requestId < 0) {
+            runState = "error"
+            resetTimer.restart()
+            return
         }
 
-        stderr: SplitParser {
-            onRead: line => {
-                if (!String(line).trim())
-                    return
+        responseTimeout.restart()
+    }
 
-                console.warn(
-                    "[macro]",
-                    root.name,
-                    line
-                )
+    function responseFailed(data) {
+        if (!data)
+            return false
 
-                root.runState = "error"
-                resetTimer.restart()
+        if (data.error !== undefined)
+            return true
+
+        const result =
+            data.result
+            ?? data.params
+            ?? data.data
+            ?? data.payload
+            ?? null
+
+        if (
+            result
+            && typeof result === "object"
+            && result.success === false
+        ) {
+            return true
+        }
+
+        return false
+    }
+
+    Connections {
+        target: root.websocket
+
+        function onRpcResponse(id, data) {
+            if (
+                root.requestId < 0
+                || id !== root.requestId
+            ) {
+                return
             }
+
+            responseTimeout.stop()
+            root.requestId = -1
+
+            root.runState =
+                root.responseFailed(data)
+                ? "error"
+                : "success"
+
+            resetTimer.restart()
+        }
+    }
+
+    Timer {
+        id: responseTimeout
+
+        interval: 10000
+        repeat: false
+
+        onTriggered: {
+            root.requestId = -1
+            root.runState = "error"
+            resetTimer.restart()
         }
     }
 
@@ -122,60 +120,26 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 12
+        anchors.leftMargin: 14
         anchors.rightMargin: 8
 
         spacing: 10
 
-        ColumnLayout {
+        Text {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
 
-            spacing: 2
+            text: root.name
+            color: Md3Theme.surfaceContent
 
-            Text {
-                Layout.fillWidth: true
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
 
-                text: root.name
-                color: Md3Theme.surfaceContent
-
-                font.pixelSize: 12
-                font.weight: Font.DemiBold
-
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            Rectangle {
-                implicitWidth:
-                    taskText.implicitWidth + 14
-
-                implicitHeight: 21
-
-                radius: 11
-                color:
-                    Md3Theme.surfaceContainerHighest
-
-                Text {
-                    id: taskText
-
-                    anchors.centerIn: parent
-
-                    text:
-                        root.taskCountText()
-
-                    color:
-                        Md3Theme.surfaceVariantContent
-
-                    font.pixelSize: 8
-                    font.weight: Font.Medium
-                }
-            }
+            elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
         }
 
         Rectangle {
-            id: runButton
-
             Layout.alignment: Qt.AlignVCenter
 
             implicitWidth: 44
@@ -210,9 +174,6 @@ Rectangle {
                 }
 
                 size: 21
-
-                // Primary/success/error backgrounds all need
-                // the dark selected icon variant.
                 selected:
                     root.runState !== "loading"
             }
