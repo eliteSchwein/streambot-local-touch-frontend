@@ -152,6 +152,15 @@ ShellRoot {
                 store: dashboardStore
             }
 
+            SystemPage {
+                id: systemPage
+                visible: appRoot.currentPage === 4
+                anchors { top: parent.top; left: parent.left; right: parent.right; bottom: navigation.top }
+                i18n: i18n
+                websocket: websocket
+                store: dashboardStore
+            }
+
             Rectangle {
                 id: navigation
 
@@ -200,6 +209,15 @@ ShellRoot {
 
                         onClicked:
                             appRoot.currentPage = 3
+                    }
+
+                    Md3NavButton {
+                        icon: "update"
+                        selected: appRoot.currentPage === 4
+                        badge: dashboardStore.updatesAvailable
+
+                        onClicked:
+                            appRoot.currentPage = 4
                     }
                 }
 

@@ -13,6 +13,17 @@ QtObject {
     property var activeChannelPoints: []
     property var alertQueue: []
     property var activeAlert: null
+    property var updateManager: ({})
+    property var systemStorage: null
+
+    readonly property bool updatesAvailable: {
+        const managers = updateManager ?? ({})
+        for (const name in managers) {
+            if (managers[name]?.update_available === true)
+                return true
+        }
+        return false
+    }
 
     // CAVA preview from notify_music_cava target=music_preview.
     property var cava: [0, 0, 0, 0, 0]
@@ -68,6 +79,14 @@ QtObject {
                 params && Array.isArray(params.active)
                 ? params.active
                 : []
+            break
+
+        case "notify_update_manager":
+            updateManager = params && typeof params === "object" ? params : ({})
+            break
+
+        case "notify_system_storage_update":
+            systemStorage = params && typeof params === "object" ? params : null
             break
 
         case "notify_alert_query":
