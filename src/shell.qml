@@ -119,7 +119,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "speaker"
+                        icon: "volume-high"
                         selected: appRoot.currentPage === 1
 
                         onClicked:

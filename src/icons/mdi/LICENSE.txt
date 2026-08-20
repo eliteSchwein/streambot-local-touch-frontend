@@ -1,0 +1,7 @@
+Material Design Icons / Pictogrammers
+
+Icons are distributed under the terms described by the upstream
+MaterialDesign-SVG project. Icons are Apache 2.0 compatible; see:
+https://github.com/Templarian/MaterialDesign-SVG
+
+This project bundles only the SVG subset it uses.
