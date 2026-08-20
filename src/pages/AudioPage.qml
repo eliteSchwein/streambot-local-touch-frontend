@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 
 import "../components/audio"
+import "../components/md3"
 import "../dialogs"
 
 Item {
@@ -20,87 +21,100 @@ Item {
     readonly property var names:
         interfaceNames()
 
-    ColumnLayout {
+    Flickable {
+        id: pageScroll
+
         anchors.fill: parent
-        anchors.margins: 10
+        anchors.margins: 8
 
-        spacing: 8
+        clip: true
 
-        // Virtual Streambot outputs.
-        ListView {
-            id: interfaceList
+        contentWidth: width
+        contentHeight:
+            contentColumn.implicitHeight
 
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredHeight: parent.height * 0.58
+        boundsBehavior:
+            Flickable.StopAtBounds
 
-            clip: true
-            spacing: 8
+        Column {
+            id: contentColumn
 
-            model: root.names
+            width: pageScroll.width
+            spacing: 5
 
-            delegate: AudioInterfaceRow {
-                required property string modelData
+            // Virtual outputs.
+            Repeater {
+                model: root.names
 
-                width: interfaceList.width
+                AudioInterfaceRow {
+                    required property string modelData
 
-                interfaceName: modelData
-                device: root.store.audio[modelData]
+                    width: contentColumn.width
 
-                physical: false
-                showLinkButton: true
+                    interfaceName: modelData
+                    device:
+                        root.store.audio[modelData]
 
-                i18n: root.i18n
-                websocket: root.websocket
+                    physical: false
+                    showLinkButton: true
 
-                onLinkRequested:
-                    function(interfaceName, device) {
-                        linkDialog.interfaceName =
-                            interfaceName
+                    i18n: root.i18n
+                    websocket: root.websocket
 
-                        linkDialog.device =
-                            device
+                    onLinkRequested:
+                        function(interfaceName, device) {
+                            linkDialog.interfaceName =
+                                interfaceName
 
-                        linkDialog.outputs =
-                            root.store.audioOutputs
+                            linkDialog.device =
+                                device
 
-                        linkDialog.open()
-                    }
+                            linkDialog.outputs =
+                                root.store.audioOutputs
+
+                            linkDialog.open()
+                        }
+                }
             }
-        }
 
-        // Physical outputs use the same row base.
-        ListView {
-            id: physicalList
+            // Small separator between virtual and physical outputs.
+            Rectangle {
+                width: contentColumn.width
+                height: 1
+                visible:
+                    root.names.length > 0
+                    && root.store.audioOutputs.length > 0
 
-            Layout.fillWidth: true
-            Layout.preferredHeight: parent.height * 0.36
+                color: Md3Theme.outlineVariant
+                opacity: 0.6
+            }
 
-            clip: true
-            spacing: 8
+            // Physical outputs, same row base.
+            Repeater {
+                model:
+                    root.store.audioOutputs
 
-            model: root.store.audioOutputs
+                AudioInterfaceRow {
+                    required property var modelData
 
-            delegate: AudioInterfaceRow {
-                required property var modelData
+                    width: contentColumn.width
 
-                width: physicalList.width
+                    interfaceName:
+                        String(
+                            modelData.description
+                            ?? modelData.name
+                            ?? modelData.id
+                            ?? "Output"
+                        )
 
-                interfaceName:
-                    String(
-                        modelData.description
-                        ?? modelData.name
-                        ?? modelData.id
-                        ?? "Output"
-                    )
+                    device: modelData
 
-                device: modelData
+                    physical: true
+                    showLinkButton: false
 
-                physical: true
-                showLinkButton: false
-
-                i18n: root.i18n
-                websocket: root.websocket
+                    i18n: root.i18n
+                    websocket: root.websocket
+                }
             }
         }
     }

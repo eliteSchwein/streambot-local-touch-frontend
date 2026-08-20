@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 
 import "../md3"
 
@@ -24,6 +25,18 @@ Rectangle {
             ?? 0
         )
 
+    // Last useful non-zero volume for unmute.
+    property real previousVolume:
+        Math.max(
+            0.01,
+            Number(
+                device.current_volume
+                ?? device.default_volume
+                ?? device.volume
+                ?? 0.2
+            )
+        )
+
     readonly property bool pipewireSink:
         !physical
         && (
@@ -38,7 +51,11 @@ Rectangle {
         Number(device.max_range ?? 1)
 
     readonly property real stepVolumeValue: {
-        const value = Number(device.steps_range ?? 0.01)
+        if (physical)
+            return 0.05
+
+        const value =
+            Number(device.steps_range ?? 0.01)
 
         return Number.isFinite(value) && value > 0
             ? value
@@ -46,7 +63,12 @@ Rectangle {
     }
 
     readonly property bool muted:
-        device.muted === true
+        physical
+        ? device.muted === true
+        : (
+            device.muted === true
+            || draftVolume <= minVolume
+        )
 
     readonly property string subtitle: {
         if (physical) {
@@ -63,13 +85,21 @@ Rectangle {
         )
     }
 
-    radius: Md3Theme.radiusLarge
+    radius: Md3Theme.radiusMedium
     color: Md3Theme.surfaceContainer
 
     border.width: 1
     border.color: Md3Theme.outlineVariant
 
-    implicitHeight: 88
+    implicitHeight: 64
+
+    function physicalOutputName() {
+        return String(
+            device.name
+            ?? device.id
+            ?? ""
+        )
+    }
 
     function clampVolume(value) {
         return Math.max(
@@ -82,11 +112,25 @@ Rectangle {
         const safeValue =
             clampVolume(Number(value))
 
+        if (safeValue > 0)
+            previousVolume = safeValue
+
         draftVolume = safeValue
 
         if (physical) {
-            // No guessed backend RPC for physical-output volume.
-            // This row remains live/read-only until the RPC name is exposed.
+            const outputName =
+                physicalOutputName()
+
+            if (!outputName)
+                return
+
+            pactlProcess.command = [
+                "pactl",
+                "set-sink-volume",
+                outputName,
+                Math.round(safeValue * 100) + "%"
+            ]
+            pactlProcess.running = true
             return
         }
 
@@ -100,51 +144,97 @@ Rectangle {
     }
 
     function stepVolume(direction) {
-        if (physical)
-            return
-
         setVolume(
             draftVolume
             + stepVolumeValue * direction
         )
     }
 
+    function toggleMute() {
+        if (physical) {
+            const outputName =
+                physicalOutputName()
+
+            if (!outputName)
+                return
+
+            pactlProcess.command = [
+                "pactl",
+                "set-sink-mute",
+                outputName,
+                "toggle"
+            ]
+            pactlProcess.running = true
+            return
+        }
+
+        if (muted) {
+            setVolume(
+                Math.max(
+                    previousVolume,
+                    Number(device.default_volume ?? 0.2)
+                )
+            )
+        } else {
+            previousVolume =
+                Math.max(draftVolume, 0.01)
+            setVolume(0)
+        }
+    }
+
     onDeviceChanged: {
         if (!volumeSlider.pressed) {
-            draftVolume = Number(
-                device.current_volume
-                ?? device.default_volume
-                ?? device.volume
-                ?? 0
-            )
+            const next =
+                Number(
+                    device.current_volume
+                    ?? device.default_volume
+                    ?? device.volume
+                    ?? 0
+                )
+
+            draftVolume = next
+
+            if (next > 0)
+                previousVolume = next
+        }
+    }
+
+    Process {
+        id: pactlProcess
+        running: false
+
+        onRunningChanged: {
+            if (!running)
+                console.log(
+                    "[audio] pactl finished:",
+                    root.interfaceName
+                )
         }
     }
 
     Timer {
         id: volumeSendTimer
 
-        interval: 160
+        interval: 140
         repeat: false
 
-        onTriggered: {
-            if (!root.physical)
-                root.setVolume(root.draftVolume)
-        }
+        onTriggered:
+            root.setVolume(root.draftVolume)
     }
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 8
+        anchors.margins: 7
+        spacing: 6
 
-        // Much tighter label area than v33.
+        // Compact label block.
         ColumnLayout {
-            Layout.preferredWidth: 92
-            Layout.minimumWidth: 82
-            Layout.maximumWidth: 110
+            Layout.preferredWidth: 82
+            Layout.minimumWidth: 72
+            Layout.maximumWidth: 96
             Layout.alignment: Qt.AlignVCenter
 
-            spacing: 1
+            spacing: 0
 
             Text {
                 Layout.fillWidth: true
@@ -152,7 +242,7 @@ Rectangle {
                 text: root.interfaceName
                 color: Md3Theme.surfaceContent
 
-                font.pixelSize: 13
+                font.pixelSize: 12
                 font.weight: Font.DemiBold
 
                 elide: Text.ElideRight
@@ -161,25 +251,22 @@ Rectangle {
 
             Text {
                 Layout.fillWidth: true
-
                 visible: root.subtitle !== ""
 
                 text: root.subtitle
-
                 color: Md3Theme.surfaceVariantContent
-                font.pixelSize: 8
 
+                font.pixelSize: 7
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
             }
         }
 
-        // Controls now immediately follow label block.
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
 
-            spacing: 2
+            spacing: 0
 
             Md3Slider {
                 id: volumeSlider
@@ -190,25 +277,16 @@ Rectangle {
                 to: root.maxVolume
                 stepSize: root.stepVolumeValue
 
-                enabled:
-                    !root.physical
-                    && !root.muted
-
+                enabled: !root.muted
                 value: root.draftVolume
 
                 onMoved: {
-                    if (root.physical)
-                        return
-
                     root.draftVolume = value
                     volumeSendTimer.restart()
                 }
 
                 onPressedChanged: {
-                    if (
-                        !pressed
-                        && !root.physical
-                    ) {
+                    if (!pressed) {
                         volumeSendTimer.stop()
                         root.setVolume(value)
                     }
@@ -217,16 +295,33 @@ Rectangle {
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 4
+                Layout.preferredHeight: 28
+                spacing: 3
 
                 Md3IconButton {
-                    visible: !root.physical
+                    implicitWidth: 30
+                    implicitHeight: 30
 
                     icon: "−"
                     enabled: !root.muted
 
                     onClicked:
                         root.stepVolume(-1)
+                }
+
+                Md3IconButton {
+                    implicitWidth: 30
+                    implicitHeight: 30
+
+                    icon:
+                        root.muted
+                        ? "×"
+                        : "◁"
+
+                    selected: root.muted
+
+                    onClicked:
+                        root.toggleMute()
                 }
 
                 Item {
@@ -243,7 +338,7 @@ Rectangle {
                         + "%"
 
                     color: Md3Theme.surfaceVariantContent
-                    font.pixelSize: 10
+                    font.pixelSize: 9
                     verticalAlignment: Text.AlignVCenter
                 }
 
@@ -252,7 +347,8 @@ Rectangle {
                 }
 
                 Md3IconButton {
-                    visible: !root.physical
+                    implicitWidth: 30
+                    implicitHeight: 30
 
                     icon: "+"
                     enabled: !root.muted
@@ -265,6 +361,9 @@ Rectangle {
 
         AudioLinkButton {
             Layout.alignment: Qt.AlignVCenter
+
+            implicitWidth: 34
+            implicitHeight: 34
 
             visible:
                 root.showLinkButton
