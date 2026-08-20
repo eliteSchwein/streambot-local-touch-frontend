@@ -1,53 +1,40 @@
 import QtQuick
-import QtQuick.Layouts
 
 Item {
     id: root
 
     property string icon: "⌂"
-    property string text: ""
     property bool selected: false
 
     signal clicked()
 
-    implicitWidth: 110
-    implicitHeight: 46
+    implicitWidth: 72
+    implicitHeight: 42
 
-    ColumnLayout {
+    Rectangle {
         anchors.centerIn: parent
-        spacing: 1
 
-        Rectangle {
-            Layout.alignment: Qt.AlignHCenter
-            width: 54
-            height: 26
-            radius: 14
+        width: 56
+        height: 32
+        radius: 18
 
-            color:
-                root.selected
-                ? Md3Theme.primary
-                : "transparent"
-
-            Text {
-                anchors.centerIn: parent
-                text: root.icon
-                color:
-                    root.selected
-                    ? Md3Theme.primaryContent
-                    : Md3Theme.surfaceVariantContent
-                font.pixelSize: 18
-            }
-        }
+        color:
+            root.selected
+            ? Md3Theme.primary
+            : "transparent"
 
         Text {
-            Layout.alignment: Qt.AlignHCenter
-            text: root.text
+            anchors.centerIn: parent
+
+            text: root.icon
+
             color:
                 root.selected
-                ? Md3Theme.surfaceContent
+                ? Md3Theme.primaryContent
                 : Md3Theme.surfaceVariantContent
-            font.pixelSize: 10
-            font.weight: root.selected ? Font.DemiBold : Font.Normal
+
+            font.pixelSize: 20
+            font.weight: Font.DemiBold
         }
     }
 

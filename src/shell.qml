@@ -87,9 +87,7 @@ ShellRoot {
                     anchors.centerIn: parent
 
                     Md3NavButton {
-                        icon: "⌂"
-                        text: i18n.text("dashboard")
-                        selected: true
+                        icon: "⌂"selected: true
                     }
                 }
             }
