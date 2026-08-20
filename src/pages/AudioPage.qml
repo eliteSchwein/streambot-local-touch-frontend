@@ -25,7 +25,7 @@ Item {
         id: pageScroll
 
         anchors.fill: parent
-        anchors.margins: 8
+        anchors.margins: 10
 
         clip: true
 
@@ -40,7 +40,7 @@ Item {
             id: contentColumn
 
             width: pageScroll.width
-            spacing: 5
+            spacing: 8
 
             // Virtual outputs.
             Repeater {

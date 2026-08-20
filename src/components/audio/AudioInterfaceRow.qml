@@ -25,7 +25,6 @@ Rectangle {
             ?? 0
         )
 
-    // Last useful non-zero volume for unmute.
     property real previousVolume:
         Math.max(
             0.01,
@@ -85,13 +84,13 @@ Rectangle {
         )
     }
 
-    radius: Md3Theme.radiusMedium
+    radius: Md3Theme.radiusLarge
     color: Md3Theme.surfaceContainer
 
     border.width: 1
     border.color: Md3Theme.outlineVariant
 
-    implicitHeight: 64
+    implicitHeight: 76
 
     function physicalOutputName() {
         return String(
@@ -130,6 +129,7 @@ Rectangle {
                 outputName,
                 Math.round(safeValue * 100) + "%"
             ]
+
             pactlProcess.running = true
             return
         }
@@ -164,6 +164,7 @@ Rectangle {
                 outputName,
                 "toggle"
             ]
+
             pactlProcess.running = true
             return
         }
@@ -178,6 +179,7 @@ Rectangle {
         } else {
             previousVolume =
                 Math.max(draftVolume, 0.01)
+
             setVolume(0)
         }
     }
@@ -202,14 +204,6 @@ Rectangle {
     Process {
         id: pactlProcess
         running: false
-
-        onRunningChanged: {
-            if (!running)
-                console.log(
-                    "[audio] pactl finished:",
-                    root.interfaceName
-                )
-        }
     }
 
     Timer {
@@ -224,25 +218,31 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 7
-        spacing: 6
+        anchors.leftMargin: 12
+        anchors.rightMargin: 10
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
 
-        // Compact label block.
+        spacing: 10
+
+        // Name / sink block.
         ColumnLayout {
-            Layout.preferredWidth: 82
-            Layout.minimumWidth: 72
-            Layout.maximumWidth: 96
+            Layout.preferredWidth: 120
+            Layout.minimumWidth: 105
+            Layout.maximumWidth: 135
+
             Layout.alignment: Qt.AlignVCenter
 
-            spacing: 0
+            spacing: 1
 
             Text {
                 Layout.fillWidth: true
 
                 text: root.interfaceName
+
                 color: Md3Theme.surfaceContent
 
-                font.pixelSize: 12
+                font.pixelSize: 13
                 font.weight: Font.DemiBold
 
                 elide: Text.ElideRight
@@ -251,33 +251,39 @@ Rectangle {
 
             Text {
                 Layout.fillWidth: true
+
                 visible: root.subtitle !== ""
 
                 text: root.subtitle
+
                 color: Md3Theme.surfaceVariantContent
 
-                font.pixelSize: 7
+                font.pixelSize: 8
+
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
             }
         }
 
+        // Main controls.
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.alignment: Qt.AlignVCenter
+            Layout.fillHeight: true
 
-            spacing: 0
+            spacing: 2
 
             Md3Slider {
                 id: volumeSlider
 
                 Layout.fillWidth: true
+                Layout.preferredHeight: 26
 
                 from: root.minVolume
                 to: root.maxVolume
                 stepSize: root.stepVolumeValue
 
                 enabled: !root.muted
+
                 value: root.draftVolume
 
                 onMoved: {
@@ -295,28 +301,23 @@ Rectangle {
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 28
-                spacing: 3
+                Layout.preferredHeight: 34
 
-                Md3IconButton {
-                    implicitWidth: 30
-                    implicitHeight: 30
+                spacing: 5
 
-                    icon: "−"
+                AudioControlButton {
+                    icon: "minus"
                     enabled: !root.muted
 
                     onClicked:
                         root.stepVolume(-1)
                 }
 
-                Md3IconButton {
-                    implicitWidth: 30
-                    implicitHeight: 30
-
+                AudioControlButton {
                     icon:
                         root.muted
-                        ? "×"
-                        : "◁"
+                        ? "mute"
+                        : "volume"
 
                     selected: root.muted
 
@@ -328,29 +329,38 @@ Rectangle {
                     Layout.fillWidth: true
                 }
 
-                Text {
-                    Layout.alignment: Qt.AlignVCenter
+                Rectangle {
+                    implicitWidth: 58
+                    implicitHeight: 28
 
-                    text:
-                        Math.round(
-                            root.draftVolume * 100
-                        )
-                        + "%"
+                    radius: 14
 
-                    color: Md3Theme.surfaceVariantContent
-                    font.pixelSize: 9
-                    verticalAlignment: Text.AlignVCenter
+                    color:
+                        Md3Theme.surfaceContainerHighest
+
+                    Text {
+                        anchors.centerIn: parent
+
+                        text:
+                            Math.round(
+                                root.draftVolume * 100
+                            )
+                            + "%"
+
+                        color:
+                            Md3Theme.surfaceContent
+
+                        font.pixelSize: 10
+                        font.weight: Font.DemiBold
+                    }
                 }
 
                 Item {
                     Layout.fillWidth: true
                 }
 
-                Md3IconButton {
-                    implicitWidth: 30
-                    implicitHeight: 30
-
-                    icon: "+"
+                AudioControlButton {
+                    icon: "plus"
                     enabled: !root.muted
 
                     onClicked:
@@ -359,11 +369,12 @@ Rectangle {
             }
         }
 
+        // Link button only for virtual Streambot sinks.
         AudioLinkButton {
             Layout.alignment: Qt.AlignVCenter
 
-            implicitWidth: 34
-            implicitHeight: 34
+            implicitWidth: 38
+            implicitHeight: 38
 
             visible:
                 root.showLinkButton
