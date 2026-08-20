@@ -171,7 +171,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "gift-outline"
+                        icon: "motion-play-outline"
                         selected: appRoot.currentPage === 3
 
                         onClicked:

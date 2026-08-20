@@ -131,6 +131,55 @@ Rectangle {
 
         spacing: 10
 
+        Rectangle {
+            Layout.preferredWidth: 40
+            Layout.preferredHeight: 40
+            Layout.alignment: Qt.AlignVCenter
+
+            radius: 10
+            color: Md3Theme.surfaceContainerHighest
+            clip: true
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 3
+
+                visible:
+                    String(
+                        root.channelPoint.image
+                        ?? ""
+                    ) !== ""
+
+                source:
+                    String(
+                        root.channelPoint.image
+                        ?? ""
+                    )
+
+                sourceSize.width: 64
+                sourceSize.height: 64
+
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                cache: true
+                smooth: true
+                mipmap: true
+            }
+
+            MdiIcon {
+                anchors.centerIn: parent
+
+                visible:
+                    String(
+                        root.channelPoint.image
+                        ?? ""
+                    ) === ""
+
+                name: "motion-play-outline"
+                size: 22
+            }
+        }
+
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
