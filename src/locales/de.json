@@ -82,5 +82,13 @@
   "macro_run_failed": "Makro fehlgeschlagen",
   "channel_points": "Kanalpunkte",
   "channel_points_empty": "Keine Kanalpunkte verfügbar",
-  "channel_point_toggle_failed": "Kanalpunkt konnte nicht umgeschaltet werden"
+  "channel_point_toggle_failed": "Kanalpunkt konnte nicht umgeschaltet werden",
+  "power_menu": "Power-Menü",
+  "shutdown_device": "Gerät ausschalten",
+  "shutdown_device_text": "Den Raspberry Pi ausschalten.",
+  "restart_device": "Gerät neu starten",
+  "restart_device_text": "Den Raspberry Pi neu starten.",
+  "restart_backend": "Backend neu starten",
+  "restart_backend_text": "stream-overlord.service neu starten.",
+  "power_action_failed": "Aktion fehlgeschlagen"
 }

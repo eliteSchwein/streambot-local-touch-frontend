@@ -82,5 +82,13 @@
   "macro_run_failed": "Macro failed",
   "channel_points": "Channel points",
   "channel_points_empty": "No channel points available",
-  "channel_point_toggle_failed": "Failed to toggle channel point"
+  "channel_point_toggle_failed": "Failed to toggle channel point",
+  "power_menu": "Power menu",
+  "shutdown_device": "Shut down device",
+  "shutdown_device_text": "Power off the Raspberry Pi.",
+  "restart_device": "Restart device",
+  "restart_device_text": "Reboot the Raspberry Pi.",
+  "restart_backend": "Restart backend",
+  "restart_backend_text": "Restart stream-overlord.service.",
+  "power_action_failed": "Power action failed"
 }

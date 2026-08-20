@@ -399,23 +399,54 @@ Item {
 
                         title: root.i18n.text("language")
 
-                        Md3Select {
+                        RowLayout {
                             Layout.fillWidth: true
+                            spacing: 8
 
-                            model: [
-                                root.i18n.text("english"),
-                                root.i18n.text("german")
-                            ]
+                            Md3Select {
+                                Layout.fillWidth: true
 
-                            currentIndex:
-                                root.config.language === "de"
-                                ? 1
-                                : 0
+                                model: [
+                                    root.i18n.text("english"),
+                                    root.i18n.text("german")
+                                ]
 
-                            onActivated: index => {
-                                root.config.setLanguage(
-                                    index === 1 ? "de" : "en"
-                                )
+                                currentIndex:
+                                    root.config.language === "de"
+                                    ? 1
+                                    : 0
+
+                                onActivated: index => {
+                                    root.config.setLanguage(
+                                        index === 1 ? "de" : "en"
+                                    )
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.preferredWidth: 44
+                                Layout.preferredHeight: 44
+                                Layout.alignment: Qt.AlignVCenter
+
+                                radius: 22
+                                color:
+                                    powerTap.pressed
+                                    ? Md3Theme.surfaceContainerHigh
+                                    : Md3Theme.surfaceContainerHighest
+
+                                MdiIcon {
+                                    anchors.centerIn: parent
+
+                                    name: "power"
+                                    size: 21
+                                }
+
+                                TapHandler {
+                                    id: powerTap
+
+                                    onTapped:
+                                        powerMenuDialog.open()
+                                }
                             }
                         }
                     }
@@ -525,6 +556,13 @@ Item {
                 }
             }
         }
+    }
+
+    PowerMenuDialog {
+        id: powerMenuDialog
+
+        z: 800000
+        i18n: root.i18n
     }
 
     WifiConnectDialog {
