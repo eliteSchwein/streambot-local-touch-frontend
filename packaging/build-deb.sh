@@ -27,6 +27,7 @@ trap cleanup EXIT
 mkdir -p \
     "$PACKAGE_ROOT/DEBIAN" \
     "$PACKAGE_ROOT/usr/bin" \
+    "$PACKAGE_ROOT/usr/lib/streambot-touch" \
     "$PACKAGE_ROOT/usr/share/streambot-touch"
 
 cat > "$PACKAGE_ROOT/DEBIAN/control" <<EOF
@@ -35,7 +36,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: quickshell, qml6-module-qtwebsockets, network-manager, qrencode, iproute2
+Depends: quickshell, qml6-module-qtwebsockets, network-manager, qrencode, iproute2, python3
 Maintainer: Thomas Ludwig
 Description: Streambot Touch Quickshell interface
  Touch interface for Streambot using Quickshell.
@@ -44,6 +45,10 @@ EOF
 install -Dm755 \
     "$PROJECT_ROOT/packaging/streambot-touch" \
     "$PACKAGE_ROOT/usr/bin/streambot-touch"
+
+install -Dm755 \
+    "$PROJECT_ROOT/helper/power_key_listener.py" \
+    "$PACKAGE_ROOT/usr/lib/streambot-touch/power-key-listener"
 
 cp -a \
     "$PROJECT_ROOT/src/." \

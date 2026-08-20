@@ -128,7 +128,7 @@ install_packages() {
     libegl-mesa0 \
     libgles2 \
     swayidle \
-    wtype
+    wtype     python3
 
   status_msg "Install Quickshell from Trixie Backports"
 
@@ -182,6 +182,15 @@ install_labwc_config() {
   fi
 }
 
+install_power_polkit() {
+  if [[ -x "$SCRIPTPATH/installPowerPolkit.sh" ]]; then
+    "$SCRIPTPATH/installPowerPolkit.sh"
+  else
+    warn_msg "installPowerPolkit.sh not found or not executable."
+    exit 1
+  fi
+}
+
 install_networkmanager_polkit() {
   if [[ -x "$SCRIPTPATH/installNetworkManagerPolkit.sh" ]]; then
     "$SCRIPTPATH/installNetworkManagerPolkit.sh"
@@ -200,6 +209,7 @@ install_packages
 cleanup_squeekboard
 modify_user
 install_networkmanager_polkit
+install_power_polkit
 install_labwc_config
 install_service
 

@@ -6,6 +6,7 @@ import Quickshell.Io
 
 import "components"
 import "components/md3"
+import "dialogs"
 import "pages"
 import "services"
 
@@ -234,6 +235,16 @@ ShellRoot {
                 i18n: i18n
                 config: config
                 network: network
+            }
+
+            ConnectDialog {
+                id: connectDialog
+
+                anchors.fill: parent
+                z: 9000000
+
+                i18n: i18n
+                websocket: websocket
             }
 
             Md3Keyboard {

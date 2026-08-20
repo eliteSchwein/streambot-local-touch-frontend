@@ -31,6 +31,11 @@ fi
 status_msg "Installing labwc autostart and config"
 
 mkdir -p "$HOME/.config/labwc"
+mkdir -p "$HOME/.local/bin"
+
+if [[ -f "$SCRIPTPATH/helper/power_key_listener.py" ]]; then
+  install -m 0755     "$SCRIPTPATH/helper/power_key_listener.py"     "$HOME/.local/bin/streambot-touch-power-key-listener"
+fi
 
 # Clean up files left behind by older Squeekboard-based installs.
 rm -f "$HOME/.local/bin/streambot-touch-squeekboard"
@@ -45,6 +50,14 @@ swayidle -w \\
   timeout 2 "sh -c 'wtype -M alt -M logo -k h -m logo -m alt'" &
 
 sh -c 'sleep 0.25; wtype -M alt -M logo -k h -m logo -m alt' &
+
+# Grab the real Linux KEY_POWER input device directly. This mirrors the
+# old Tauri backend's EVIOCGRAB behavior and avoids compositor key mapping.
+if [ -x /usr/lib/streambot-touch/power-key-listener ]; then
+  /usr/lib/streambot-touch/power-key-listener &
+elif [ -x "$HOME/.local/bin/streambot-touch-power-key-listener" ]; then
+  "$HOME/.local/bin/streambot-touch-power-key-listener" &
+fi
 
 # Qt Virtual Keyboard is configured by /usr/bin/streambot-touch.
 exec /usr/bin/streambot-touch --app-config "$MCCONFIGFILE"

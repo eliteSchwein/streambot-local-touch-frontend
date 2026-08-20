@@ -26,6 +26,11 @@ QtObject {
     readonly property bool connected:
         socket.status === WebSocket.Open
 
+    readonly property bool connecting:
+        socket.status === WebSocket.Connecting
+
+    property bool everConnected: false
+
     signal connectionChanged(bool connected)
     signal messageReceived(string message)
     signal jsonReceived(var data)
@@ -115,6 +120,7 @@ QtObject {
                     root.url
                 )
 
+                root.everConnected = true
                 root.reconnectTimer.stop()
                 root.connectionChanged(true)
                 Qt.callLater(root.registerEndpoints)
