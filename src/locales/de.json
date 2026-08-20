@@ -67,5 +67,13 @@
   "audio_default": "Standard",
   "audio_muted": "Stumm",
   "audio_unmute": "Ton an",
-  "audio_mute": "Stumm"
+  "audio_mute": "Stumm",
+  "audio_virtual_outputs": "Virtuelle Ausgänge",
+  "audio_physical_outputs": "Physische Ausgänge",
+  "audio_link_outputs": "Ausgänge verknüpfen",
+  "audio_link_outputs_for": "Ausgänge für %1",
+  "audio_no_physical_outputs": "Keine physischen Ausgänge",
+  "audio_running": "Aktiv",
+  "audio_idle": "Inaktiv",
+  "audio_suspended": "Pausiert"
 }

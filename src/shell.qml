@@ -111,7 +111,7 @@ ShellRoot {
                     spacing: 10
 
                     Md3NavButton {
-                        icon: "⌂"
+                        icon: "home"
                         selected: appRoot.currentPage === 0
 
                         onClicked:
@@ -119,7 +119,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "🔊"
+                        icon: "speaker"
                         selected: appRoot.currentPage === 1
 
                         onClicked:

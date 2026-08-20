@@ -67,5 +67,13 @@
   "audio_default": "Default",
   "audio_muted": "Muted",
   "audio_unmute": "Unmute",
-  "audio_mute": "Mute"
+  "audio_mute": "Mute",
+  "audio_virtual_outputs": "Virtual outputs",
+  "audio_physical_outputs": "Physical outputs",
+  "audio_link_outputs": "Link outputs",
+  "audio_link_outputs_for": "Outputs for %1",
+  "audio_no_physical_outputs": "No physical outputs",
+  "audio_running": "Running",
+  "audio_idle": "Idle",
+  "audio_suspended": "Suspended"
 }
