@@ -8,6 +8,7 @@ QtObject {
     property var audio: ({})
     property var audioOutputs: []
     property var autoMacros: []
+    property var macros: ({})
     property var alertQueue: []
     property var activeAlert: null
 
@@ -46,6 +47,13 @@ QtObject {
 
         case "notify_auto_macros_update":
             autoMacros = Array.isArray(params) ? params : []
+            break
+
+        case "notify_macro_update":
+            macros =
+                params && params.macros
+                ? params.macros
+                : ({})
             break
 
         case "notify_alert_query":

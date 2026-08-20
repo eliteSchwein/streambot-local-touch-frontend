@@ -75,5 +75,11 @@
   "audio_no_physical_outputs": "No physical outputs",
   "audio_running": "Running",
   "audio_idle": "Idle",
-  "audio_suspended": "Suspended"
+  "audio_suspended": "Suspended",
+  "macros": "Macros",
+  "macro_search": "Search macros",
+  "macro_no_results": "No macros found",
+  "macro_tasks": "%1 tasks",
+  "macro_task": "1 task",
+  "macro_run_failed": "Macro failed"
 }

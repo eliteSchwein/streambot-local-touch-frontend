@@ -94,6 +94,24 @@ ShellRoot {
                 store: dashboardStore
             }
 
+            MacrosPage {
+                id: macrosPage
+
+                visible:
+                    appRoot.currentPage === 2
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                i18n: i18n
+                store: dashboardStore
+                restUrl: config.restUrl
+            }
+
             Rectangle {
                 id: navigation
 
@@ -124,6 +142,14 @@ ShellRoot {
 
                         onClicked:
                             appRoot.currentPage = 1
+                    }
+
+                    Md3NavButton {
+                        icon: "code-braces"
+                        selected: appRoot.currentPage === 2
+
+                        onClicked:
+                            appRoot.currentPage = 2
                     }
                 }
             }
