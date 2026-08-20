@@ -79,5 +79,8 @@
   "macros": "Macros",
   "macro_search": "Search macros",
   "macro_no_results": "No macros found",
-  "macro_run_failed": "Macro failed"
+  "macro_run_failed": "Macro failed",
+  "channel_points": "Channel points",
+  "channel_points_empty": "No channel points available",
+  "channel_point_toggle_failed": "Failed to toggle channel point"
 }

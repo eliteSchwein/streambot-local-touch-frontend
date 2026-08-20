@@ -9,6 +9,8 @@ QtObject {
     property var audioOutputs: []
     property var autoMacros: []
     property var macros: ({})
+    property var channelPoints: []
+    property var activeChannelPoints: []
     property var alertQueue: []
     property var activeAlert: null
 
@@ -54,6 +56,18 @@ QtObject {
                 params && params.macros
                 ? params.macros
                 : ({})
+            break
+
+        case "notify_channel_point_update":
+            channelPoints =
+                params && Array.isArray(params.all)
+                ? params.all
+                : []
+
+            activeChannelPoints =
+                params && Array.isArray(params.active)
+                ? params.active
+                : []
             break
 
         case "notify_alert_query":

@@ -17,7 +17,8 @@ QtObject {
         "notify_audio_update",
         "notify_audio_outputs_update",
         "notify_auto_macros_update",
-        "notify_macro_update"
+        "notify_macro_update",
+        "notify_channel_point_update"
     ]
 
     property int nextRequestId: 1

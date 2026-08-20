@@ -112,6 +112,24 @@ ShellRoot {
                 websocket: websocket
             }
 
+            ChannelPointsPage {
+                id: channelPointsPage
+
+                visible:
+                    appRoot.currentPage === 3
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                i18n: i18n
+                websocket: websocket
+                store: dashboardStore
+            }
+
             Rectangle {
                 id: navigation
 
@@ -150,6 +168,14 @@ ShellRoot {
 
                         onClicked:
                             appRoot.currentPage = 2
+                    }
+
+                    Md3NavButton {
+                        icon: "gift-outline"
+                        selected: appRoot.currentPage === 3
+
+                        onClicked:
+                            appRoot.currentPage = 3
                     }
                 }
             }
