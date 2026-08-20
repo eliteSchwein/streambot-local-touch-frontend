@@ -1,5 +1,5 @@
 {
-  "app_title": "Streambot Touch",
+  "app_title": "StreamDing",
   "page_home": "Home",
   "page_controls": "Controls",
   "page_system": "System",
@@ -85,9 +85,9 @@
   "channel_point_toggle_failed": "Failed to toggle channel point",
   "power_menu": "Power menu",
   "shutdown_device": "Shut down device",
-  "shutdown_device_text": "Power off the Raspberry Pi.",
+  "shutdown_device_text": "Power off the device.",
   "restart_device": "Restart device",
-  "restart_device_text": "Reboot the Raspberry Pi.",
+  "restart_device_text": "Restart the device.",
   "restart_backend": "Restart backend",
   "restart_backend_text": "Restart stream-overlord.service.",
   "power_action_failed": "Power action failed",

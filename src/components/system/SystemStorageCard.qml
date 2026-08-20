@@ -57,7 +57,8 @@ Rectangle {
                     s.mediaUsed,
                     s.assetUsed,
                     s.assetsUsed
-                ])
+                ]),
+                "#2196F3"
             ],
             [
                 "system_asset_config_used",
@@ -66,7 +67,8 @@ Rectangle {
                     f.assetConfigs,
                     s.assetConfigUsed,
                     s.assetConfigsUsed
-                ])
+                ]),
+                "#9C27B0"
             ],
             [
                 "system_overlay_used",
@@ -75,14 +77,16 @@ Rectangle {
                     f.overlay,
                     s.overlayUsed,
                     s.overlaysUsed
-                ])
+                ]),
+                "#00BCD4"
             ],
             [
                 "system_music_used",
                 firstNumber([
                     f.music,
                     s.musicUsed
-                ])
+                ]),
+                "#4CAF50"
             ],
             [
                 "system_macro_used",
@@ -91,7 +95,8 @@ Rectangle {
                     f.macro,
                     s.macroUsed,
                     s.macrosUsed
-                ])
+                ]),
+                "#FFC107"
             ],
             [
                 "system_auto_macro_used",
@@ -101,7 +106,8 @@ Rectangle {
                     f.auto_macro,
                     s.autoMacroUsed,
                     s.autoMacrosUsed
-                ])
+                ]),
+                "#FF5722"
             ],
             [
                 "system_channel_point_used",
@@ -111,7 +117,8 @@ Rectangle {
                     f.channel_points_configs,
                     s.channelPointUsed,
                     s.channelPointsUsed
-                ])
+                ]),
+                "#E91E63"
             ],
             [
                 "system_command_used",
@@ -121,7 +128,8 @@ Rectangle {
                     s.commands,
                     s.commandUsed,
                     s.commandsUsed
-                ])
+                ]),
+                "#009688"
             ],
             [
                 "system_rotating_scene_used",
@@ -131,14 +139,16 @@ Rectangle {
                     f.rotating_scene,
                     s.rotatingSceneUsed,
                     s.rotatingScenesUsed
-                ])
+                ]),
+                "#CDDC39"
             ],
             [
                 "system_ollama_used",
                 firstNumber([
                     f.ollama,
                     s.ollamaUsed
-                ])
+                ]),
+                "#3F51B5"
             ]
         ].filter(row => Number(row[1]) > 0)
     }
@@ -202,10 +212,37 @@ Rectangle {
             model:root.rows()
             delegate: RowLayout {
                 required property var modelData
-                width:list.width
-                height:19
-                Text { Layout.fillWidth:true; text:root.i18n.text(modelData[0]); color:Md3Theme.surfaceVariantContent; font.pixelSize:8; elide:Text.ElideRight }
-                Text { text:root.fmt(modelData[1]); color:Md3Theme.surfaceContent; font.pixelSize:8; font.weight:Font.Medium }
+
+                width: list.width
+                height: 20
+                spacing: 7
+
+                Rectangle {
+                    Layout.preferredWidth: 10
+                    Layout.preferredHeight: 10
+                    Layout.alignment: Qt.AlignVCenter
+
+                    radius: 3
+                    color: modelData[2]
+                }
+
+                Text {
+                    Layout.fillWidth: true
+
+                    text: root.i18n.text(modelData[0])
+                    color: Md3Theme.surfaceVariantContent
+
+                    font.pixelSize: 8
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    text: root.fmt(modelData[1])
+                    color: Md3Theme.surfaceContent
+
+                    font.pixelSize: 8
+                    font.weight: Font.Medium
+                }
             }
         }
     }
