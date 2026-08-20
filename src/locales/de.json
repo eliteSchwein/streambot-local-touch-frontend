@@ -30,10 +30,11 @@
   "english": "Englisch",
   "german": "Deutsch",
   "wifi_connect": "Mit WLAN verbinden",
-  "wifi_password_hint": "WLAN-Passwort eingeben",
+  "wifi_password_hint": "WLAN-Passwort",
   "cancel": "Abbrechen",
   "enabled": "Aktiviert",
   "disabled": "Deaktiviert",
   "saved": "Gespeichert",
-  "available": "Verfügbar"
+  "available": "Verfügbar",
+  "web_access": "Webzugriff"
 }

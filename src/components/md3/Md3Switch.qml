@@ -1,16 +1,22 @@
 import QtQuick
 import QtQuick.Controls
 
-Switch {
+Control {
     id: root
+
+    property bool checked: false
+    signal clicked()
 
     implicitWidth: 52
     implicitHeight: 32
 
-    indicator: Rectangle {
+    background: Item {}
+
+    contentItem: Rectangle {
         width: 48
         height: 28
         radius: 14
+        anchors.centerIn: parent
 
         color: root.checked
             ? Md3Theme.primary
@@ -49,5 +55,7 @@ Switch {
         }
     }
 
-    contentItem: Item {}
+    TapHandler {
+        onTapped: root.clicked()
+    }
 }

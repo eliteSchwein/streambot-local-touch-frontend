@@ -38,7 +38,7 @@ Item {
             "-o",
             qrPath,
             "-s",
-            "10",
+            "12",
             "-m",
             "1",
             commanderUrl
@@ -110,33 +110,6 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
-
-                Text {
-                    Layout.fillWidth: true
-                    text: root.i18n.text("network")
-                    color: Md3Theme.surfaceContent
-                    font.pixelSize: 22
-                    font.weight: Font.DemiBold
-                }
-
-                Md3Button {
-                    text: root.i18n.text("refresh")
-
-                    onClicked: {
-                        root.network.refresh()
-                        root.refreshQr()
-                    }
-                }
-
-                Md3Button {
-                    text: "×"
-                    outlined: true
-                    onClicked: root.open = false
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 10
 
@@ -191,8 +164,10 @@ Item {
                             Md3Switch {
                                 checked: root.network.ethernetEnabled
 
-                                onToggled: {
-                                    root.network.setEthernetEnabled(checked)
+                                onClicked: {
+                                    root.network.setEthernetEnabled(
+                                        !root.network.ethernetEnabled
+                                    )
                                 }
                             }
                         }
@@ -221,8 +196,10 @@ Item {
                             Md3Switch {
                                 checked: root.network.wifiEnabled
 
-                                onToggled: {
-                                    root.network.setWifiEnabled(checked)
+                                onClicked: {
+                                    root.network.setWifiEnabled(
+                                        !root.network.wifiEnabled
+                                    )
                                 }
                             }
                         }
@@ -371,7 +348,7 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
 
-                        title: root.i18n.text("commander")
+                        title: root.i18n.text("web_access")
 
                         ColumnLayout {
                             Layout.fillWidth: true

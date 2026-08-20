@@ -30,10 +30,11 @@
   "english": "English",
   "german": "German",
   "wifi_connect": "Connect to Wi-Fi",
-  "wifi_password_hint": "Enter Wi-Fi password",
+  "wifi_password_hint": "Wi-Fi password",
   "cancel": "Cancel",
   "enabled": "Enabled",
   "disabled": "Disabled",
   "saved": "Saved",
-  "available": "Available"
+  "available": "Available",
+  "web_access": "Web access"
 }

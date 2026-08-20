@@ -13,6 +13,23 @@ QtObject {
 
     signal error(string message)
 
+    function refreshWifi() {
+        wifiStateProcess.exec([
+            "nmcli", "-t", "-f", "WIFI", "general"
+        ])
+
+        wifiListProcess.exec([
+            "nmcli", "-t", "--escape", "yes",
+            "-f", "IN-USE,SSID,SIGNAL,SECURITY",
+            "device", "wifi", "list"
+        ])
+
+        savedWifiProcess.exec([
+            "nmcli", "-t", "-f", "NAME,TYPE,DEVICE",
+            "connection", "show"
+        ])
+    }
+
     function refresh() {
         wifiStateProcess.exec([
             "nmcli",
@@ -58,14 +75,23 @@ QtObject {
 
 
     function setEthernetEnabled(enabled) {
+        const action = enabled ? "connect" : "disconnect"
+
         ethernetToggleProcess.exec([
-            "nmcli",
-            "networking",
-            enabled ? "on" : "off"
+            "sh",
+            "-c",
+            "for d in $(nmcli -t -f DEVICE,TYPE device status | awk -F: '$2==\"ethernet\" {print $1}'); do nmcli device "
+                + action
+                + " \"$d\"; done"
         ])
     }
 
     function setWifiEnabled(enabled) {
+        console.log(
+            "[network] setting wifi:",
+            enabled ? "on" : "off"
+        )
+
         wifiToggleProcess.exec([
             "nmcli",
             "radio",
@@ -260,7 +286,31 @@ QtObject {
     }
 
     property Process wifiToggleProcess: Process {
-        onExited: root.refresh()
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() !== "")
+                    console.log("[network] wifi:", text.trim())
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() !== "")
+                    console.warn(
+                        "[network] wifi toggle failed:",
+                        text.trim()
+                    )
+            }
+        }
+
+        onExited: (exitCode, exitStatus) => {
+            console.log(
+                "[network] wifi toggle exited:",
+                exitCode
+            )
+
+            root.refresh()
+        }
     }
 
     property Process wifiConnectProcess: Process {
@@ -289,6 +339,55 @@ QtObject {
         }
 
         onExited: root.refresh()
+    }
+
+
+    property Process monitorProcess: Process {
+        command: [
+            "nmcli",
+            "monitor"
+        ]
+
+        running: true
+
+        stdout: SplitParser {
+            onRead: line => {
+                if (line.trim() === "")
+                    return
+
+                console.log(
+                    "[network] change:",
+                    line
+                )
+
+                refreshDebounce.restart()
+            }
+        }
+
+        stderr: SplitParser {
+            onRead: line => {
+                if (line.trim() !== "")
+                    console.warn(
+                        "[network] monitor:",
+                        line
+                    )
+            }
+        }
+    }
+
+    property Timer refreshDebounce: Timer {
+        interval: 250
+        repeat: false
+
+        onTriggered: root.refresh()
+    }
+
+    property Timer wifiRefreshTimer: Timer {
+        interval: 10000
+        repeat: true
+        running: true
+
+        onTriggered: root.refreshWifi()
     }
 
     Component.onCompleted: refresh()
