@@ -38,7 +38,7 @@ QtObject {
     }
 
     function sendText(message) {
-        if (!connected) {
+        if (socket.status !== WebSocket.Open) {
             console.warn(
                 "[websocket] cannot send while disconnected"
             )
@@ -82,12 +82,15 @@ QtObject {
     }
 
     function registerEndpoints() {
+        if (socket.status !== WebSocket.Open)
+            return
+
         console.log(
             "[websocket] registering endpoints:",
             JSON.stringify(endpoints)
         )
 
-        return sendRpc(
+        sendRpc(
             "register_endpoints",
             endpoints
         )
@@ -127,7 +130,7 @@ QtObject {
                     root.reconnectTimer.stop()
                     root.connectionChanged(true)
 
-                    root.registerEndpoints()
+                    Qt.callLater(root.registerEndpoints)
 
                     break
 
@@ -167,7 +170,7 @@ QtObject {
                 const data = JSON.parse(message)
                 root.jsonReceived(data)
             } catch (error) {
-                // Non-JSON messages are valid too.
+                // Raw non-JSON messages are valid too.
             }
         }
     }
@@ -177,7 +180,7 @@ QtObject {
         repeat: false
 
         onTriggered: {
-            if (root.connected)
+            if (root.socket.status === WebSocket.Open)
                 return
 
             console.log(
