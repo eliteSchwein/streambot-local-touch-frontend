@@ -36,6 +36,32 @@ if [[ ${UID} == '0' ]]; then
   exit 1
 fi
 
+
+check_distribution() {
+  status_msg "Check Debian version"
+
+  if [[ ! -r /etc/os-release ]]; then
+    warn_msg "Unable to detect the operating system."
+    exit 1
+  fi
+
+  . /etc/os-release
+
+  if [[ "${ID:-}" != "debian" ]]; then
+    warn_msg "Streambot Touch currently only supports Debian."
+    exit 1
+  fi
+
+  if [[ "${VERSION_CODENAME:-}" != "trixie" ]]; then
+    warn_msg "Streambot Touch requires Debian 13 (Trixie)."
+    warn_msg "Detected: ${PRETTY_NAME:-unknown}"
+    exit 1
+  fi
+
+  ok_msg "Debian 13 (Trixie) detected"
+}
+
+
 questions() {
   title_msg "Welcome to the Streambot Touch kiosk installer."
 
@@ -49,27 +75,53 @@ questions() {
   ok_msg "Streambot Touch config file set: $MCCONFIGFILE"
 }
 
-setup_custom_apt_repo() {
+
+setup_apt_dependencies() {
   status_msg "Install APT bootstrap dependencies"
+
   sudo apt update
+
   sudo apt-get -y install --no-install-recommends \
     ca-certificates \
-    curl
-
-  status_msg "Enable tludwig dev repo"
-  curl -fsSL https://apt.tludwig.dev/install.sh | sh
+    curl \
+    debian-archive-keyring
 }
 
-install_packages() {
-  status_msg "Update package data"
+
+setup_backports_repo() {
+  status_msg "Enable Debian Trixie Backports"
+
+  sudo tee /etc/apt/sources.list.d/debian-backports.sources >/dev/null <<'EOF'
+Types: deb
+URIs: http://deb.debian.org/debian
+Suites: trixie-backports
+Components: main
+Enabled: yes
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+
   sudo apt update
 
-  status_msg "Install kiosk + Quickshell dependencies"
+  ok_msg "Trixie Backports enabled"
+}
+
+
+setup_custom_apt_repo() {
+  status_msg "Enable tludwig dev repo"
+
+  curl -fsSL https://apt.tludwig.dev/install.sh | sh
+
+  sudo apt update
+}
+
+
+install_packages() {
+  status_msg "Install kiosk dependencies"
+
   sudo apt-get -y install --no-install-recommends \
     labwc \
     dbus-user-session \
     seatd \
-    quickshell \
     qt6-wayland \
     qml6-module-qtquick \
     qml6-module-qtquick-controls \
@@ -81,18 +133,31 @@ install_packages() {
     swayidle \
     wtype \
     squeekboard \
-    libglib2.0-bin \
+    libglib2.0-bin
+
+  status_msg "Install Quickshell from Trixie Backports"
+
+  sudo apt-get -y install \
+    quickshell/trixie-backports
+
+  status_msg "Install Streambot Touch"
+
+  sudo apt-get -y install \
     streambot-touch
 
   status_msg "Enable seatd service"
+
   sudo systemctl enable --now seatd
 }
 
+
 modify_user() {
   status_msg "Update user permissions"
+
   sudo usermod -aG video,render,input,tty "$USER"
   sudo loginctl enable-linger "$USER"
 }
+
 
 install_service() {
   if [[ -x "$SCRIPTPATH/generateService.sh" ]]; then
@@ -103,6 +168,7 @@ install_service() {
   fi
 }
 
+
 install_labwc_config() {
   if [[ -x "$SCRIPTPATH/installLabwcConfig.sh" ]]; then
     "$SCRIPTPATH/installLabwcConfig.sh" --app_config="$MCCONFIGFILE"
@@ -111,6 +177,7 @@ install_labwc_config() {
     exit 1
   fi
 }
+
 
 install_networkmanager_polkit() {
   if [[ -x "$SCRIPTPATH/installNetworkManagerPolkit.sh" ]]; then
@@ -121,7 +188,11 @@ install_networkmanager_polkit() {
   fi
 }
 
+
+check_distribution
 questions
+setup_apt_dependencies
+setup_backports_repo
 setup_custom_apt_repo
 install_packages
 modify_user
