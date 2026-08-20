@@ -225,11 +225,10 @@ Rectangle {
 
         spacing: 10
 
-        // Name / sink block.
         ColumnLayout {
-            Layout.preferredWidth: 120
-            Layout.minimumWidth: 105
-            Layout.maximumWidth: 135
+            Layout.preferredWidth: 110
+            Layout.minimumWidth: 95
+            Layout.maximumWidth: 125
 
             Layout.alignment: Qt.AlignVCenter
 
@@ -239,7 +238,6 @@ Rectangle {
                 Layout.fillWidth: true
 
                 text: root.interfaceName
-
                 color: Md3Theme.surfaceContent
 
                 font.pixelSize: 13
@@ -251,11 +249,9 @@ Rectangle {
 
             Text {
                 Layout.fillWidth: true
-
                 visible: root.subtitle !== ""
 
                 text: root.subtitle
-
                 color: Md3Theme.surfaceVariantContent
 
                 font.pixelSize: 8
@@ -265,7 +261,6 @@ Rectangle {
             }
         }
 
-        // Main controls.
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -283,7 +278,6 @@ Rectangle {
                 stepSize: root.stepVolumeValue
 
                 enabled: !root.muted
-
                 value: root.draftVolume
 
                 onMoved: {
@@ -303,7 +297,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
 
-                spacing: 5
+                spacing: 6
 
                 AudioControlButton {
                     icon: "minus"
@@ -313,45 +307,69 @@ Rectangle {
                         root.stepVolume(-1)
                 }
 
-                AudioControlButton {
-                    icon:
-                        root.muted
-                        ? "mute"
-                        : "volume"
-
-                    selected: root.muted
-
-                    onClicked:
-                        root.toggleMute()
-                }
-
                 Item {
                     Layout.fillWidth: true
                 }
 
                 Rectangle {
-                    implicitWidth: 58
-                    implicitHeight: 28
+                    id: volumeMutePill
 
-                    radius: 14
+                    implicitWidth: 94
+                    implicitHeight: 32
+
+                    radius: 16
 
                     color:
-                        Md3Theme.surfaceContainerHighest
+                        root.muted
+                        ? Md3Theme.primary
+                        : muteTap.pressed
+                            ? Md3Theme.surfaceContainerHigh
+                            : Md3Theme.surfaceContainerHighest
 
-                    Text {
+                    border.width:
+                        root.muted
+                        ? 0
+                        : 1
+
+                    border.color:
+                        Md3Theme.outlineVariant
+
+                    RowLayout {
                         anchors.centerIn: parent
+                        spacing: 6
 
-                        text:
-                            Math.round(
-                                root.draftVolume * 100
-                            )
-                            + "%"
+                        MdiIcon {
+                            name:
+                                root.muted
+                                ? "volume-off"
+                                : "volume-high"
 
-                        color:
-                            Md3Theme.surfaceContent
+                            size: 17
+                            selected: root.muted
+                        }
 
-                        font.pixelSize: 10
-                        font.weight: Font.DemiBold
+                        Text {
+                            text:
+                                Math.round(
+                                    root.draftVolume * 100
+                                )
+                                + "%"
+
+                            color:
+                                root.muted
+                                ? Md3Theme.primaryContent
+                                : Md3Theme.surfaceContent
+
+                            font.pixelSize: 10
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    TapHandler {
+                        id: muteTap
+
+                        onTapped:
+                            root.toggleMute()
                     }
                 }
 
@@ -369,7 +387,6 @@ Rectangle {
             }
         }
 
-        // Link button only for virtual Streambot sinks.
         AudioLinkButton {
             Layout.alignment: Qt.AlignVCenter
 
