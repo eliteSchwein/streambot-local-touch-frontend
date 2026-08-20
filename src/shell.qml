@@ -27,6 +27,18 @@ ShellRoot {
         id: network
     }
 
+    DashboardStore {
+        id: dashboardStore
+    }
+
+    Connections {
+        target: websocket
+
+        function onJsonReceived(data) {
+            dashboardStore.handleMessage(data)
+        }
+    }
+
     PanelWindow {
         id: window
         anchors {
@@ -44,36 +56,23 @@ ShellRoot {
             anchors.fill: parent
             color: Md3Theme.background
 
-            SwipeView {
-                id: pages
+            DashboardPage {
+                id: dashboardPage
 
                 anchors {
                     top: parent.top
                     left: parent.left
                     right: parent.right
-                    bottom: pagination.top
+                    bottom: navigation.top
                 }
 
-                interactive: true
-
-                HomePage {
-                    i18n: i18n
-                    websocket: websocket
-                }
-
-                ControlsPage {
-                    i18n: i18n
-                    websocket: websocket
-                }
-
-                SystemPage {
-                    i18n: i18n
-                    config: config
-                }
+                i18n: i18n
+                websocket: websocket
+                store: dashboardStore
             }
 
             Rectangle {
-                id: pagination
+                id: navigation
 
                 anchors {
                     left: parent.left
@@ -81,43 +80,16 @@ ShellRoot {
                     bottom: parent.bottom
                 }
 
-                height: 48
+                height: 52
                 color: Md3Theme.surfaceContainer
 
                 Row {
                     anchors.centerIn: parent
-                    spacing: 10
 
-                    Repeater {
-                        model: pages.count
-
-                        Rectangle {
-                            required property int index
-
-                            width: pages.currentIndex === index
-                                ? 22
-                                : 8
-
-                            height: 8
-                            radius: 4
-
-                            color: pages.currentIndex === index
-                                ? Md3Theme.primary
-                                : Md3Theme.surfaceVariantContent
-
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: 140
-                                    easing.type: Easing.OutCubic
-                                }
-                            }
-
-                            TapHandler {
-                                onTapped: {
-                                    pages.currentIndex = index
-                                }
-                            }
-                        }
+                    Md3NavButton {
+                        icon: "⌂"
+                        text: i18n.text("dashboard")
+                        selected: true
                     }
                 }
             }

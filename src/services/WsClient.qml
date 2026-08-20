@@ -10,7 +10,14 @@ QtObject {
 
     property var endpoints: [
         "notify_alert",
-        "notify_alert_query"
+        "notify_alert_query",
+        "notify_music_update",
+        "notify_playlist_update",
+        "notify_music_cava",
+        "notify_audio_update",
+        "notify_auto_macros_update",
+        "notify_rotating_scene_update",
+        "notify_rotating_scene_runtime_update"
     ]
 
     property int nextRequestId: 1
