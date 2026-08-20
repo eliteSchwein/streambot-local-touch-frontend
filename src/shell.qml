@@ -18,6 +18,15 @@ ShellRoot {
         language: config.language
     }
 
+    WsClient {
+        id: websocket
+        url: config.websocketUrl
+    }
+
+    NetworkManager {
+        id: network
+    }
+
     PanelWindow {
         id: window
         anchors {
