@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import Quickshell
 
 import "components"
+import "pages"
 import "services"
 
 ShellRoot {
@@ -11,6 +12,12 @@ ShellRoot {
 
     Config {
         id: config
+    }
+
+    I18n {
+        id: i18n
+
+        language: config.language
     }
 
     WsClient {
@@ -21,7 +28,9 @@ ShellRoot {
         onConnectionChanged: connected => {
             console.log(
                 "[websocket]",
-                connected ? "connected" : "disconnected"
+                connected
+                    ? "connected"
+                    : "disconnected"
             )
         }
 
@@ -31,23 +40,11 @@ ShellRoot {
                 JSON.stringify(data)
             )
         }
-
-        onMessageReceived: message => {
-            console.log(
-                "[websocket] raw:",
-                message
-            )
-        }
-
-        onSocketError: error => {
-            console.warn(
-                "[websocket] error:",
-                error
-            )
-        }
     }
 
     PanelWindow {
+        id: window
+
         anchors {
             top: true
             bottom: true
@@ -55,43 +52,102 @@ ShellRoot {
             right: true
         }
 
+        focusable: true
+
         color: "#121212"
 
-        ColumnLayout {
-            anchors.centerIn: parent
-            spacing: 16
+        Rectangle {
+            anchors.fill: parent
 
-            Text {
-                text: websocket.connected
-                    ? "WebSocket connected"
-                    : "WebSocket disconnected"
+            color: "#121212"
 
-                color: "white"
-            }
+            SwipeView {
+                id: pages
 
-            Text {
-                text: config.websocketUrl
-                color: "#aaaaaa"
-            }
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: pagination.top
+                }
 
-            Button {
-                text: "Send test"
-                enabled: websocket.connected
+                currentIndex: 0
 
-                onClicked: {
-                    websocket.sendJson({
-                        type: "test",
-                        source: "streambot-touch"
-                    })
+                interactive: true
+
+                HomePage {
+                    i18n: i18n
+                    websocket: websocket
+                }
+
+                ControlsPage {
+                    i18n: i18n
+                    websocket: websocket
+                }
+
+                SystemPage {
+                    i18n: i18n
+                    config: config
+                    websocket: websocket
                 }
             }
 
-            Button {
-                text: "Reconnect"
+            Rectangle {
+                id: pagination
 
-                onClicked: {
-                    websocket.reconnect()
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
                 }
+
+                height: 74
+
+                color: "#181818"
+
+                Row {
+                    anchors.centerIn: parent
+
+                    spacing: 16
+
+                    Repeater {
+                        model: pages.count
+
+                        Rectangle {
+                            required property int index
+
+                            width: pages.currentIndex === index
+                                ? 28
+                                : 12
+
+                            height: 12
+
+                            radius: 6
+
+                            color: pages.currentIndex === index
+                                ? "white"
+                                : "#555555"
+
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: 150
+                                }
+                            }
+
+                            TapHandler {
+                                onTapped: {
+                                    pages.currentIndex = index
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            NotificationDrawer {
+                i18n: i18n
+
+                anchors.top: parent.top
             }
         }
     }
