@@ -36,5 +36,8 @@
   "disabled": "Disabled",
   "saved": "Saved",
   "available": "Available",
-  "web_access": "Web access"
+  "web_access": "Web access",
+  "known": "Saved",
+  "secured": "Secured",
+  "open_network": "Open"
 }

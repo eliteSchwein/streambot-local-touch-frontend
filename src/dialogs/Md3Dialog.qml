@@ -8,36 +8,45 @@ Popup {
     id: root
 
     property string title: ""
-    default property alias dialogContent: contentColumn.data
+    property string supportingText: ""
+
+    default property alias dialogContent: body.data
+    property alias actions: actionRow.data
 
     modal: true
     focus: true
-
-    width: Math.min(400, Overlay.overlay ? Overlay.overlay.width - 32 : 400)
     padding: 0
 
-    anchors.centerIn: Overlay.overlay
+    width: Math.min(
+        420,
+        Overlay.overlay ? Overlay.overlay.width - 32 : 420
+    )
 
+    anchors.centerIn: Overlay.overlay
     closePolicy: Popup.CloseOnEscape
 
     background: Rectangle {
         radius: Md3Theme.radiusExtraLarge
         color: Md3Theme.surfaceContainerHigh
+
         border.width: 1
         border.color: Md3Theme.outlineVariant
     }
 
     contentItem: ColumnLayout {
-        id: contentColumn
+        spacing: 0
 
-        spacing: 16
-
-        // Actual dialog padding. Child dialogs no longer need to fake this.
-        anchors.margins: 24
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 24
+        }
 
         Text {
-            visible: root.title !== ""
             Layout.fillWidth: true
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+
+            visible: root.title !== ""
 
             text: root.title
             color: Md3Theme.surfaceContent
@@ -46,6 +55,52 @@ Popup {
             font.weight: Font.DemiBold
 
             wrapMode: Text.Wrap
+        }
+
+        Text {
+            Layout.fillWidth: true
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+            Layout.topMargin: root.title !== "" ? 8 : 0
+
+            visible: root.supportingText !== ""
+
+            text: root.supportingText
+            color: Md3Theme.surfaceVariantContent
+
+            font.pixelSize: 13
+            wrapMode: Text.Wrap
+        }
+
+        ColumnLayout {
+            id: body
+
+            Layout.fillWidth: true
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+            Layout.topMargin: 18
+
+            spacing: 14
+        }
+
+        RowLayout {
+            id: actionRow
+
+            Layout.fillWidth: true
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+            Layout.topMargin: 20
+
+            spacing: 10
+
+            Item {
+                Layout.fillWidth: true
+            }
+        }
+
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 24
         }
     }
 }

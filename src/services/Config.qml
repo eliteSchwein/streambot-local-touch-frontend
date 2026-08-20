@@ -130,6 +130,49 @@ QtObject {
         }
     }
 
+    function setLanguage(newLanguage) {
+        if (newLanguage !== "en" && newLanguage !== "de")
+            return
+
+        let data = {}
+
+        if (settingsFile.loaded) {
+            const currentText = settingsFile.text()
+
+            if (currentText && currentText.trim() !== "") {
+                try {
+                    data = JSON.parse(currentText)
+                } catch (error) {
+                    console.warn(
+                        "[config] cannot save language because streambot-settings.json is invalid:",
+                        error
+                    )
+                    return
+                }
+            }
+        }
+
+        data.language = newLanguage
+
+        try {
+            settingsFile.setText(
+                JSON.stringify(data, null, 2) + "\n"
+            )
+
+            language = newLanguage
+
+            console.log(
+                "[config] saved language:",
+                newLanguage
+            )
+        } catch (error) {
+            console.warn(
+                "[config] failed to save language:",
+                error
+            )
+        }
+    }
+
     function loadSharedSettings() {
         language = "en"
 

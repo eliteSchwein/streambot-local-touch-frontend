@@ -36,5 +36,8 @@
   "disabled": "Deaktiviert",
   "saved": "Gespeichert",
   "available": "Verfügbar",
-  "web_access": "Webzugriff"
+  "web_access": "Webzugriff",
+  "known": "Gespeichert",
+  "secured": "Gesichert",
+  "open_network": "Offen"
 }

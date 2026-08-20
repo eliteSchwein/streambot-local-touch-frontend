@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Networking
 
 import "md3"
 import "../dialogs"
@@ -26,7 +27,8 @@ Item {
 
     readonly property string commanderUrl:
         network.primaryIp !== ""
-        ? "http://" + network.primaryIp + ":" + config.restPort + "/commander"
+        ? "http://" + network.primaryIp + ":"
+            + config.restPort + "/commander"
         : ""
 
     function refreshQr() {
@@ -38,7 +40,7 @@ Item {
             "-o",
             qrPath,
             "-s",
-            "12",
+            "8",
             "-m",
             "1",
             commanderUrl
@@ -46,6 +48,15 @@ Item {
     }
 
     onCommanderUrlChanged: refreshQr()
+
+    onOpenChanged: {
+        network.setWifiScanning(open)
+
+        if (open) {
+            network.refreshPrimaryIp()
+            refreshQr()
+        }
+    }
 
     property Process qrProcess: Process {
         onExited: code => {
@@ -56,7 +67,7 @@ Item {
         }
     }
 
-    // Closed state: only this thin top strip listens for a downward pull.
+    // Android-like pull-down activation area.
     Item {
         anchors {
             top: parent.top
@@ -68,7 +79,6 @@ Item {
         z: 20
 
         DragHandler {
-            id: openGesture
             target: null
 
             property real startY: 0
@@ -76,7 +86,9 @@ Item {
             onActiveChanged: {
                 if (active) {
                     startY = centroid.position.y
-                } else if (centroid.position.y - startY > 36) {
+                } else if (
+                    centroid.position.y - startY > 36
+                ) {
                     root.open = true
                 }
             }
@@ -88,10 +100,9 @@ Item {
     }
 
     Rectangle {
-        id: drawer
-
         width: parent.width
         height: parent.height
+
         y: root.open ? 0 : -height
 
         color: Md3Theme.background
@@ -113,7 +124,7 @@ Item {
                 Layout.fillHeight: true
                 spacing: 10
 
-                // LEFT: Ethernet then Wi-Fi.
+                // LEFT
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -121,53 +132,66 @@ Item {
 
                     Md3Card {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 128
+                        Layout.preferredHeight:
+                            Math.max(115, ethernetColumn.implicitHeight + 28)
 
                         title: root.i18n.text("ethernet")
 
-                        RowLayout {
+                        ColumnLayout {
+                            id: ethernetColumn
+
                             Layout.fillWidth: true
+                            spacing: 6
 
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 2
+                            Repeater {
+                                model: root.network.ethernetDevices
 
-                                Text {
-                                    text: root.network.ethernetEnabled
-                                        ? root.i18n.text("enabled")
-                                        : root.i18n.text("disabled")
+                                RowLayout {
+                                    required property var modelData
 
-                                    color: Md3Theme.surfaceVariantContent
-                                    font.pixelSize: 12
-                                }
+                                    Layout.fillWidth: true
 
-                                Repeater {
-                                    model: root.network.ethernetDevices
-
-                                    Text {
-                                        required property var modelData
-
+                                    ColumnLayout {
                                         Layout.fillWidth: true
+                                        spacing: 1
 
-                                        text:
-                                            modelData.device
-                                            + " — "
-                                            + modelData.state
+                                        Text {
+                                            text: modelData.name
+                                            color: Md3Theme.surfaceContent
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
 
-                                        color: Md3Theme.surfaceContent
-                                        font.pixelSize: 11
-                                        elide: Text.ElideRight
+                                        Text {
+                                            text:
+                                                modelData.connected
+                                                ? root.i18n.text("connected")
+                                                : root.i18n.text("disconnected")
+
+                                            color:
+                                                modelData.connected
+                                                ? Md3Theme.success
+                                                : Md3Theme.surfaceVariantContent
+
+                                            font.pixelSize: 11
+                                        }
                                     }
-                                }
-                            }
 
-                            Md3Switch {
-                                checked: root.network.ethernetEnabled
+                                    Md3Switch {
+                                        checked:
+                                            modelData.connected
+                                            || modelData.autoconnect
 
-                                onClicked: {
-                                    root.network.setEthernetEnabled(
-                                        !root.network.ethernetEnabled
-                                    )
+                                        onClicked: {
+                                            root.network.setEthernetEnabled(
+                                                modelData,
+                                                !(
+                                                    modelData.connected
+                                                    || modelData.autoconnect
+                                                )
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -185,9 +209,14 @@ Item {
                             Text {
                                 Layout.fillWidth: true
 
-                                text: root.network.wifiEnabled
-                                    ? root.i18n.text("enabled")
-                                    : root.i18n.text("disabled")
+                                text:
+                                    !root.network.wifiHardwareEnabled
+                                    ? root.i18n.text("disabled")
+                                    : (
+                                        root.network.wifiEnabled
+                                        ? root.i18n.text("enabled")
+                                        : root.i18n.text("disabled")
+                                    )
 
                                 color: Md3Theme.surfaceVariantContent
                                 font.pixelSize: 12
@@ -202,61 +231,6 @@ Item {
                                     )
                                 }
                             }
-                        }
-
-                        Text {
-                            text: root.i18n.text("saved")
-                            color: Md3Theme.surfaceContent
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                        }
-
-                        Repeater {
-                            model: root.network.savedWifiConnections
-
-                            RowLayout {
-                                required property var modelData
-
-                                Layout.fillWidth: true
-
-                                Text {
-                                    Layout.fillWidth: true
-
-                                    text: modelData.name
-                                    color: Md3Theme.surfaceContent
-
-                                    font.pixelSize: 12
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    visible: modelData.device !== ""
-
-                                    text: root.i18n.text("connected")
-                                    color: Md3Theme.success
-                                    font.pixelSize: 10
-                                }
-
-                                Md3Button {
-                                    visible: modelData.device === ""
-
-                                    text: root.i18n.text("connect")
-                                    outlined: true
-
-                                    onClicked: {
-                                        root.network.activateConnection(
-                                            modelData.name
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Text {
-                            text: root.i18n.text("available")
-                            color: Md3Theme.surfaceContent
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
                         }
 
                         ListView {
@@ -274,29 +248,64 @@ Item {
                                 required property var modelData
 
                                 width: wifiList.width
-                                height: 42
+                                height: 46
+
                                 radius: Md3Theme.radiusMedium
 
-                                color: modelData.active
+                                color:
+                                    modelData.connected
                                     ? Md3Theme.surfaceContainerHigh
                                     : Md3Theme.surfaceContainerHighest
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 8
+                                    anchors.margins: 9
+                                    spacing: 8
 
-                                    Text {
+                                    ColumnLayout {
                                         Layout.fillWidth: true
+                                        spacing: 1
 
-                                        text: modelData.ssid
-                                        color: Md3Theme.surfaceContent
+                                        Text {
+                                            Layout.fillWidth: true
 
-                                        font.pixelSize: 12
-                                        elide: Text.ElideRight
+                                            text: modelData.name
+                                            color: Md3Theme.surfaceContent
+
+                                            font.pixelSize: 12
+                                            font.weight:
+                                                modelData.connected
+                                                ? Font.DemiBold
+                                                : Font.Normal
+
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+
+                                            text:
+                                                modelData.known
+                                                ? root.i18n.text("known")
+                                                : (
+                                                    modelData.security
+                                                    === WifiSecurityType.Open
+                                                    ? root.i18n.text("open_network")
+                                                    : root.i18n.text("secured")
+                                                )
+
+                                            color: Md3Theme.surfaceVariantContent
+                                            font.pixelSize: 9
+                                        }
                                     }
 
                                     Text {
-                                        text: modelData.signal + "%"
+                                        text:
+                                            Math.round(
+                                                modelData.signalStrength * 100
+                                            )
+                                            + "%"
+
                                         color: Md3Theme.surfaceVariantContent
                                         font.pixelSize: 10
                                     }
@@ -304,8 +313,27 @@ Item {
 
                                 TapHandler {
                                     onTapped: {
-                                        wifiDialog.ssid = modelData.ssid
-                                        wifiDialog.security = modelData.security
+                                        if (modelData.connected) {
+                                            modelData.disconnect()
+                                            return
+                                        }
+
+                                        // Known networks use their saved NM profile.
+                                        if (modelData.known) {
+                                            modelData.connect()
+                                            return
+                                        }
+
+                                        // Open networks don't require a dialog.
+                                        if (
+                                            modelData.security
+                                            === WifiSecurityType.Open
+                                        ) {
+                                            modelData.connect()
+                                            return
+                                        }
+
+                                        wifiDialog.network = modelData
                                         wifiDialog.open()
                                     }
                                 }
@@ -314,7 +342,7 @@ Item {
                     }
                 }
 
-                // RIGHT: Language then big QR.
+                // RIGHT
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -335,11 +363,14 @@ Item {
                             ]
 
                             currentIndex:
-                                root.config.language === "de" ? 1 : 0
+                                root.config.language === "de"
+                                ? 1
+                                : 0
 
                             onActivated: index => {
-                                root.config.language =
+                                root.config.setLanguage(
                                     index === 1 ? "de" : "en"
+                                )
                             }
                         }
                     }
@@ -367,8 +398,9 @@ Item {
                                     anchors.centerIn: parent
 
                                     width: Math.min(
-                                        parent.width - 12,
-                                        parent.height - 12
+                                        190,
+                                        parent.width - 16,
+                                        parent.height - 16
                                     )
 
                                     height: width
@@ -376,7 +408,8 @@ Item {
                                     fillMode: Image.PreserveAspectFit
                                     cache: false
 
-                                    source: root.commanderUrl !== ""
+                                    source:
+                                        root.commanderUrl !== ""
                                         ? "file://" + root.qrPath
                                             + "?v=" + revision
                                         : ""
@@ -386,12 +419,13 @@ Item {
                             Text {
                                 Layout.fillWidth: true
 
-                                text: root.commanderUrl !== ""
+                                text:
+                                    root.commanderUrl !== ""
                                     ? root.commanderUrl
                                     : root.i18n.text("no_ip")
 
                                 color: Md3Theme.surfaceVariantContent
-                                font.pixelSize: 10
+                                font.pixelSize: 13
 
                                 horizontalAlignment: Text.AlignHCenter
                                 wrapMode: Text.WrapAnywhere
@@ -404,7 +438,7 @@ Item {
                 }
             }
 
-            // Open drawer: swipe up on this Android-style handle to close.
+            // Simple upward close gesture.
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
@@ -415,6 +449,7 @@ Item {
                     radius: 3
 
                     anchors.centerIn: parent
+
                     color: Md3Theme.surfaceVariantContent
                 }
 
@@ -445,6 +480,5 @@ Item {
         id: wifiDialog
 
         i18n: root.i18n
-        network: root.network
     }
 }
