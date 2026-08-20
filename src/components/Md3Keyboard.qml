@@ -35,6 +35,7 @@ Item {
         ? symbolRows
         : (language === "de" ? deRows : enRows)
 
+    z: 1000000
     visible: KeyboardController.visible
     height: visible ? Math.min(260, parent.height * 0.43) : 0
 

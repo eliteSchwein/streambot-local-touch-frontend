@@ -133,13 +133,15 @@ ShellRoot {
             Md3Keyboard {
                 id: keyboard
 
+                parent: Overlay.overlay
+
                 anchors {
                     left: parent.left
                     right: parent.right
                     bottom: parent.bottom
                 }
 
-                z: 100000
+                z: 1000000
                 language: config.language
             }
 

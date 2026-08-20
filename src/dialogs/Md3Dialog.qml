@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 import "../components/md3"
+import "../services"
 
 Popup {
     id: root
@@ -22,8 +23,37 @@ Popup {
         Overlay.overlay ? Overlay.overlay.width - 32 : 420
     )
 
-    anchors.centerIn: Overlay.overlay
+    x: Overlay.overlay
+        ? Math.round((Overlay.overlay.width - width) / 2)
+        : 0
+
+    y: {
+        if (!Overlay.overlay)
+            return 0
+
+        const centered =
+            Math.round((Overlay.overlay.height - height) / 2)
+
+        if (!KeyboardController.visible)
+            return centered
+
+        // Keep the dialog visually above the keyboard instead of
+        // allowing the keyboard to cover its lower controls.
+        return Math.max(
+            12,
+            Math.round(centered - Overlay.overlay.height * 0.18)
+        )
+    }
+
+    Behavior on y {
+        NumberAnimation {
+            duration: 160
+            easing.type: Easing.OutCubic
+        }
+    }
     closePolicy: Popup.CloseOnEscape
+
+    onClosed: KeyboardController.clearFocus()
 
     background: Rectangle {
         radius: Md3Theme.radiusExtraLarge
@@ -31,6 +61,14 @@ Popup {
 
         border.width: 1
         border.color: Md3Theme.outlineVariant
+
+        TapHandler {
+            gesturePolicy: TapHandler.ReleaseWithinBounds
+
+            onTapped: {
+                KeyboardController.clearFocus()
+            }
+        }
     }
 
     contentItem: ColumnLayout {

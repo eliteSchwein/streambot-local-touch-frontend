@@ -17,11 +17,21 @@ QtObject {
             target = null
     }
 
-    function hide() {
-        if (target !== null)
+    function clearFocus() {
+        if (target !== null) {
             target.focus = false
 
+            if (target.parent !== null
+                && target.parent.forceActiveFocus !== undefined) {
+                target.parent.forceActiveFocus()
+            }
+        }
+
         target = null
+    }
+
+    function hide() {
+        clearFocus()
     }
 
     function insert(text) {
@@ -43,21 +53,14 @@ QtObject {
         const pos = target.cursorPosition
 
         if (target.selectionStart !== target.selectionEnd) {
-            target.remove(target.selectionStart, target.selectionEnd)
+            target.remove(
+                target.selectionStart,
+                target.selectionEnd
+            )
             return
         }
 
         if (pos > 0)
             target.remove(pos - 1, pos)
-    }
-
-    function submit() {
-        if (target === null)
-            return
-
-        if (target.accepted !== undefined)
-            target.accepted()
-
-        hide()
     }
 }
