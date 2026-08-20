@@ -253,7 +253,7 @@ ShellRoot {
                 id: connectDialog
 
                 anchors.fill: parent
-                z: 9000000
+                z: 8000000
 
                 i18n: i18n
                 websocket: websocket

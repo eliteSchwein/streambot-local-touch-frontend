@@ -35,10 +35,10 @@ QtObject {
     }
 
     function applyStatus(raw) {
-        let status
+        let response
 
         try {
-            status = JSON.parse(raw)
+            response = JSON.parse(raw)
         } catch (error) {
             // Match the old Vue behavior:
             // invalid/transient responses must not erase the last
@@ -47,12 +47,30 @@ QtObject {
         }
 
         if (
-            status === null
-            || typeof status !== "object"
-            || Array.isArray(status)
+            response === null
+            || typeof response !== "object"
+            || Array.isArray(response)
         ) {
             return
         }
+
+        // The backend API wraps successful responses like:
+        //
+        // {
+        //   "data": {
+        //     "bootup_stage": "finished",
+        //     "ready": true
+        //   },
+        //   "status": 200
+        // }
+        //
+        // Keep support for an unwrapped object as well.
+        const status =
+            response.data
+            && typeof response.data === "object"
+            && !Array.isArray(response.data)
+            ? response.data
+            : response
 
         hasStatus = true
         ready = status.ready === true

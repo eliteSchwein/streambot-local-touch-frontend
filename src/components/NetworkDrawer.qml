@@ -534,7 +534,8 @@ Item {
     PowerMenuDialog {
         id: powerMenuDialog
 
-        z: 800000
+        // Must stay above the shell-level connection/status dialog.
+        z: 10000000
         i18n: root.i18n
     }
 
