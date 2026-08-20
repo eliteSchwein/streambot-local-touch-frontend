@@ -135,13 +135,54 @@ Item {
                         Layout.preferredHeight:
                             Math.max(115, ethernetColumn.implicitHeight + 28)
 
-                        title: root.i18n.text("ethernet")
+                        title: ""
 
                         ColumnLayout {
                             id: ethernetColumn
 
                             Layout.fillWidth: true
                             spacing: 6
+
+                            RowLayout {
+                                Layout.fillWidth: true
+
+                                Text {
+                                    Layout.fillWidth: true
+
+                                    text: root.i18n.text("ethernet")
+                                    color: Md3Theme.surfaceContent
+
+                                    font.pixelSize: 16
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Md3Switch {
+                                    visible: root.network.ethernetDevices.length > 0
+
+                                    checked:
+                                        root.network.ethernetDevices.length > 0
+                                        && (
+                                            root.network.ethernetDevices[0].connected
+                                            || root.network.ethernetDevices[0].autoconnect
+                                        )
+
+                                    onClicked: {
+                                        if (root.network.ethernetDevices.length === 0)
+                                            return
+
+                                        const device =
+                                            root.network.ethernetDevices[0]
+
+                                        root.network.setEthernetEnabled(
+                                            device,
+                                            !(
+                                                device.connected
+                                                || device.autoconnect
+                                            )
+                                        )
+                                    }
+                                }
+                            }
 
                             Repeater {
                                 model: root.network.ethernetDevices
@@ -151,46 +192,28 @@ Item {
 
                                     Layout.fillWidth: true
 
-                                    ColumnLayout {
+                                    Text {
                                         Layout.fillWidth: true
-                                        spacing: 1
 
-                                        Text {
-                                            text: modelData.name
-                                            color: Md3Theme.surfaceContent
-                                            font.pixelSize: 13
-                                            font.weight: Font.DemiBold
-                                        }
+                                        text: modelData.name
+                                        color: Md3Theme.surfaceContent
 
-                                        Text {
-                                            text:
-                                                modelData.connected
-                                                ? root.i18n.text("connected")
-                                                : root.i18n.text("disconnected")
-
-                                            color:
-                                                modelData.connected
-                                                ? Md3Theme.success
-                                                : Md3Theme.surfaceVariantContent
-
-                                            font.pixelSize: 11
-                                        }
+                                        font.pixelSize: 12
+                                        elide: Text.ElideRight
                                     }
 
-                                    Md3Switch {
-                                        checked:
+                                    Text {
+                                        text:
                                             modelData.connected
-                                            || modelData.autoconnect
+                                            ? root.i18n.text("connected")
+                                            : root.i18n.text("disconnected")
 
-                                        onClicked: {
-                                            root.network.setEthernetEnabled(
-                                                modelData,
-                                                !(
-                                                    modelData.connected
-                                                    || modelData.autoconnect
-                                                )
-                                            )
-                                        }
+                                        color:
+                                            modelData.connected
+                                            ? Md3Theme.success
+                                            : Md3Theme.surfaceVariantContent
+
+                                        font.pixelSize: 10
                                     }
                                 }
                             }
@@ -201,7 +224,7 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
 
-                        title: root.i18n.text("wifi")
+                        title: ""
 
                         RowLayout {
                             Layout.fillWidth: true
@@ -209,17 +232,11 @@ Item {
                             Text {
                                 Layout.fillWidth: true
 
-                                text:
-                                    !root.network.wifiHardwareEnabled
-                                    ? root.i18n.text("disabled")
-                                    : (
-                                        root.network.wifiEnabled
-                                        ? root.i18n.text("enabled")
-                                        : root.i18n.text("disabled")
-                                    )
+                                text: root.i18n.text("wifi")
+                                color: Md3Theme.surfaceContent
 
-                                color: Md3Theme.surfaceVariantContent
-                                font.pixelSize: 12
+                                font.pixelSize: 16
+                                font.weight: Font.DemiBold
                             }
 
                             Md3Switch {
@@ -398,9 +415,9 @@ Item {
                                     anchors.centerIn: parent
 
                                     width: Math.min(
-                                        190,
-                                        parent.width - 16,
-                                        parent.height - 16
+                                        165,
+                                        parent.width - 20,
+                                        parent.height - 20
                                     )
 
                                     height: width
@@ -425,7 +442,7 @@ Item {
                                     : root.i18n.text("no_ip")
 
                                 color: Md3Theme.surfaceVariantContent
-                                font.pixelSize: 13
+                                font.pixelSize: 14
 
                                 horizontalAlignment: Text.AlignHCenter
                                 wrapMode: Text.WrapAnywhere
