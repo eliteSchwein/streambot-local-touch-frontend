@@ -32,7 +32,7 @@ Rectangle {
         runState = "loading"
 
         requestId = websocket.sendRpc(
-            "macro",
+            "trigger_macro",
             {
                 macro: name
             }
