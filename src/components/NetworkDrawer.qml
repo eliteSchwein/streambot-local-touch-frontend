@@ -229,6 +229,9 @@ Item {
 
                             Md3Button {
                                 text: root.i18n.text("saved_wifi")
+                        implicitHeight: 34
+                        leftPadding: 10
+                        rightPadding: 10
                                 outlined: true
 
                                 onClicked: {
@@ -538,5 +541,35 @@ Item {
 
         i18n: root.i18n
         network: root.network
+
+        onDeleteRequested: function(connection) {
+            deleteWifiDialog.connection = connection
+            deleteWifiDialog.title =
+                root.i18n.text("delete_saved_wifi")
+            deleteWifiDialog.message =
+                root.i18n
+                    .text("delete_saved_wifi_text")
+                    .replace("%1", connection.name)
+            deleteWifiDialog.open()
+        }
+    }
+
+    ConfirmDialog {
+        id: deleteWifiDialog
+
+        z: 700000
+        i18n: root.i18n
+        property var connection: null
+
+        onConfirmed: {
+            if (connection !== null) {
+                connection.forget()
+                connection = null
+            }
+        }
+
+        onClosed: {
+            connection = null
+        }
     }
 }

@@ -9,7 +9,7 @@ Md3Dialog {
     required property var i18n
     required property var network
 
-    property var pendingDelete: null
+    signal deleteRequested(var connection)
 
     title: root.i18n.text("saved_wifi")
 
@@ -100,17 +100,7 @@ Md3Dialog {
                         outlined: true
 
                         onClicked: {
-                            root.pendingDelete = modelData
-
-                            confirmDelete.title =
-                                root.i18n.text("delete_saved_wifi")
-
-                            confirmDelete.message =
-                                root.i18n
-                                    .text("delete_saved_wifi_text")
-                                    .replace("%1", modelData.name)
-
-                            confirmDelete.open()
+                            root.deleteRequested(modelData)
                         }
                     }
                 }
@@ -126,16 +116,4 @@ Md3Dialog {
         }
     ]
 
-    ConfirmDialog {
-        id: confirmDelete
-
-        i18n: root.i18n
-
-        onConfirmed: {
-            if (root.pendingDelete !== null) {
-                root.pendingDelete.forget()
-                root.pendingDelete = null
-            }
-        }
-    }
 }
