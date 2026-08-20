@@ -6,9 +6,6 @@ import Quickshell.Networking
 QtObject {
     id: root
 
-    // Native reactive Quickshell models.
-    readonly property var devices: Networking.devices
-
     readonly property var wifiDevices:
         Networking.devices.values.filter(
             device => device.type === DeviceType.Wifi
@@ -51,27 +48,6 @@ QtObject {
             wifiDevice.scannerEnabled = enabled
     }
 
-    function connectWifi(network) {
-        if (network === null || network === undefined)
-            return
-
-        network.connect()
-    }
-
-    function connectWifiWithPsk(network, psk) {
-        if (network === null || network === undefined)
-            return
-
-        network.connectWithPsk(psk)
-    }
-
-    function disconnectWifi(network) {
-        if (network === null || network === undefined)
-            return
-
-        network.disconnect()
-    }
-
     function setEthernetEnabled(device, enabled) {
         if (device === null || device === undefined)
             return
@@ -101,8 +77,6 @@ QtObject {
         ])
     }
 
-    // Quickshell.Networking is reactive, so no polling or nmcli monitor is needed.
-    // Scanner is enabled while this service exists so APs stay current.
     Component.onCompleted: {
         setWifiScanning(true)
         refreshPrimaryIp()
@@ -116,8 +90,6 @@ QtObject {
         }
     }
 
-    // Re-evaluate PRIMARYIP occasionally because the native QS 0.3 API does
-    // not expose IPv4 addresses. This is only for the Web access QR URL.
     property Timer primaryIpTimer: Timer {
         interval: 5000
         repeat: true

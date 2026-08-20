@@ -39,5 +39,12 @@
   "web_access": "Web access",
   "known": "Saved",
   "secured": "Secured",
-  "open_network": "Open"
+  "open_network": "Open",
+  "saved_wifi": "Saved Wi-Fi",
+  "no_saved_wifi": "No saved Wi-Fi connections",
+  "no_wifi_networks": "No Wi-Fi networks found",
+  "wifi_disabled": "Wi-Fi is disabled",
+  "delete": "Delete",
+  "delete_saved_wifi": "Delete saved Wi-Fi?",
+  "delete_saved_wifi_text": "The saved connection for \"%1\" will be removed."
 }

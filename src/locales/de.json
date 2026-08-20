@@ -39,5 +39,12 @@
   "web_access": "Webzugriff",
   "known": "Gespeichert",
   "secured": "Gesichert",
-  "open_network": "Offen"
+  "open_network": "Offen",
+  "saved_wifi": "Gespeicherte WLANs",
+  "no_saved_wifi": "Keine gespeicherten WLAN-Verbindungen",
+  "no_wifi_networks": "Keine WLAN-Netzwerke gefunden",
+  "wifi_disabled": "WLAN ist deaktiviert",
+  "delete": "Löschen",
+  "delete_saved_wifi": "Gespeichertes WLAN löschen?",
+  "delete_saved_wifi_text": "Die gespeicherte Verbindung für \"%1\" wird entfernt."
 }

@@ -53,7 +53,6 @@ Popup {
 
             font.pixelSize: 20
             font.weight: Font.DemiBold
-
             wrapMode: Text.Wrap
         }
 
