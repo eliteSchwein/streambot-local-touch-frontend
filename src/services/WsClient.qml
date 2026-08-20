@@ -15,9 +15,8 @@ QtObject {
         "notify_playlist_update",
         "notify_music_cava",
         "notify_audio_update",
-        "notify_auto_macros_update",
-        "notify_rotating_scene_update",
-        "notify_rotating_scene_runtime_update"
+        "notify_audio_outputs_update",
+        "notify_auto_macros_update"
     ]
 
     property int nextRequestId: 1

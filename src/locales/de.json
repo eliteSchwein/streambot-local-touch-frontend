@@ -53,12 +53,19 @@
   "unknown_artist": "Unbekannter Künstler",
   "auto_macros": "Auto-Makros",
   "no_auto_macros": "Keine Auto-Makros",
-  "rotate_scene": "Szenenrotation",
-  "no_rotations": "Keine Szenenrotationen",
   "queued": "in Warteschlange",
   "active": "Aktiv",
   "next": "Als Nächstes",
   "music_volume": "Musik",
   "tts_volume": "TTS",
-  "alert_volume": "Alert"
+  "alert_volume": "Alert",
+  "audio_name": "Name",
+  "audio_volume": "Lautstärke",
+  "audio_outputs": "Ausgänge",
+  "audio_no_outputs": "Keine Ausgänge",
+  "audio_unknown_output": "Unbekannter Ausgang",
+  "audio_default": "Standard",
+  "audio_muted": "Stumm",
+  "audio_unmute": "Ton an",
+  "audio_mute": "Stumm"
 }

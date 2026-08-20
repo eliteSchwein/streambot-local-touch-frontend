@@ -6,9 +6,8 @@ QtObject {
     property var music: ({})
     property var playlist: ({})
     property var audio: ({})
+    property var audioOutputs: []
     property var autoMacros: []
-    property var rotatingScenes: ({})
-    property var rotatingRuntime: ({})
     property var alertQueue: []
     property var activeAlert: null
 
@@ -35,19 +34,18 @@ QtObject {
             audio = params ?? ({})
             break
 
+        case "notify_audio_outputs_update":
+            audioOutputs = Array.isArray(params)
+                ? params
+                : (
+                    params && Array.isArray(params.outputs)
+                    ? params.outputs
+                    : []
+                )
+            break
+
         case "notify_auto_macros_update":
             autoMacros = Array.isArray(params) ? params : []
-            break
-
-        case "notify_rotating_scene_update":
-            rotatingScenes =
-                params && params.rotatingScenes
-                ? params.rotatingScenes
-                : ({})
-            break
-
-        case "notify_rotating_scene_runtime_update":
-            rotatingRuntime = params ?? ({})
             break
 
         case "notify_alert_query":
@@ -129,18 +127,4 @@ QtObject {
         return minutes + ":" + String(rest).padStart(2, "0")
     }
 
-    function rotationList() {
-        const result = []
-
-        for (const name in rotatingScenes) {
-            const item = rotatingScenes[name]
-            result.push({
-                name: name,
-                interval: item.interval,
-                scenes: item.scenes ?? []
-            })
-        }
-
-        return result
-    }
 }

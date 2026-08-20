@@ -53,11 +53,34 @@ ShellRoot {
         color: Md3Theme.background
 
         Rectangle {
+            id: appRoot
+
+            property int currentPage: 0
+
             anchors.fill: parent
             color: Md3Theme.background
 
             DashboardPage {
                 id: dashboardPage
+
+                visible: appRoot.currentPage === 0
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                i18n: i18n
+                websocket: websocket
+                store: dashboardStore
+            }
+
+            AudioPage {
+                id: audioPage
+
+                visible: appRoot.currentPage === 1
 
                 anchors {
                     top: parent.top
@@ -85,10 +108,22 @@ ShellRoot {
 
                 Row {
                     anchors.centerIn: parent
+                    spacing: 10
 
                     Md3NavButton {
                         icon: "⌂"
-                        selected: true
+                        selected: appRoot.currentPage === 0
+
+                        onClicked:
+                            appRoot.currentPage = 0
+                    }
+
+                    Md3NavButton {
+                        icon: "♪"
+                        selected: appRoot.currentPage === 1
+
+                        onClicked:
+                            appRoot.currentPage = 1
                     }
                 }
             }

@@ -23,7 +23,7 @@ Md3Card {
 
             text: root.i18n.text("no_alerts")
             color: Md3Theme.surfaceVariantContent
-            font.pixelSize: 10
+            font.pixelSize: 13
         }
 
         ListView {

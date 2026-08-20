@@ -53,12 +53,19 @@
   "unknown_artist": "Unknown artist",
   "auto_macros": "Auto macros",
   "no_auto_macros": "No auto macros",
-  "rotate_scene": "Rotate scene",
-  "no_rotations": "No scene rotations",
   "queued": "queued",
   "active": "Active",
   "next": "Next",
   "music_volume": "Music",
   "tts_volume": "TTS",
-  "alert_volume": "Alert"
+  "alert_volume": "Alert",
+  "audio_name": "Name",
+  "audio_volume": "Volume",
+  "audio_outputs": "Outputs",
+  "audio_no_outputs": "No outputs",
+  "audio_unknown_output": "Unknown output",
+  "audio_default": "Default",
+  "audio_muted": "Muted",
+  "audio_unmute": "Unmute",
+  "audio_mute": "Mute"
 }
