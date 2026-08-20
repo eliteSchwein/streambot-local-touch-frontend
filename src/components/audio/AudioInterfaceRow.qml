@@ -218,49 +218,75 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
+
         anchors.leftMargin: 12
-        anchors.rightMargin: 10
+        anchors.rightMargin: 12
         anchors.topMargin: 8
         anchors.bottomMargin: 8
 
-        spacing: 10
+        spacing: 12
 
-        ColumnLayout {
-            Layout.preferredWidth: 110
-            Layout.minimumWidth: 95
-            Layout.maximumWidth: 125
+        // Left block: name, subtitle, and link icon.
+        Item {
+            Layout.preferredWidth: 150
+            Layout.minimumWidth: 135
+            Layout.maximumWidth: 165
+            Layout.fillHeight: true
 
-            Layout.alignment: Qt.AlignVCenter
+            RowLayout {
+                anchors.fill: parent
+                spacing: 5
 
-            spacing: 1
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
 
-            Text {
-                Layout.fillWidth: true
+                    spacing: 1
 
-                text: root.interfaceName
-                color: Md3Theme.surfaceContent
+                    Text {
+                        Layout.fillWidth: true
 
-                font.pixelSize: 13
-                font.weight: Font.DemiBold
+                        text: root.interfaceName
+                        color: Md3Theme.surfaceContent
 
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
-            }
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
 
-            Text {
-                Layout.fillWidth: true
-                visible: root.subtitle !== ""
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
 
-                text: root.subtitle
-                color: Md3Theme.surfaceVariantContent
+                    Text {
+                        Layout.fillWidth: true
+                        visible: root.subtitle !== ""
 
-                font.pixelSize: 8
+                        text: root.subtitle
+                        color: Md3Theme.surfaceVariantContent
 
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 8
+
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                AudioLinkButton {
+                    Layout.alignment: Qt.AlignVCenter
+
+                    visible:
+                        root.showLinkButton
+                        && root.pipewireSink
+
+                    onClicked:
+                        root.linkRequested(
+                            root.interfaceName,
+                            root.device
+                        )
+                }
             }
         }
 
+        // Right block: centered slider + controls.
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -293,115 +319,93 @@ Rectangle {
                 }
             }
 
-            RowLayout {
+            Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
 
-                spacing: 6
+                RowLayout {
+                    anchors.centerIn: parent
+                    spacing: 12
 
-                AudioControlButton {
-                    icon: "minus"
-                    enabled: !root.muted
+                    AudioControlButton {
+                        icon: "minus"
+                        enabled: !root.muted
 
-                    onClicked:
-                        root.stepVolume(-1)
-                }
+                        onClicked:
+                            root.stepVolume(-1)
+                    }
 
-                Item {
-                    Layout.fillWidth: true
-                }
+                    Rectangle {
+                        id: volumeMutePill
 
-                Rectangle {
-                    id: volumeMutePill
+                        implicitWidth: 96
+                        implicitHeight: 32
 
-                    implicitWidth: 94
-                    implicitHeight: 32
+                        radius: 16
 
-                    radius: 16
+                        color:
+                            root.muted
+                            ? Md3Theme.primary
+                            : muteTap.pressed
+                                ? Md3Theme.surfaceContainerHigh
+                                : Md3Theme.surfaceContainerHighest
 
-                    color:
-                        root.muted
-                        ? Md3Theme.primary
-                        : muteTap.pressed
-                            ? Md3Theme.surfaceContainerHigh
-                            : Md3Theme.surfaceContainerHighest
+                        border.width:
+                            root.muted
+                            ? 0
+                            : 1
 
-                    border.width:
-                        root.muted
-                        ? 0
-                        : 1
+                        border.color:
+                            Md3Theme.outlineVariant
 
-                    border.color:
-                        Md3Theme.outlineVariant
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 6
 
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 6
+                            MdiIcon {
+                                name:
+                                    root.muted
+                                    ? "volume-off"
+                                    : "volume-high"
 
-                        MdiIcon {
-                            name:
-                                root.muted
-                                ? "volume-off"
-                                : "volume-high"
+                                size: 17
+                                selected: root.muted
+                            }
 
-                            size: 17
-                            selected: root.muted
+                            Text {
+                                text:
+                                    Math.round(
+                                        root.draftVolume * 100
+                                    )
+                                    + "%"
+
+                                color:
+                                    root.muted
+                                    ? Md3Theme.primaryContent
+                                    : Md3Theme.surfaceContent
+
+                                font.pixelSize: 10
+                                font.weight: Font.DemiBold
+                            }
                         }
 
-                        Text {
-                            text:
-                                Math.round(
-                                    root.draftVolume * 100
-                                )
-                                + "%"
+                        TapHandler {
+                            id: muteTap
 
-                            color:
-                                root.muted
-                                ? Md3Theme.primaryContent
-                                : Md3Theme.surfaceContent
-
-                            font.pixelSize: 10
-                            font.weight: Font.DemiBold
+                            onTapped:
+                                root.toggleMute()
                         }
                     }
 
-                    TapHandler {
-                        id: muteTap
+                    AudioControlButton {
+                        icon: "plus"
+                        enabled: !root.muted
 
-                        onTapped:
-                            root.toggleMute()
+                        onClicked:
+                            root.stepVolume(1)
                     }
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                AudioControlButton {
-                    icon: "plus"
-                    enabled: !root.muted
-
-                    onClicked:
-                        root.stepVolume(1)
                 }
             }
-        }
-
-        AudioLinkButton {
-            Layout.alignment: Qt.AlignVCenter
-
-            implicitWidth: 38
-            implicitHeight: 38
-
-            visible:
-                root.showLinkButton
-                && root.pipewireSink
-
-            onClicked:
-                root.linkRequested(
-                    root.interfaceName,
-                    root.device
-                )
         }
     }
 }
