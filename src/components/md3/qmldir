@@ -1,2 +1,5 @@
 singleton Md3Theme 1.0 Md3Theme.qml
 Md3Card 1.0 Md3Card.qml
+Md3Button 1.0 Md3Button.qml
+Md3Slider 1.0 Md3Slider.qml
+Md3Switch 1.0 Md3Switch.qml

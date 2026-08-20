@@ -1,11 +1,21 @@
 #!/bin/bash
 set -euo pipefail
+
 MCCONFIGFILE="$HOME/.config/streambot/streambot-touch.cfg"
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --app-config|--config_path) MCCONFIGFILE="$2"; shift 2 ;;
-        *) echo "Unknown argument: $1" >&2; exit 1 ;;
+        --app-config|--config_path)
+            MCCONFIGFILE="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 1
+            ;;
     esac
 done
+
 export STREAMBOT_TOUCH_CONFIG="$MCCONFIGFILE"
+
 exec /usr/bin/qs --path /usr/share/streambot-touch

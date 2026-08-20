@@ -25,5 +25,8 @@
   "commander": "Commander",
   "primary_ip": "Primary IP",
   "no_ip": "No network connection",
-  "notifications": "Notifications"
+  "ethernet": "Ethernet",
+  "wifi": "Wi-Fi",
+  "english": "English",
+  "german": "German"
 }
