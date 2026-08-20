@@ -164,7 +164,11 @@ ShellRoot {
             InputPanel {
                 id: inputPanel
 
-                z: 10000
+                z: 100000
+
+                onActiveChanged: {
+                    console.log("[keyboard] active:", active)
+                }
                 width: parent.width
 
                 y: active

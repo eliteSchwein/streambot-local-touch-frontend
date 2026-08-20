@@ -10,7 +10,7 @@ default=$(echo -en "\e[39m")
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 MCSERVICENAME="streambottouch"
-MCCONFIGFILE="/home/$(whoami)/streambot-touch.cfg"
+MCCONFIGFILE="/home/$(whoami)/.config/streambot/streambot-touch.cfg"
 
 status_msg(){ echo; echo -e "${yellow}###### $1${default}"; }
 ok_msg(){ echo -e "${green}>>>>>> $1${default}"; }
@@ -36,7 +36,6 @@ if [[ ${UID} == '0' ]]; then
   exit 1
 fi
 
-
 check_distribution() {
   status_msg "Check Debian version"
 
@@ -61,7 +60,6 @@ check_distribution() {
   ok_msg "Debian 13 (Trixie) detected"
 }
 
-
 questions() {
   title_msg "Welcome to the Streambot Touch kiosk installer."
 
@@ -75,7 +73,6 @@ questions() {
   ok_msg "Streambot Touch config file set: $MCCONFIGFILE"
 }
 
-
 setup_apt_dependencies() {
   status_msg "Install APT bootstrap dependencies"
 
@@ -86,7 +83,6 @@ setup_apt_dependencies() {
     curl \
     debian-archive-keyring
 }
-
 
 setup_backports_repo() {
   status_msg "Enable Debian Trixie Backports"
@@ -105,7 +101,6 @@ EOF
   ok_msg "Trixie Backports enabled"
 }
 
-
 setup_custom_apt_repo() {
   status_msg "Enable tludwig dev repo"
 
@@ -113,7 +108,6 @@ setup_custom_apt_repo() {
 
   sudo apt update
 }
-
 
 install_packages() {
   status_msg "Install kiosk dependencies"
@@ -126,14 +120,16 @@ install_packages() {
     qml6-module-qtquick \
     qml6-module-qtquick-controls \
     qml6-module-qtquick-layouts \
+    qml6-module-qtquick-virtualkeyboard \
     qml6-module-qtwebsockets \
+    network-manager \
+    qrencode \
+    iproute2 \
     libgl1-mesa-dri \
     libegl-mesa0 \
     libgles2 \
     swayidle \
-    wtype \
-    squeekboard \
-    libglib2.0-bin
+    wtype
 
   status_msg "Install Quickshell from Trixie Backports"
 
@@ -150,6 +146,17 @@ install_packages() {
   sudo systemctl enable --now seatd
 }
 
+cleanup_squeekboard() {
+  status_msg "Remove obsolete Squeekboard integration"
+
+  sudo apt-get -y purge squeekboard 2>/dev/null || true
+
+  rm -f "$HOME/.local/bin/streambot-touch-squeekboard"
+  rm -rf "$HOME/.local/share/streambot-touch-squeekboard-data"
+  rm -rf "$HOME/.local/share/streambot-touch-squeekboard-home"
+
+  ok_msg "Squeekboard removed"
+}
 
 modify_user() {
   status_msg "Update user permissions"
@@ -157,7 +164,6 @@ modify_user() {
   sudo usermod -aG video,render,input,tty "$USER"
   sudo loginctl enable-linger "$USER"
 }
-
 
 install_service() {
   if [[ -x "$SCRIPTPATH/generateService.sh" ]]; then
@@ -168,7 +174,6 @@ install_service() {
   fi
 }
 
-
 install_labwc_config() {
   if [[ -x "$SCRIPTPATH/installLabwcConfig.sh" ]]; then
     "$SCRIPTPATH/installLabwcConfig.sh" --app_config="$MCCONFIGFILE"
@@ -177,7 +182,6 @@ install_labwc_config() {
     exit 1
   fi
 }
-
 
 install_networkmanager_polkit() {
   if [[ -x "$SCRIPTPATH/installNetworkManagerPolkit.sh" ]]; then
@@ -188,13 +192,13 @@ install_networkmanager_polkit() {
   fi
 }
 
-
 check_distribution
 questions
 setup_apt_dependencies
 setup_backports_repo
 setup_custom_apt_repo
 install_packages
+cleanup_squeekboard
 modify_user
 install_networkmanager_polkit
 install_labwc_config
