@@ -1,10 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="${VERSION:?VERSION is required}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+PACKAGE_JSON="$PROJECT_ROOT/package.json"
+
+if [[ ! -f "$PACKAGE_JSON" ]]; then
+    echo "package.json not found: $PACKAGE_JSON" >&2
+    exit 1
+fi
+
+VERSION="${VERSION:-$(node -p "require('$PACKAGE_JSON').version")}"
 DISTRO="${DISTRO:-trixie}"
 ARCH="${ARCH:-all}"
-OUT_DIR="${OUT_DIR:-dist-artifacts}"
+OUT_DIR="${OUT_DIR:-$PROJECT_ROOT/dist-artifacts}"
 
 PACKAGE_ROOT="$(mktemp -d)"
 
@@ -32,10 +42,11 @@ Description: Streambot Touch Quickshell interface
 EOF
 
 install -Dm755 \
-    packaging/streambot-touch \
+    "$PROJECT_ROOT/packaging/streambot-touch" \
     "$PACKAGE_ROOT/usr/bin/streambot-touch"
 
-cp -a src/. \
+cp -a \
+    "$PROJECT_ROOT/src/." \
     "$PACKAGE_ROOT/usr/share/streambot-touch/"
 
 mkdir -p "$OUT_DIR"
