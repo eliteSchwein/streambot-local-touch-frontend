@@ -44,10 +44,6 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: "#99000000"
-
-        TapHandler {
-            onTapped: KeyboardController.hide()
-        }
     }
 
     FocusScope {
@@ -111,13 +107,7 @@ Item {
                 easing.type: Easing.OutCubic
             }
         }
-
-        // Tapping blank dialog surface dismisses keyboard focus.
-        TapHandler {
-            onTapped: KeyboardController.hide()
-        }
-
-        ColumnLayout {
+ColumnLayout {
             id: dialogLayout
 
             anchors {
