@@ -96,6 +96,10 @@ Md3Dialog {
                     }
 
                     Md3Button {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitHeight: 34
+                        implicitWidth: Math.max(72, contentItem.implicitWidth + 24)
+
                         text: root.i18n.text("delete")
                         outlined: true
 

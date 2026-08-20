@@ -30,8 +30,8 @@ Md3Dialog {
             text: root.confirmText
 
             onClicked: {
-                root.close()
                 root.confirmed()
+                root.close()
             }
         }
     ]
