@@ -98,7 +98,6 @@
   "connect_connection_lost": "Connection Lost",
   "connect_connection_lost_text": "The connection to the bot backend was lost. Reconnecting automatically…",
   "connect_stage_unknown": "Unknown",
-  "connect_stage_label": "Stage",
   "connect_stage_loading_cache": "Loading cache…",
   "connect_stage_loading_variables": "Loading variables…",
   "connect_stage_loading_web_components": "Loading web components…",

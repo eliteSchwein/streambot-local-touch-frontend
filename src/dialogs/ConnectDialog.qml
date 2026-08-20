@@ -140,13 +140,7 @@ Md3Dialog {
                     Layout.fillWidth: true
 
                     text:
-                        root.showStartupStatus
-                        ? (
-                            root.i18n.text("connect_stage_label")
-                            + ": "
-                            + root.currentStatusText
-                        )
-                        : root.currentStatusText
+                        root.currentStatusText
 
                     color: Md3Theme.surfaceContent
 

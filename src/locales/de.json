@@ -98,7 +98,6 @@
   "connect_connection_lost": "Verbindung verloren",
   "connect_connection_lost_text": "Die Verbindung zum Bot-Backend wurde unterbrochen. Die Verbindung wird automatisch wiederhergestellt…",
   "connect_stage_unknown": "Unbekannt",
-  "connect_stage_label": "Status",
   "connect_stage_loading_cache": "Cache wird geladen…",
   "connect_stage_loading_variables": "Variablen werden geladen…",
   "connect_stage_loading_web_components": "Web-Komponenten werden geladen…",
