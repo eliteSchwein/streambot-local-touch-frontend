@@ -18,9 +18,9 @@ ShellRoot {
 
         url: config.websocketUrl
 
-        onConnectedChangedState: connected => {
+        onConnectionChanged: connected => {
             console.log(
-                "[websocket] state:",
+                "[websocket]",
                 connected ? "connected" : "disconnected"
             )
         }
@@ -41,7 +41,7 @@ ShellRoot {
 
         onSocketError: error => {
             console.warn(
-                "[websocket]",
+                "[websocket] error:",
                 error
             )
         }
