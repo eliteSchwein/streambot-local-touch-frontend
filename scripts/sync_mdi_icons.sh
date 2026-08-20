@@ -12,6 +12,14 @@ ICONS=(
   volume-high
   volume-off
   link-variant
+  code-braces
+  dialpad
+  gift-outline
+  motion-play-outline
+  magnify
+  alert-circle
+  check
+  play
 )
 
 cd "$TMP"
