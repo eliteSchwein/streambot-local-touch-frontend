@@ -167,16 +167,93 @@ Rectangle {
         }
 
         Rectangle {
-            Layout.fillWidth:true
-            Layout.preferredHeight:8
-            radius:4
-            color:Md3Theme.surfaceContainerHighest
-            Rectangle {
-                width:parent.width*root.usedPercent
-                height:parent.height
-                radius:4
-                color:Md3Theme.primary
-                Behavior on width { NumberAnimation { duration:300 } }
+            id: usageBar
+
+            Layout.fillWidth: true
+            Layout.preferredHeight: 10
+
+            radius: 5
+            color: Md3Theme.surfaceContainerHighest
+            clip: true
+
+            readonly property var segments:
+                root.rows()
+
+            readonly property real categorizedBytes: {
+                let total = 0
+
+                for (const row of segments)
+                    total += Number(row[1] ?? 0)
+
+                return total
+            }
+
+            readonly property real totalBytes:
+                Math.max(0, Number(root.storage?.total ?? 0))
+
+            readonly property real usedBytes:
+                Math.max(0, Number(root.storage?.used ?? 0))
+
+            readonly property real uncategorizedUsedBytes:
+                Math.max(
+                    0,
+                    usedBytes - categorizedBytes
+                )
+
+            Row {
+                anchors.fill: parent
+                spacing: 0
+
+                Repeater {
+                    model: usageBar.segments
+
+                    delegate: Rectangle {
+                        required property var modelData
+
+                        width:
+                            usageBar.totalBytes > 0
+                            ? usageBar.width
+                                * Math.min(
+                                    1,
+                                    Number(modelData[1] ?? 0)
+                                    / usageBar.totalBytes
+                                )
+                            : 0
+
+                        height: usageBar.height
+                        color: modelData[2]
+
+                        Behavior on width {
+                            NumberAnimation {
+                                duration: 300
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width:
+                        usageBar.totalBytes > 0
+                        ? usageBar.width
+                            * Math.min(
+                                1,
+                                usageBar.uncategorizedUsedBytes
+                                / usageBar.totalBytes
+                            )
+                        : 0
+
+                    height: usageBar.height
+
+                    // Used disk space not covered by the configured
+                    // StreamDing folders.
+                    color: Md3Theme.primary
+
+                    Behavior on width {
+                        NumberAnimation {
+                            duration: 300
+                        }
+                    }
+                }
             }
         }
 
@@ -214,12 +291,12 @@ Rectangle {
                 required property var modelData
 
                 width: list.width
-                height: 20
-                spacing: 7
+                height: 26
+                spacing: 8
 
                 Rectangle {
-                    Layout.preferredWidth: 10
-                    Layout.preferredHeight: 10
+                    Layout.preferredWidth: 12
+                    Layout.preferredHeight: 12
                     Layout.alignment: Qt.AlignVCenter
 
                     radius: 3
@@ -232,7 +309,7 @@ Rectangle {
                     text: root.i18n.text(modelData[0])
                     color: Md3Theme.surfaceVariantContent
 
-                    font.pixelSize: 8
+                    font.pixelSize: 12
                     elide: Text.ElideRight
                 }
 
@@ -240,7 +317,7 @@ Rectangle {
                     text: root.fmt(modelData[1])
                     color: Md3Theme.surfaceContent
 
-                    font.pixelSize: 8
+                    font.pixelSize: 12
                     font.weight: Font.Medium
                 }
             }
