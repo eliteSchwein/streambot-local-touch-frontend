@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Controls
 
+import "../../services"
+
 TextField {
     id: root
 
@@ -23,5 +25,14 @@ TextField {
             root.activeFocus
             ? Md3Theme.primary
             : Md3Theme.outline
+    }
+
+    onActiveFocusChanged: {
+        if (activeFocus)
+            KeyboardController.attach(root)
+    }
+
+    Component.onDestruction: {
+        KeyboardController.detach(root)
     }
 }

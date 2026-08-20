@@ -1,8 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.VirtualKeyboard
-import QtQuick.VirtualKeyboard.Settings
 import Quickshell
 
 import "components"
@@ -18,42 +16,6 @@ ShellRoot {
     I18n {
         id: i18n
         language: config.language
-    }
-
-    function updateKeyboardLocale() {
-        const wantedLocale =
-            config.language === "de"
-            ? "de_DE"
-            : "en_US"
-
-        // Keep the keyboard limited to the two languages supported by the UI.
-        VirtualKeyboardSettings.activeLocales = [
-            "en_US",
-            "de_DE"
-        ]
-
-        VirtualKeyboardSettings.locale = wantedLocale
-        VirtualKeyboardSettings.closeOnReturn = true
-        VirtualKeyboardSettings.handwritingModeDisabled = true
-    }
-
-    Component.onCompleted: updateKeyboardLocale()
-
-    Connections {
-        target: config
-
-        function onLanguageChanged() {
-            updateKeyboardLocale()
-        }
-    }
-
-    WsClient {
-        id: websocket
-        url: config.websocketUrl
-    }
-
-    NetworkManager {
-        id: network
     }
 
     PanelWindow {
@@ -159,29 +121,21 @@ ShellRoot {
                 network: network
             }
 
-            // Qt Virtual Keyboard. It lives inside the kiosk window, so it
-            // overlays the UI instead of changing the Wayland exclusive zone.
-            InputPanel {
-                id: inputPanel
+            Md3Keyboard {
+                id: keyboard
+
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                }
 
                 z: 100000
-
-                onActiveChanged: {
-                    console.log("[keyboard] active:", active)
-                }
-                width: parent.width
-
-                y: active
-                    ? parent.height - height
-                    : parent.height
-
-                Behavior on y {
-                    NumberAnimation {
-                        duration: 180
-                        easing.type: Easing.OutCubic
-                    }
-                }
+                language: config.language
             }
-        }
+
+            // Qt Virtual Keyboard. It lives inside the kiosk window, so it
+            // overlays the UI instead of changing the Wayland exclusive zone.
+}
     }
 }

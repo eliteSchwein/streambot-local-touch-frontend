@@ -120,7 +120,6 @@ install_packages() {
     qml6-module-qtquick \
     qml6-module-qtquick-controls \
     qml6-module-qtquick-layouts \
-    qml6-module-qtquick-virtualkeyboard \
     qml6-module-qtwebsockets \
     network-manager \
     qrencode \

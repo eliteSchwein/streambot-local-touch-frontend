@@ -18,16 +18,10 @@ done
 
 export STREAMBOT_TOUCH_CONFIG="$MCCONFIGFILE"
 
-# Use Qt Virtual Keyboard directly inside the Quickshell application.
-export QT_IM_MODULE=qtvirtualkeyboard
-
-# Force embedded/application integration. This prevents Qt Wayland from
-# attempting unsupported client-side desktop virtual-keyboard integration.
-export QT_VIRTUALKEYBOARD_DESKTOP_DISABLE=1
-
-# Keep the custom Material 3 keyboard style disabled until the stock
-# Qt Virtual Keyboard is confirmed working.
+# Streambot Touch uses its own in-app QML keyboard.
+unset QT_IM_MODULE
+unset QT_IM_MODULES
 unset QT_VIRTUALKEYBOARD_STYLE
-unset QML2_IMPORT_PATH
+unset QT_VIRTUALKEYBOARD_DESKTOP_DISABLE
 
 exec /usr/bin/qs --path /usr/share/streambot-touch
