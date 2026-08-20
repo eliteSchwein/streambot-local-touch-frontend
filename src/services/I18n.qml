@@ -1,72 +1,23 @@
 import QtQuick
-import Quickshell
 import Quickshell.Io
-
 QtObject {
     id: root
-
     property string language: "en"
     property var translations: ({})
-
-    readonly property string localePath:
-        Qt.resolvedUrl("../locales/" + language + ".json")
-
+    readonly property string localePath: Qt.resolvedUrl("../locales/" + (language === "de" ? "de" : "en") + ".json")
     property FileView localeFile: FileView {
         path: root.localePath
-
         blockLoading: true
         watchChanges: true
         printErrors: false
-
-        onLoaded: {
-            root.loadTranslations()
-        }
-
-        onFileChanged: {
-            reload()
-        }
-
-        onTextChanged: {
-            if (loaded)
-                root.loadTranslations()
-        }
+        onLoaded: root.load()
+        onFileChanged: reload()
+        onTextChanged: { if (loaded) root.load() }
     }
-
-    function loadTranslations() {
-        translations = {}
-
-        if (!localeFile.loaded)
-            return
-
-        const text = localeFile.text()
-
-        if (!text || text.trim() === "")
-            return
-
-        try {
-            translations = JSON.parse(text)
-
-            console.log(
-                "[i18n] loaded language:",
-                language
-            )
-        } catch (error) {
-            console.warn(
-                "[i18n] failed to parse locale:",
-                localePath,
-                error
-            )
-        }
+    function load() {
+        if (!localeFile.loaded) return
+        try { translations = JSON.parse(localeFile.text()) }
+        catch (e) { console.warn("[i18n] parse error:", e) }
     }
-
-    function text(key) {
-        if (translations[key] !== undefined)
-            return translations[key]
-
-        return key
-    }
-
-    onLanguageChanged: {
-        localeFile.reload()
-    }
+    function text(key) { return translations[key] !== undefined ? translations[key] : key }
 }

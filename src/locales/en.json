@@ -1,36 +1,29 @@
 {
   "app_title": "Streambot Touch",
-
   "page_home": "Home",
   "page_controls": "Controls",
   "page_system": "System",
-
   "websocket": "WebSocket",
   "connected": "Connected",
   "disconnected": "Disconnected",
-
   "alerts": "Alerts",
-  "latest_alert": "Latest alert",
   "no_alerts": "No alerts yet",
-
-  "stream": "Stream",
-  "stream_status": "Stream status",
-  "offline": "Offline",
-
   "audio": "Audio",
   "music": "Music",
   "tts": "TTS",
-
   "actions": "Actions",
-  "test_alert": "Test alert",
   "reconnect": "Reconnect",
-
   "system": "System",
   "host": "Host",
   "rest_api": "REST API",
   "language": "Language",
-
-  "notifications": "Notifications",
-  "notification_dummy_title": "Hello!",
-  "notification_dummy_text": "This is a dummy notification."
+  "network": "Network",
+  "refresh": "Refresh",
+  "connect": "Connect",
+  "disconnect": "Disconnect",
+  "password": "Password",
+  "commander": "Commander",
+  "primary_ip": "Primary IP",
+  "no_ip": "No network connection",
+  "notifications": "Notifications"
 }

@@ -2,152 +2,60 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-
 import "components"
+import "components/md3"
 import "pages"
 import "services"
 
 ShellRoot {
-    id: root
-
-    Config {
-        id: config
-    }
-
-    I18n {
-        id: i18n
-
-        language: config.language
-    }
-
-    WsClient {
-        id: websocket
-
-        url: config.websocketUrl
-
-        onConnectionChanged: connected => {
-            console.log(
-                "[websocket]",
-                connected
-                    ? "connected"
-                    : "disconnected"
-            )
-        }
-
-        onJsonReceived: data => {
-            console.log(
-                "[websocket] json:",
-                JSON.stringify(data)
-            )
-        }
-    }
+    Config { id:config }
+    I18n { id:i18n; language:config.language }
+    WsClient { id:websocket; url:config.websocketUrl }
+    NetworkManager { id:network }
 
     PanelWindow {
-        id: window
-
-        anchors {
-            top: true
-            bottom: true
-            left: true
-            right: true
-        }
-
-        focusable: true
-
-        color: "#121212"
+        anchors { top:true; bottom:true; left:true; right:true }
+        focusable:true
+        color:Md3Theme.background
 
         Rectangle {
-            anchors.fill: parent
-
-            color: "#121212"
+            anchors.fill:parent
+            color:Md3Theme.background
 
             SwipeView {
-                id: pages
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: pagination.top
-                }
-
-                currentIndex: 0
-
-                interactive: true
-
-                HomePage {
-                    i18n: i18n
-                    websocket: websocket
-                }
-
-                ControlsPage {
-                    i18n: i18n
-                    websocket: websocket
-                }
-
-                SystemPage {
-                    i18n: i18n
-                    config: config
-                    websocket: websocket
-                }
+                id:pages
+                anchors { top:parent.top; left:parent.left; right:parent.right; bottom:pagination.top }
+                interactive:true
+                HomePage { i18n:i18n; websocket:websocket }
+                ControlsPage { i18n:i18n; websocket:websocket }
+                SystemPage { i18n:i18n; config:config }
             }
 
             Rectangle {
-                id: pagination
-
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    bottom: parent.bottom
-                }
-
-                height: 74
-
-                color: "#181818"
-
+                id:pagination
+                anchors { left:parent.left; right:parent.right; bottom:parent.bottom }
+                height:50
+                color:Md3Theme.surfaceContainer
                 Row {
-                    anchors.centerIn: parent
-
-                    spacing: 16
-
+                    anchors.centerIn:parent; spacing:12
                     Repeater {
-                        model: pages.count
-
+                        model:pages.count
                         Rectangle {
                             required property int index
-
-                            width: pages.currentIndex === index
-                                ? 28
-                                : 12
-
-                            height: 12
-
-                            radius: 6
-
-                            color: pages.currentIndex === index
-                                ? "white"
-                                : "#555555"
-
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: 150
-                                }
-                            }
-
-                            TapHandler {
-                                onTapped: {
-                                    pages.currentIndex = index
-                                }
-                            }
+                            width:pages.currentIndex===index?24:8; height:8; radius:4
+                            color:pages.currentIndex===index?Md3Theme.primary:Md3Theme.onSurfaceVariant
+                            Behavior on width { NumberAnimation { duration:150 } }
+                            TapHandler { onTapped:pages.currentIndex=index }
                         }
                     }
                 }
             }
 
-            NotificationDrawer {
-                i18n: i18n
-
-                anchors.top: parent.top
+            NetworkDrawer {
+                anchors.fill:parent
+                i18n:i18n
+                config:config
+                network:network
             }
         }
     }

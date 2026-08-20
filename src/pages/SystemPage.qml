@@ -1,95 +1,17 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
-
-import "../components"
-
+import "../components/md3"
 Item {
-    id: root
-
-    property var i18n
-    property var config
-    property var websocket
-
+    required property var i18n
+    required property var config
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 24
-
-        spacing: 18
-
-        Text {
-            text: root.i18n.text("page_system")
-
-            color: "white"
-
-            font.pixelSize: 34
-            font.bold: true
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            spacing: 18
-
-            DashboardCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                title: root.i18n.text("system")
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-
-                    Text {
-                        text:
-                            root.i18n.text("host")
-                            + ": "
-                            + root.config.host
-
-                        color: "white"
-                        font.pixelSize: 18
-                    }
-
-                    Text {
-                        text:
-                            root.i18n.text("websocket")
-                            + ": "
-                            + root.config.websocketUrl
-
-                        color: "#cccccc"
-                        font.pixelSize: 18
-                    }
-
-                    Text {
-                        text:
-                            root.i18n.text("rest_api")
-                            + ": "
-                            + root.config.restUrl
-
-                        color: "#cccccc"
-                        font.pixelSize: 18
-                    }
-                }
-            }
-
-            DashboardCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                title: root.i18n.text("language")
-
-                Text {
-                    text: root.config.language === "de"
-                        ? "Deutsch"
-                        : "English"
-
-                    color: "white"
-
-                    font.pixelSize: 26
-                    font.bold: true
-                }
-            }
+        anchors.fill:parent; anchors.margins:16; spacing:12
+        Text { text:i18n.text("page_system"); color:Md3Theme.onSurface; font.pixelSize:24; font.weight:Font.DemiBold }
+        Md3Card { Layout.fillWidth:true; Layout.fillHeight:true; title:i18n.text("system")
+            Text { text:i18n.text("host")+": "+config.host; color:Md3Theme.onSurface; font.pixelSize:14 }
+            Text { text:i18n.text("websocket")+": "+config.websocketUrl; color:Md3Theme.onSurfaceVariant; font.pixelSize:13 }
+            Text { text:i18n.text("rest_api")+": "+config.restUrl; color:Md3Theme.onSurfaceVariant; font.pixelSize:13 }
+            Text { text:i18n.text("language")+": "+config.language; color:Md3Theme.onSurfaceVariant; font.pixelSize:13 }
         }
     }
 }

@@ -1,69 +1,19 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
-
-import "../components"
-
+import "../components/md3"
 Item {
-    id: root
-
-    property var i18n
-    property var websocket
-
+    required property var i18n
+    required property var websocket
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 24
-
-        spacing: 18
-
-        Text {
-            text: root.i18n.text("page_home")
-
-            color: "white"
-
-            font.pixelSize: 34
-            font.bold: true
-        }
-
+        anchors.fill:parent; anchors.margins:16; spacing:12
+        Text { text:i18n.text("page_home"); color:Md3Theme.onSurface; font.pixelSize:24; font.weight:Font.DemiBold }
         RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            spacing: 18
-
-            DashboardCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                title: root.i18n.text("websocket")
-
-                Text {
-                    text: root.websocket.connected
-                        ? root.i18n.text("connected")
-                        : root.i18n.text("disconnected")
-
-                    color: root.websocket.connected
-                        ? "#9be28f"
-                        : "#ff8a80"
-
-                    font.pixelSize: 25
-                    font.bold: true
-                }
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:12
+            Md3Card { Layout.fillWidth:true; Layout.fillHeight:true; title:i18n.text("websocket")
+                Text { text:websocket.connected?i18n.text("connected"):i18n.text("disconnected"); color:Md3Theme.onSurface; font.pixelSize:16 }
             }
-
-            DashboardCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                title: root.i18n.text("alerts")
-
-                Text {
-                    text: root.i18n.text("no_alerts")
-
-                    color: "#cccccc"
-
-                    font.pixelSize: 20
-                }
+            Md3Card { Layout.fillWidth:true; Layout.fillHeight:true; title:i18n.text("alerts")
+                Text { text:i18n.text("no_alerts"); color:Md3Theme.onSurfaceVariant; font.pixelSize:14 }
             }
         }
     }
