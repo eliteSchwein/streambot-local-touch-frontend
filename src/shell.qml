@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.VirtualKeyboard
+import QtQuick.VirtualKeyboard.Settings
 import Quickshell
 
 import "components"
@@ -18,6 +20,33 @@ ShellRoot {
         language: config.language
     }
 
+    function updateKeyboardLocale() {
+        const wantedLocale =
+            config.language === "de"
+            ? "de_DE"
+            : "en_US"
+
+        // Keep the keyboard limited to the two languages supported by the UI.
+        VirtualKeyboardSettings.activeLocales = [
+            "en_US",
+            "de_DE"
+        ]
+
+        VirtualKeyboardSettings.locale = wantedLocale
+        VirtualKeyboardSettings.closeOnReturn = true
+        VirtualKeyboardSettings.handwritingModeDisabled = true
+    }
+
+    Component.onCompleted: updateKeyboardLocale()
+
+    Connections {
+        target: config
+
+        function onLanguageChanged() {
+            updateKeyboardLocale()
+        }
+    }
+
     WsClient {
         id: websocket
         url: config.websocketUrl
@@ -28,6 +57,7 @@ ShellRoot {
     }
 
     PanelWindow {
+        id: window
         anchors {
             top: true
             bottom: true
@@ -127,6 +157,26 @@ ShellRoot {
                 i18n: i18n
                 config: config
                 network: network
+            }
+
+            // Qt Virtual Keyboard. It lives inside the kiosk window, so it
+            // overlays the UI instead of changing the Wayland exclusive zone.
+            InputPanel {
+                id: inputPanel
+
+                z: 10000
+                width: parent.width
+
+                y: active
+                    ? parent.height - height
+                    : parent.height
+
+                Behavior on y {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
+                }
             }
         }
     }

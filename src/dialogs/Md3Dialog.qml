@@ -3,7 +3,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 import "../components/md3"
-import "../services"
 
 Popup {
     id: root
@@ -26,10 +25,6 @@ Popup {
     anchors.centerIn: Overlay.overlay
     closePolicy: Popup.CloseOnEscape
 
-    onClosed: {
-        Keyboard.hide()
-    }
-
     background: Rectangle {
         radius: Md3Theme.radiusExtraLarge
         color: Md3Theme.surfaceContainerHigh
@@ -41,17 +36,6 @@ Popup {
     contentItem: ColumnLayout {
         id: dialogLayout
         spacing: 0
-
-        TapHandler {
-            acceptedButtons: Qt.LeftButton
-            gesturePolicy: TapHandler.ReleaseWithinBounds
-            onTapped: {
-                if (root.activeFocusItem !== null) {
-                    root.activeFocusItem.focus = false
-                    Keyboard.hide()
-                }
-            }
-        }
 
         Item {
             Layout.fillWidth: true

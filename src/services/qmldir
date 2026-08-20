@@ -2,4 +2,3 @@ Config 1.0 Config.qml
 I18n 1.0 I18n.qml
 NetworkManager 1.0 NetworkManager.qml
 WsClient 1.0 WsClient.qml
-singleton Keyboard 1.0 Keyboard.qml

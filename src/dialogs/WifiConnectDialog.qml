@@ -4,7 +4,6 @@ import QtQuick.Layouts
 import Quickshell.Networking
 
 import "../components/md3"
-import "../services"
 
 Md3Dialog {
     id: root
@@ -49,9 +48,7 @@ Md3Dialog {
 
             onClicked: {
                 passwordField.focus = false
-                Keyboard.hide()
                 passwordField.focus = false
-                Keyboard.hide()
                 root.close()
             }
         },
