@@ -9,6 +9,13 @@ QtObject {
     property bool autoReconnect: true
     property int reconnectInterval: 2000
 
+    property var endpoints: [
+        "notify_alert",
+        "notify_alert_query"
+    ]
+
+    property int nextRequestId: 1
+
     readonly property bool connected:
         socket.status === WebSocket.Open
 
@@ -23,9 +30,19 @@ QtObject {
     signal jsonReceived(var data)
     signal socketError(string error)
 
+    function send(message) {
+        if (typeof message === "string")
+            return sendText(message)
+
+        return sendJson(message)
+    }
+
     function sendText(message) {
         if (!connected) {
-            console.warn("[websocket] cannot send while disconnected")
+            console.warn(
+                "[websocket] cannot send while disconnected"
+            )
+
             return false
         }
 
@@ -34,7 +51,46 @@ QtObject {
     }
 
     function sendJson(data) {
-        return sendText(JSON.stringify(data))
+        try {
+            return sendText(JSON.stringify(data))
+        } catch (error) {
+            console.warn(
+                "[websocket] failed to serialize JSON:",
+                error
+            )
+
+            return false
+        }
+    }
+
+    function sendRpc(method, params) {
+        const id = nextRequestId++
+
+        const request = {
+            jsonrpc: "2.0",
+            id: id,
+            method: method
+        }
+
+        if (params !== undefined)
+            request.params = params
+
+        if (!sendJson(request))
+            return -1
+
+        return id
+    }
+
+    function registerEndpoints() {
+        console.log(
+            "[websocket] registering endpoints:",
+            JSON.stringify(endpoints)
+        )
+
+        return sendRpc(
+            "register_endpoints",
+            endpoints
+        )
     }
 
     function reconnect() {
@@ -70,6 +126,9 @@ QtObject {
 
                     root.reconnectTimer.stop()
                     root.connectionChanged(true)
+
+                    root.registerEndpoints()
+
                     break
 
                 case WebSocket.Closed:
@@ -108,7 +167,7 @@ QtObject {
                 const data = JSON.parse(message)
                 root.jsonReceived(data)
             } catch (error) {
-                // Raw/non-JSON websocket messages are valid too.
+                // Non-JSON messages are valid too.
             }
         }
     }
