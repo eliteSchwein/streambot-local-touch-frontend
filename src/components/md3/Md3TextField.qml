@@ -20,9 +20,7 @@ TextField {
         radius: Md3Theme.radiusMedium
         color: Md3Theme.surfaceContainerHighest
 
-        border.width:
-            root.activeFocus ? 2 : 1
-
+        border.width: root.activeFocus ? 2 : 1
         border.color:
             root.activeFocus
             ? Md3Theme.primary
@@ -31,13 +29,18 @@ TextField {
 
     onActiveFocusChanged: {
         if (activeFocus)
-            Keyboard.inputFocused()
-        else
-            Keyboard.inputBlurred()
+            Keyboard.show()
     }
 
-    Component.onDestruction: {
-        if (activeFocus)
-            Keyboard.inputBlurred()
+    Keys.onReturnPressed: event => {
+        focus = false
+        Keyboard.hide()
+        event.accepted = true
+    }
+
+    Keys.onEnterPressed: event => {
+        focus = false
+        Keyboard.hide()
+        event.accepted = true
     }
 }
