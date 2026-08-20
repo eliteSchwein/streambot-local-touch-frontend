@@ -32,7 +32,7 @@ Item {
 
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: parent.height * 0.64
+            Layout.preferredHeight: parent.height * 0.58
 
             clip: true
             spacing: 8
@@ -46,6 +46,9 @@ Item {
 
                 interfaceName: modelData
                 device: root.store.audio[modelData]
+
+                physical: false
+                showLinkButton: true
 
                 i18n: root.i18n
                 websocket: root.websocket
@@ -66,52 +69,38 @@ Item {
             }
         }
 
-        // Physical outputs.
-        Flickable {
-            Layout.fillWidth: true
-            Layout.preferredHeight: parent.height * 0.30
+        // Physical outputs use the same row base.
+        ListView {
+            id: physicalList
 
-            contentWidth: physicalRow.implicitWidth
-            contentHeight: height
+            Layout.fillWidth: true
+            Layout.preferredHeight: parent.height * 0.36
 
             clip: true
+            spacing: 8
 
-            Row {
-                id: physicalRow
+            model: root.store.audioOutputs
 
-                height: parent.height
-                spacing: 8
+            delegate: AudioInterfaceRow {
+                required property var modelData
 
-                Repeater {
-                    model:
-                        root.store.audioOutputs
+                width: physicalList.width
 
-                    PhysicalAudioOutputCard {
-                        required property var modelData
+                interfaceName:
+                    String(
+                        modelData.description
+                        ?? modelData.name
+                        ?? modelData.id
+                        ?? "Output"
+                    )
 
-                        width: 250
-                        height: parent.height
+                device: modelData
 
-                        output: modelData
-                    }
-                }
+                physical: true
+                showLinkButton: false
 
-                Text {
-                    visible:
-                        root.store.audioOutputs.length === 0
-
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    text:
-                        root.i18n.text(
-                            "audio_no_physical_outputs"
-                        )
-
-                    color:
-                        Md3Theme.surfaceVariantContent
-
-                    font.pixelSize: 12
-                }
+                i18n: root.i18n
+                websocket: root.websocket
             }
         }
     }

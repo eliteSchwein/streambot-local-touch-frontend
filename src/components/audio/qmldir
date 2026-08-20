@@ -1,4 +1,3 @@
 AudioOutputChip 1.0 AudioOutputChip.qml
 AudioInterfaceRow 1.0 AudioInterfaceRow.qml
 AudioLinkButton 1.0 AudioLinkButton.qml
-PhysicalAudioOutputCard 1.0 PhysicalAudioOutputCard.qml

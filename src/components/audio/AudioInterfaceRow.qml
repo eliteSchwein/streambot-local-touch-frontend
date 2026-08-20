@@ -11,18 +11,25 @@ Rectangle {
     required property var i18n
     required property var websocket
 
+    property bool physical: false
+    property bool showLinkButton: !physical
+
     signal linkRequested(string interfaceName, var device)
 
     property real draftVolume:
         Number(
             device.current_volume
             ?? device.default_volume
+            ?? device.volume
             ?? 0
         )
 
     readonly property bool pipewireSink:
-        device.pipewire_sink === true
-        || device.pipewire_sink === "true"
+        !physical
+        && (
+            device.pipewire_sink === true
+            || device.pipewire_sink === "true"
+        )
 
     readonly property real minVolume:
         Number(device.min_range ?? 0)
@@ -41,13 +48,28 @@ Rectangle {
     readonly property bool muted:
         device.muted === true
 
+    readonly property string subtitle: {
+        if (physical) {
+            return String(
+                device.name
+                ?? device.id
+                ?? ""
+            )
+        }
+
+        return String(
+            device.sink_name
+            ?? ("streambot_" + interfaceName)
+        )
+    }
+
     radius: Md3Theme.radiusLarge
     color: Md3Theme.surfaceContainer
 
     border.width: 1
     border.color: Md3Theme.outlineVariant
 
-    implicitHeight: 92
+    implicitHeight: 88
 
     function clampVolume(value) {
         return Math.max(
@@ -62,6 +84,12 @@ Rectangle {
 
         draftVolume = safeValue
 
+        if (physical) {
+            // No guessed backend RPC for physical-output volume.
+            // This row remains live/read-only until the RPC name is exposed.
+            return
+        }
+
         websocket.sendRpc(
             "set_volume",
             {
@@ -72,6 +100,9 @@ Rectangle {
     }
 
     function stepVolume(direction) {
+        if (physical)
+            return
+
         setVolume(
             draftVolume
             + stepVolumeValue * direction
@@ -83,6 +114,7 @@ Rectangle {
             draftVolume = Number(
                 device.current_volume
                 ?? device.default_volume
+                ?? device.volume
                 ?? 0
             )
         }
@@ -94,20 +126,25 @@ Rectangle {
         interval: 160
         repeat: false
 
-        onTriggered:
-            root.setVolume(root.draftVolume)
+        onTriggered: {
+            if (!root.physical)
+                root.setVolume(root.draftVolume)
+        }
     }
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 12
+        anchors.margins: 10
+        spacing: 8
 
+        // Much tighter label area than v33.
         ColumnLayout {
-            Layout.preferredWidth: 125
+            Layout.preferredWidth: 92
+            Layout.minimumWidth: 82
+            Layout.maximumWidth: 110
             Layout.alignment: Qt.AlignVCenter
 
-            spacing: 2
+            spacing: 1
 
             Text {
                 Layout.fillWidth: true
@@ -115,31 +152,34 @@ Rectangle {
                 text: root.interfaceName
                 color: Md3Theme.surfaceContent
 
-                font.pixelSize: 14
+                font.pixelSize: 13
                 font.weight: Font.DemiBold
+
                 elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
             }
 
             Text {
                 Layout.fillWidth: true
 
-                visible: root.pipewireSink
+                visible: root.subtitle !== ""
 
-                text:
-                    root.device.sink_name
-                    || ("streambot_" + root.interfaceName)
+                text: root.subtitle
 
                 color: Md3Theme.surfaceVariantContent
                 font.pixelSize: 8
+
                 elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
             }
         }
 
+        // Controls now immediately follow label block.
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
 
-            spacing: 3
+            spacing: 2
 
             Md3Slider {
                 id: volumeSlider
@@ -150,16 +190,25 @@ Rectangle {
                 to: root.maxVolume
                 stepSize: root.stepVolumeValue
 
-                enabled: !root.muted
+                enabled:
+                    !root.physical
+                    && !root.muted
+
                 value: root.draftVolume
 
                 onMoved: {
+                    if (root.physical)
+                        return
+
                     root.draftVolume = value
                     volumeSendTimer.restart()
                 }
 
                 onPressedChanged: {
-                    if (!pressed) {
+                    if (
+                        !pressed
+                        && !root.physical
+                    ) {
                         volumeSendTimer.stop()
                         root.setVolume(value)
                     }
@@ -171,6 +220,8 @@ Rectangle {
                 spacing: 4
 
                 Md3IconButton {
+                    visible: !root.physical
+
                     icon: "−"
                     enabled: !root.muted
 
@@ -193,6 +244,7 @@ Rectangle {
 
                     color: Md3Theme.surfaceVariantContent
                     font.pixelSize: 10
+                    verticalAlignment: Text.AlignVCenter
                 }
 
                 Item {
@@ -200,6 +252,8 @@ Rectangle {
                 }
 
                 Md3IconButton {
+                    visible: !root.physical
+
                     icon: "+"
                     enabled: !root.muted
 
@@ -212,7 +266,9 @@ Rectangle {
         AudioLinkButton {
             Layout.alignment: Qt.AlignVCenter
 
-            visible: root.pipewireSink
+            visible:
+                root.showLinkButton
+                && root.pipewireSink
 
             onClicked:
                 root.linkRequested(
