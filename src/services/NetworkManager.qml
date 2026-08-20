@@ -6,6 +6,7 @@ QtObject {
 
     property bool wifiEnabled: false
     property var wifiNetworks: []
+    property var savedWifiConnections: []
     property var ethernetDevices: []
     property string primaryIp: ""
 
@@ -32,6 +33,10 @@ QtObject {
             "list",
             "--rescan",
             "yes"
+        ])
+
+        savedWifiProcess.exec([
+            "nmcli", "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show"
         ])
 
         ethernetProcess.exec([
@@ -75,6 +80,10 @@ QtObject {
             args.push("password", password)
 
         wifiConnectProcess.exec(args)
+    }
+
+    function activateConnection(name) {
+        connectionProcess.exec(["nmcli", "connection", "up", "id", name])
     }
 
     function connectDevice(device) {
@@ -159,6 +168,36 @@ QtObject {
                     console.warn("[network] wifi list:", text.trim())
             }
         }
+    }
+
+
+    property Process savedWifiProcess: Process {
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const result = []
+                for (const line of text.trim().split("\n")) {
+                    if (!line) continue
+                    const p = line.split(":")
+                    if (p.length < 3) continue
+                    if (p[1] !== "wifi" && p[1] !== "802-11-wireless") continue
+                    result.push({
+                        name: p[0],
+                        type: p[1],
+                        device: p.slice(2).join(":")
+                    })
+                }
+                root.savedWifiConnections = result
+            }
+        }
+    }
+
+    property Process connectionProcess: Process {
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() !== "") root.error(text.trim())
+            }
+        }
+        onExited: root.refresh()
     }
 
     property Process ethernetProcess: Process {
