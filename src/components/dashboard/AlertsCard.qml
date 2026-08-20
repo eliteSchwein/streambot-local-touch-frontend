@@ -8,6 +8,7 @@ Md3Card {
 
     required property var i18n
     required property var store
+    required property var websocket
 
     title:
         i18n.text("alerts")
@@ -17,11 +18,12 @@ Md3Card {
             : ""
         )
 
-    ColumnLayout {
+    Item {
         Layout.fillWidth: true
-        spacing: 5
+        Layout.fillHeight: true
 
         Text {
+            anchors.centerIn: parent
             visible:
                 root.store.activeAlert === null
                 && root.store.alertQueue.length === 0
@@ -31,76 +33,95 @@ Md3Card {
             font.pixelSize: 10
         }
 
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 40
+        ListView {
+            id: alertList
 
-            visible: root.store.activeAlert !== null
+            anchors.fill: parent
+            clip: true
+            spacing: 5
 
-            radius: Md3Theme.radiusMedium
-            color: Md3Theme.surfaceContainerHigh
+            model: root.store.alertQueue
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 7
-                spacing: 0
+            delegate: Rectangle {
+                required property var modelData
 
-                Text {
-                    text: root.i18n.text("active")
-                    color: Md3Theme.primary
-                    font.pixelSize: 8
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    Layout.fillWidth: true
-
-                    text:
-                        root.store.activeAlert
-                        ? (
-                            root.store.activeAlert.message
-                            || root.store.activeAlert.channel
-                            || "Alert"
-                        )
-                        : ""
-
-                    color: Md3Theme.surfaceContent
-                    font.pixelSize: 10
-                    elide: Text.ElideRight
-                }
-            }
-        }
-
-        Repeater {
-            model: Math.min(2, root.store.alertQueue.length)
-
-            Rectangle {
-                required property int index
-
-                Layout.fillWidth: true
-                Layout.preferredHeight: 27
+                width: alertList.width
+                height: 42
 
                 radius: Md3Theme.radiusMedium
-                color: Md3Theme.surfaceContainerHighest
 
-                Text {
-                    anchors {
-                        left: parent.left
-                        right: parent.right
-                        verticalCenter: parent.verticalCenter
+                color:
+                    modelData.active === true
+                    ? Md3Theme.surfaceContainerHigh
+                    : Md3Theme.surfaceContainerHighest
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 8
+                    spacing: 8
+
+                    Rectangle {
+                        Layout.alignment: Qt.AlignVCenter
+                        width: 7
+                        height: 7
+                        radius: 4
+
+                        color:
+                            modelData.active === true
+                            ? Md3Theme.success
+                            : Md3Theme.outline
                     }
 
-                    anchors.leftMargin: 7
-                    anchors.rightMargin: 7
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: 0
 
-                    text:
-                        root.store.alertQueue[index].message
-                        || root.store.alertQueue[index].channel
-                        || "Alert"
+                        Text {
+                            Layout.fillWidth: true
 
-                    color: Md3Theme.surfaceContent
-                    font.pixelSize: 9
-                    elide: Text.ElideRight
+                            text:
+                                modelData.message
+                                || modelData.channel
+                                || "Alert"
+
+                            color: Md3Theme.surfaceContent
+                            font.pixelSize: 10
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+
+                            text:
+                                String(modelData["event-uuid"] ?? "")
+
+                            visible: text !== ""
+
+                            color: Md3Theme.surfaceVariantContent
+                            font.pixelSize: 8
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    Md3IconButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        icon: "×"
+
+                        onClicked: {
+                            root.websocket.sendRpc(
+                                "remove_event",
+                                {
+                                    "event-uuid":
+                                        modelData["event-uuid"]
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -16,16 +16,17 @@ Item {
         spacing: 10
 
         ColumnLayout {
-            Layout.preferredWidth: parent.width * 0.40
+            Layout.preferredWidth: parent.width * 0.39
             Layout.fillHeight: true
             spacing: 8
 
             AlertsCard {
                 Layout.fillWidth: true
-                Layout.preferredHeight: parent.height * 0.27
+                Layout.preferredHeight: parent.height * 0.28
 
                 i18n: root.i18n
                 store: root.store
+                websocket: root.websocket
             }
 
             AutoMacrosCard {
@@ -34,11 +35,12 @@ Item {
 
                 i18n: root.i18n
                 store: root.store
+                websocket: root.websocket
             }
 
             RotateSceneCard {
                 Layout.fillWidth: true
-                Layout.preferredHeight: parent.height * 0.27
+                Layout.preferredHeight: parent.height * 0.26
 
                 i18n: root.i18n
                 store: root.store
@@ -48,6 +50,7 @@ Item {
         MusicPlayerCard {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumWidth: 320
 
             i18n: root.i18n
             websocket: root.websocket
