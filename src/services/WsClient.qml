@@ -18,7 +18,7 @@ QtObject {
     readonly property string errorString:
         socket.errorString
 
-    signal connectedChangedState(bool connected)
+    signal connectionChanged(bool connected)
     signal messageReceived(string message)
     signal jsonReceived(var data)
     signal socketError(string error)
@@ -56,28 +56,32 @@ QtObject {
             socket.active = true
     }
 
-    WebSocket {
-        id: socket
-
+    property WebSocket socket: WebSocket {
         url: root.url
         active: true
 
         onStatusChanged: {
             switch (status) {
                 case WebSocket.Open:
-                    console.log("[websocket] connected:", root.url)
+                    console.log(
+                        "[websocket] connected:",
+                        root.url
+                    )
 
-                    reconnectTimer.stop()
-                    root.connectedChangedState(true)
+                    root.reconnectTimer.stop()
+                    root.connectionChanged(true)
                     break
 
                 case WebSocket.Closed:
-                    console.log("[websocket] disconnected:", root.url)
+                    console.log(
+                        "[websocket] disconnected:",
+                        root.url
+                    )
 
-                    root.connectedChangedState(false)
+                    root.connectionChanged(false)
 
                     if (root.autoReconnect)
-                        reconnectTimer.restart()
+                        root.reconnectTimer.restart()
 
                     break
 
@@ -88,10 +92,10 @@ QtObject {
                     )
 
                     root.socketError(errorString)
-                    root.connectedChangedState(false)
+                    root.connectionChanged(false)
 
                     if (root.autoReconnect)
-                        reconnectTimer.restart()
+                        root.reconnectTimer.restart()
 
                     break
             }
@@ -104,14 +108,12 @@ QtObject {
                 const data = JSON.parse(message)
                 root.jsonReceived(data)
             } catch (error) {
-                // Not every websocket message needs to be JSON.
+                // Raw/non-JSON websocket messages are valid too.
             }
         }
     }
 
-    Timer {
-        id: reconnectTimer
-
+    property Timer reconnectTimer: Timer {
         interval: root.reconnectInterval
         repeat: false
 
@@ -119,10 +121,13 @@ QtObject {
             if (root.connected)
                 return
 
-            console.log("[websocket] reconnecting:", root.url)
+            console.log(
+                "[websocket] reconnecting:",
+                root.url
+            )
 
-            socket.active = false
-            socket.active = true
+            root.socket.active = false
+            root.socket.active = true
         }
     }
 }
