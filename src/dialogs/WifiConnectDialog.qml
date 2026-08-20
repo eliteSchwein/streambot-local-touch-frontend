@@ -26,11 +26,10 @@ Md3Dialog {
             Qt.callLater(passwordField.forceActiveFocus)
     }
 
-    TextField {
+    Md3TextField {
         id: passwordField
 
         Layout.fillWidth: true
-        implicitHeight: 52
 
         visible:
             root.network !== null
@@ -40,27 +39,6 @@ Md3Dialog {
             root.i18n.text("wifi_password_hint")
 
         echoMode: TextInput.Password
-
-        color: Md3Theme.surfaceContent
-        placeholderTextColor: Md3Theme.surfaceVariantContent
-        selectionColor: Md3Theme.primary
-        selectedTextColor: Md3Theme.primaryContent
-
-        leftPadding: 16
-        rightPadding: 16
-
-        background: Rectangle {
-            radius: Md3Theme.radiusMedium
-            color: Md3Theme.surfaceContainerHighest
-
-            border.width:
-                passwordField.activeFocus ? 2 : 1
-
-            border.color:
-                passwordField.activeFocus
-                ? Md3Theme.primary
-                : Md3Theme.outline
-        }
     }
 
     actions: [

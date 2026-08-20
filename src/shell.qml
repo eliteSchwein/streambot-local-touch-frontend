@@ -36,6 +36,7 @@ ShellRoot {
         }
 
         focusable: true
+        exclusionMode: ExclusionMode.Ignore
         color: Md3Theme.background
 
         Rectangle {

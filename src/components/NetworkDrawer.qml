@@ -488,7 +488,7 @@ Item {
             // Upward gesture / tap to close.
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 30
+                Layout.preferredHeight: 18
 
                 Rectangle {
                     width: 48
