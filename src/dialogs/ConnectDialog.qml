@@ -8,15 +8,38 @@ Md3Dialog {
 
     required property var i18n
     required property var websocket
-
-    readonly property bool startupMode:
-        !websocket.everConnected
+    required property var backendStatus
 
     readonly property bool shouldShow:
-        !websocket.connected
+        !backendStatus.ready
+        || !websocket.connected
+
+    readonly property bool showStartupStatus:
+        !backendStatus.ready
+        && backendStatus.startupStage !== ""
+
+    function humanizeStage(stage) {
+        const value =
+            String(stage ?? "")
+                .trim()
+
+        if (value === "")
+            return i18n.text("connect_stage_unknown")
+
+        return value
+            .replace(/[_-]+/g, " ")
+            .replace(/\b\w/g, function(character) {
+                return character.toUpperCase()
+            })
+    }
+
+    readonly property string localizedStage:
+        humanizeStage(
+            backendStatus.startupStage
+        )
 
     title:
-        startupMode
+        showStartupStatus
         ? i18n.text("connect_starting_title")
         : (
             websocket.connecting
@@ -25,7 +48,7 @@ Md3Dialog {
         )
 
     supportingText:
-        startupMode
+        showStartupStatus
         ? i18n.text("connect_starting_text")
         : i18n.text("connect_connection_lost_text")
 
@@ -73,19 +96,33 @@ Md3Dialog {
                     Layout.fillWidth: true
 
                     text:
-                        root.startupMode
-                        ? root.i18n.text("connect_starting_stage")
-                        : root.i18n.text("connect_reconnecting")
+                        root.showStartupStatus
+                        ? root.localizedStage
+                        : (
+                            root.websocket.connecting
+                            ? root.i18n.text("connect_reconnecting")
+                            : root.i18n.text("connect_connection_lost")
+                        )
 
                     color: Md3Theme.surfaceContent
+
                     font.pixelSize: 14
                     font.weight: Font.DemiBold
+
+                    wrapMode: Text.Wrap
                 }
 
                 Text {
                     Layout.fillWidth: true
 
-                    text: root.websocket.url
+                    text:
+                        root.backendStatus.hasStatus
+                        ? (
+                            root.backendStatus.ready
+                            ? root.websocket.url
+                            : root.backendStatus.restUrl + "/api/status"
+                        )
+                        : root.backendStatus.restUrl + "/api/status"
 
                     color: Md3Theme.surfaceVariantContent
                     font.pixelSize: 9
@@ -98,8 +135,6 @@ Md3Dialog {
                 Layout.preferredHeight: 28
 
                 Rectangle {
-                    id: spinner
-
                     anchors.centerIn: parent
 
                     width: 22
@@ -107,6 +142,7 @@ Md3Dialog {
                     radius: 11
 
                     color: "transparent"
+
                     border.width: 3
                     border.color: Md3Theme.primary
 
@@ -118,7 +154,9 @@ Md3Dialog {
 
                         width: 10
                         height: 10
-                        color: Md3Theme.surfaceContainerHigh
+
+                        color:
+                            Md3Theme.surfaceContainerHigh
                     }
 
                     RotationAnimator on rotation {
@@ -133,6 +171,6 @@ Md3Dialog {
         }
     }
 
-    // Intentionally no actions: this is a persistent status dialog.
+    // Persistent, same as old Vue dialog.
     actions: []
 }

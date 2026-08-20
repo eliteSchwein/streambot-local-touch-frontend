@@ -91,10 +91,11 @@
   "restart_backend": "Backend neu starten",
   "restart_backend_text": "stream-overlord.service neu starten.",
   "power_action_failed": "Aktion fehlgeschlagen",
-  "connect_starting_title": "Backend startet",
-  "connect_starting_text": "Streambot wird gestartet. Die Touch-Oberfläche verbindet sich automatisch.",
+  "connect_starting_title": "Streambot startet",
+  "connect_starting_text": "Das Backend wird noch gestartet. Die Verbindung wird automatisch hergestellt.",
   "connect_starting_stage": "Warte auf Backend",
   "connect_reconnecting": "Verbindung wird wiederhergestellt",
   "connect_connection_lost": "Verbindung verloren",
-  "connect_connection_lost_text": "Die Verbindung zu Streambot wurde verloren. Die Verbindung wird automatisch wiederhergestellt."
+  "connect_connection_lost_text": "Die Verbindung zu Streambot wurde verloren. Die Verbindung wird automatisch wiederhergestellt.",
+  "connect_stage_unknown": "Warte auf Backend"
 }

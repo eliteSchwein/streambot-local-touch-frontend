@@ -7,6 +7,7 @@ QtObject {
     property string url: "ws://127.0.0.1:8100"
     property bool autoReconnect: true
     property int reconnectInterval: 2000
+    property bool enabled: true
 
     property var endpoints: [
         "notify_alert",
@@ -110,7 +111,7 @@ QtObject {
 
     property WebSocket socket: WebSocket {
         url: root.url
-        active: true
+        active: root.enabled
 
         onStatusChanged: function(status) {
             switch (status) {
@@ -129,8 +130,12 @@ QtObject {
             case WebSocket.Closed:
                 root.connectionChanged(false)
 
-                if (root.autoReconnect)
+                if (
+                    root.autoReconnect
+                    && root.enabled
+                ) {
                     root.reconnectTimer.restart()
+                }
 
                 break
 
@@ -138,8 +143,12 @@ QtObject {
                 root.socketError(errorString)
                 root.connectionChanged(false)
 
-                if (root.autoReconnect)
+                if (
+                    root.autoReconnect
+                    && root.enabled
+                ) {
                     root.reconnectTimer.restart()
+                }
 
                 break
             }
@@ -178,8 +187,12 @@ QtObject {
         repeat: false
 
         onTriggered: {
-            if (root.socket.status === WebSocket.Open)
+            if (
+                !root.enabled
+                || root.socket.status === WebSocket.Open
+            ) {
                 return
+            }
 
             root.socket.active = false
             root.socket.active = true

@@ -20,9 +20,21 @@ ShellRoot {
         language: config.language
     }
 
+    BackendStatus {
+        id: backendStatus
+
+        restUrl: config.restUrl
+        websocket: websocket
+    }
+
     WsClient {
         id: websocket
+
         url: config.websocketUrl
+
+        // Same basic order as the old Vue reconnect loop:
+        // do not establish WS until /api/status reports ready=true.
+        enabled: backendStatus.ready
     }
 
     NetworkManager {
@@ -245,6 +257,7 @@ ShellRoot {
 
                 i18n: i18n
                 websocket: websocket
+                backendStatus: backendStatus
             }
 
             Md3Keyboard {
