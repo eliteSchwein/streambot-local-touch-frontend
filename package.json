@@ -1,44 +1,5 @@
 {
-  "name": "stream-overlord-touch",
-  "private": true,
-  "version": "0.0.11",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri"
-  },
-  "dependencies": {
-    "@mdi/font": "7.4.47",
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/cli": "^2",
-    "@tauri-apps/plugin-opener": "^2",
-    "@types/node": "^26",
-    "@vitejs/plugin-vue": "^6.0.8",
-    "pinia": "^3.0.4",
-    "qrcode.vue": "^3.10.0",
-    "sass": "1.101.3",
-    "sass-embedded": "^1.100.0",
-    "tiny-emitter": "^2.1.0",
-    "unplugin-auto-import": "^21.0.0",
-    "unplugin-fonts": "^2.0.0",
-    "unplugin-vue-components": "^32.1.0",
-    "vite": "^8.1.5",
-    "vite-plugin-vue-layouts-next": "^2.1.0",
-    "vite-plugin-vuetify": "^2.1.3",
-    "vue": "^3.5.40",
-    "vue-i18n": "^11.4.7",
-    "vue-router": "^5",
-    "vuetify": "^4.1.5",
-    "websocket-ts": "^2.3.0",
-    "ws": "^8.21.1"
-  },
-  "allowScripts": {
-    "@parcel/watcher@2.5.6": true
-  },
-  "devDependencies": {
-    "typescript": "5.9.3",
-    "vue-tsc": "3.3.7"
-  }
+  "name": "streambot-touch",
+  "version": "0.0.22",
+  "private": true
 }

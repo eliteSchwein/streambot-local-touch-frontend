@@ -50,6 +50,12 @@ questions() {
 }
 
 setup_custom_apt_repo() {
+  status_msg "Install APT bootstrap dependencies"
+  sudo apt update
+  sudo apt-get -y install --no-install-recommends \
+    ca-certificates \
+    curl
+
   status_msg "Enable tludwig dev repo"
   curl -fsSL https://apt.tludwig.dev/install.sh | sh
 }
@@ -58,19 +64,25 @@ install_packages() {
   status_msg "Update package data"
   sudo apt update
 
-  status_msg "Install kiosk dependencies"
+  status_msg "Install kiosk + Quickshell dependencies"
   sudo apt-get -y install --no-install-recommends \
     labwc \
     dbus-user-session \
-    libwebkit2gtk-4.1-0 \
-    libgtk-3-0 \
-    libayatana-appindicator3-1 \
+    seatd \
+    quickshell \
+    qt6-wayland \
+    qml6-module-qtquick \
+    qml6-module-qtquick-controls \
+    qml6-module-qtquick-layouts \
+    qml6-module-qtwebsockets \
     libgl1-mesa-dri \
     libegl-mesa0 \
     libgles2 \
-    swayidle wtype \
-    squeekboard libglib2.0-bin \
-    streambot-touch seatd
+    swayidle \
+    wtype \
+    squeekboard \
+    libglib2.0-bin \
+    streambot-touch
 
   status_msg "Enable seatd service"
   sudo systemctl enable --now seatd
@@ -83,7 +95,12 @@ modify_user() {
 }
 
 install_service() {
-  "$SCRIPTPATH/generateService.sh" --app_config="$MCCONFIGFILE"
+  if [[ -x "$SCRIPTPATH/generateService.sh" ]]; then
+    "$SCRIPTPATH/generateService.sh" --app_config="$MCCONFIGFILE"
+  else
+    warn_msg "generateService.sh not found or not executable."
+    exit 1
+  fi
 }
 
 install_labwc_config() {

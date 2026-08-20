@@ -2,200 +2,46 @@ name: Build
 
 on:
   push:
-    branches: [main, master, dev, develop]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  frontend-build:
-    name: Build frontend
+  build:
     runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "25"
-          cache: "npm"
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Frontend audit
-        run: npm audit --audit-level=high
-
-      - name: Frontend build
-        run: npm run build --if-present
-
-      - name: Upload frontend build
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: |
-            dist
-            build
-          if-no-files-found: error
-
-  audit:
-    name: Security audit
-    needs: frontend-build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Install base tools
-        run: |
-          sudo -n apt-get update
-          sudo -n apt-get install -y \
-            ca-certificates curl git xz-utils build-essential \
-            pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf \
-            libssl-dev clang mold
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
-
-      - name: Rust audit
-        working-directory: src-tauri
-        run: cargo audit || true
-
-      - name: Rust build check
-        working-directory: src-tauri
-        run: cargo check --all-targets
-
-  build-linux-native:
-    name: Build Linux ${{ matrix.arch }} ${{ matrix.osname }}
-    needs:
-      - frontend-build
-      - audit
-    runs-on: ${{ matrix.runner }}
-    container: debian:${{ matrix.debian }}
 
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-latest
-            debian: "12"
-            osname: bookworm
-
-          - arch: amd64
-            runner: ubuntu-latest
-            debian: "13"
-            osname: trixie
-
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-            debian: "12"
-            osname: bookworm
-
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-            debian: "13"
-            osname: trixie
+        distro:
+          - bookworm
+          - trixie
 
     steps:
-      - name: Install native build tools
-        run: |
-          apt-get update
-          apt-get install -y \
-            ca-certificates curl git xz-utils build-essential \
-            pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf \
-            libssl-dev clang mold binutils file dpkg
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: .
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "25"
-          cache: "npm"
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build Tauri app
+      - name: Validate scripts
         run: |
-          set -eu
+          bash -n packaging/streambot-touch
+          bash -n packaging/build-deb.sh
 
-          CORES="$(nproc)"
-          JOBS="$((CORES > 1 ? CORES - 1 : 1))"
-
-          export CARGO_BUILD_JOBS="$JOBS"
-          export MAKEFLAGS="-j$JOBS"
-
-          echo "Using $JOBS build jobs out of $CORES cores"
-          echo "Debian architecture:"
-          dpkg --print-architecture
-
-          npm run tauri build
-
-      - name: Verify GLIBC requirement
+      - name: Read version
+        id: version
         run: |
-          ldd --version
-
-          BIN="src-tauri/target/release/streambot-touch"
-
-          if [ -f "$BIN" ]; then
-            objdump -T "$BIN" | grep GLIBC_ | sort -Vu | tail -n 30 || true
-            file "$BIN" || true
-          fi
-
-      - name: Collect artifacts
-        run: |
-          set -eu
-
           VERSION="$(node -p "require('./package.json').version")"
-          OUT_DIR="dist-artifacts/${{ matrix.osname }}-${{ matrix.arch }}"
-          mkdir -p "$OUT_DIR"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-          DEB_FILE="$(find src-tauri/target/release/bundle -type f -name "*.deb" | head -n 1 || true)"
+      - name: Build Debian package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DISTRO: ${{ matrix.distro }}
+          ARCH: all
+        run: |
+          ./packaging/build-deb.sh
 
-          if [ -n "$DEB_FILE" ]; then
-            echo "Deb file: $DEB_FILE"
-            DEB_ARCH="$(dpkg-deb -f "$DEB_FILE" Architecture)"
-            echo "Deb architecture: $DEB_ARCH"
-
-            if [ "$DEB_ARCH" != "${{ matrix.arch }}" ]; then
-              echo "Expected .deb architecture ${{ matrix.arch }}, got $DEB_ARCH"
-              exit 1
-            fi
-
-            cp -v "$DEB_FILE" "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}.deb"
-          fi
-
-          BIN_FILE="src-tauri/target/release/streambot-touch"
-
-          if [ -f "$BIN_FILE" ]; then
-            cp -v "$BIN_FILE" "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
-            chmod +x "$OUT_DIR/streambot-touch_${VERSION}.${{ matrix.osname }}_${{ matrix.arch }}"
-          fi
-
-      - name: Upload artifacts
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: streambot-touch-${{ matrix.osname }}-${{ matrix.arch }}
-          path: dist-artifacts/${{ matrix.osname }}-${{ matrix.arch }}
-          if-no-files-found: error
+          name: streambot-touch-${{ matrix.distro }}
+          path: dist-artifacts/*.deb
