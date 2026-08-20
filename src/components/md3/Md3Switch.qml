@@ -5,6 +5,7 @@ Control {
     id: root
 
     property bool checked: false
+    property bool animated: true
     signal clicked()
 
     implicitWidth: 52
@@ -41,6 +42,8 @@ Control {
                 : Md3Theme.surfaceVariantContent
 
             Behavior on x {
+                enabled: root.animated
+
                 NumberAnimation {
                     duration: 140
                     easing.type: Easing.OutCubic
@@ -48,6 +51,8 @@ Control {
             }
 
             Behavior on width {
+                enabled: root.animated
+
                 NumberAnimation {
                     duration: 140
                 }

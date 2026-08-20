@@ -47,58 +47,59 @@ Md3Card {
                 radius: Md3Theme.radiusMedium
                 color: Md3Theme.surfaceContainerHighest
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 10
-                    anchors.bottomMargin: 5
-                    spacing: 8
-
-                    Text {
-                        Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignVCenter
-
-                        text: modelData.name
-                        color: Md3Theme.surfaceContent
-
-                        font.pixelSize: 11
-                        font.weight: Font.Medium
-
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
+                Text {
+                    anchors {
+                        left: parent.left
+                        leftMargin: 12
+                        right: macroSwitch.left
+                        rightMargin: 10
+                        verticalCenter: parent.verticalCenter
                     }
 
-                    Text {
-                        Layout.alignment: Qt.AlignVCenter
+                    // Leave a little room for the bottom progress strip.
+                    anchors.verticalCenterOffset: -2
 
-                        text:
-                            root.store.formatCountdown(
-                                modelData.current_interval
-                            )
+                    text: modelData.name
+                    color: Md3Theme.surfaceContent
 
-                        color: Md3Theme.surfaceVariantContent
-                        font.pixelSize: 8
-                        verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                }
+
+                Md3Switch {
+                    id: macroSwitch
+
+                    anchors {
+                        right: parent.right
+                        rightMargin: 9
+                        verticalCenter: parent.verticalCenter
                     }
 
-                    Md3Switch {
-                        Layout.alignment: Qt.AlignVCenter
+                    anchors.verticalCenterOffset: -2
 
-                        checked: modelData.enabled === true
+                    checked: modelData.enabled === true
 
-                        onClicked: {
-                            root.websocket.sendRpc(
-                                "toggle_auto_macro",
-                                {
-                                    name: modelData.name,
-                                    enable: !modelData.enabled
-                                }
-                            )
-                        }
+                    // notify_auto_macros_update arrives every second and the
+                    // JS-array model is rebound. Do not replay the thumb
+                    // animation on each server update.
+                    animated: false
+
+                    onClicked: {
+                        root.websocket.sendRpc(
+                            "toggle_auto_macro",
+                            {
+                                name: modelData.name,
+                                enable: !modelData.enabled
+                            }
+                        )
                     }
                 }
 
-                // Matches the old v-progress-linear location="bottom".
+                // Same position/meaning as the old Vuetify
+                // v-progress-linear location="bottom" absolute.
                 Rectangle {
                     anchors {
                         left: parent.left
@@ -108,7 +109,10 @@ Md3Card {
 
                     height: 4
 
-                    color: Md3Theme.surfaceContainerHigh
+                    color:
+                        modelData.enabled
+                        ? Md3Theme.surfaceContainerHigh
+                        : "transparent"
 
                     Rectangle {
                         anchors {
@@ -119,12 +123,12 @@ Md3Card {
 
                         radius: 2
 
-                        color:
-                            modelData.enabled
-                            ? Md3Theme.primary
-                            : Md3Theme.outline
+                        color: Md3Theme.outline
 
                         width: {
+                            if (!modelData.enabled)
+                                return 0
+
                             const interval =
                                 Math.max(
                                     1,
@@ -143,8 +147,8 @@ Md3Card {
                                     )
                                 )
 
-                            // Inverted from v25: full after reset,
-                            // drains as current_interval approaches zero.
+                            // Exactly the old touch behavior:
+                            // 100 / interval * current_interval.
                             return parent.width
                                 * remaining / interval
                         }
@@ -152,6 +156,7 @@ Md3Card {
                         Behavior on width {
                             NumberAnimation {
                                 duration: 180
+                                easing.type: Easing.Linear
                             }
                         }
                     }
