@@ -75,7 +75,7 @@ QtObject {
     Component.onCompleted:
         Qt.callLater(fetchStatus)
 
-    Connections {
+    property Connections websocketConnections: Connections {
         target: root.websocket
 
         function onConnectionChanged(connected) {
