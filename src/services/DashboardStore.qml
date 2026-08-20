@@ -187,17 +187,21 @@ QtObject {
             raw.root?.total
         ])
 
-        return {
-            ...raw,
-            used: used ?? 0,
-            free: free ?? 0,
-            total: total ?? 0,
-            folders:
-                raw.folders
-                ?? raw.directories
-                ?? raw.paths
-                ?? ({})
-        }
+        const normalized = ({})
+
+        for (const key in raw)
+            normalized[key] = raw[key]
+
+        normalized.used = used ?? 0
+        normalized.free = free ?? 0
+        normalized.total = total ?? 0
+        normalized.folders =
+            raw.folders
+            ?? raw.directories
+            ?? raw.paths
+            ?? ({})
+
+        return normalized
     }
 
     function parseCava(raw) {
