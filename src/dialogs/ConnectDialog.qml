@@ -16,15 +16,28 @@ Md3Dialog {
 
     readonly property bool showStartupStatus:
         !backendStatus.ready
-        && backendStatus.startupStage !== ""
 
-    function humanizeStage(stage) {
+    function stageText(stage) {
         const value =
             String(stage ?? "")
                 .trim()
 
         if (value === "")
             return i18n.text("connect_stage_unknown")
+
+        const key =
+            "connect_stage_" + value
+
+        const translated =
+            i18n.text(key)
+
+        // I18n returns the key itself when a translation does not exist.
+        if (
+            translated !== ""
+            && translated !== key
+        ) {
+            return translated
+        }
 
         return value
             .replace(/[_-]+/g, " ")
@@ -33,19 +46,23 @@ Md3Dialog {
             })
     }
 
-    readonly property string localizedStage:
-        humanizeStage(
-            backendStatus.startupStage
-        )
+    readonly property string currentStatusText: {
+        if (showStartupStatus) {
+            return stageText(
+                backendStatus.startupStage
+            )
+        }
+
+        if (websocket.connecting)
+            return i18n.text("connect_reconnecting")
+
+        return i18n.text("connect_connection_lost")
+    }
 
     title:
         showStartupStatus
         ? i18n.text("connect_starting_title")
-        : (
-            websocket.connecting
-            ? i18n.text("connect_reconnecting")
-            : i18n.text("connect_connection_lost")
-        )
+        : i18n.text("connect_connection_lost")
 
     supportingText:
         showStartupStatus
@@ -67,72 +84,17 @@ Md3Dialog {
 
     ColumnLayout {
         Layout.fillWidth: true
-        spacing: 14
+        spacing: 12
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 12
+            spacing: 10
 
-            Rectangle {
-                Layout.preferredWidth: 44
-                Layout.preferredHeight: 44
-
-                radius: 22
-                color: Md3Theme.surfaceContainerHighest
-
-                MdiIcon {
-                    anchors.centerIn: parent
-
-                    name: "wifi-sync"
-                    size: 22
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 3
-
-                Text {
-                    Layout.fillWidth: true
-
-                    text:
-                        root.showStartupStatus
-                        ? root.localizedStage
-                        : (
-                            root.websocket.connecting
-                            ? root.i18n.text("connect_reconnecting")
-                            : root.i18n.text("connect_connection_lost")
-                        )
-
-                    color: Md3Theme.surfaceContent
-
-                    font.pixelSize: 14
-                    font.weight: Font.DemiBold
-
-                    wrapMode: Text.Wrap
-                }
-
-                Text {
-                    Layout.fillWidth: true
-
-                    text:
-                        root.backendStatus.hasStatus
-                        ? (
-                            root.backendStatus.ready
-                            ? root.websocket.url
-                            : root.backendStatus.restUrl + "/api/status"
-                        )
-                        : root.backendStatus.restUrl + "/api/status"
-
-                    color: Md3Theme.surfaceVariantContent
-                    font.pixelSize: 9
-                    elide: Text.ElideMiddle
-                }
-            }
-
+            // Spinner directly beside the actual status text.
             Item {
-                Layout.preferredWidth: 28
-                Layout.preferredHeight: 28
+                Layout.preferredWidth: 26
+                Layout.preferredHeight: 26
+                Layout.alignment: Qt.AlignVCenter
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -168,9 +130,36 @@ Md3Dialog {
                     }
                 }
             }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                spacing: 1
+
+                Text {
+                    Layout.fillWidth: true
+
+                    text:
+                        root.showStartupStatus
+                        ? (
+                            root.i18n.text("connect_stage_label")
+                            + ": "
+                            + root.currentStatusText
+                        )
+                        : root.currentStatusText
+
+                    color: Md3Theme.surfaceContent
+
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+
+                    wrapMode: Text.Wrap
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
         }
     }
 
-    // Persistent, same as old Vue dialog.
+    // Persistent status dialog, matching the old admin/touch behavior.
     actions: []
 }
