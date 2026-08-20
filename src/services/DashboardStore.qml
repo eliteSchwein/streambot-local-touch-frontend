@@ -85,7 +85,7 @@ QtObject {
             updateManager = params && typeof params === "object" ? params : ({})
             break
 
-        case "notify_system_storage_update":
+        case "notify_storage_update":
             systemStorage = normalizeSystemStorage(params)
             console.log(
                 "[system-storage] update:",
