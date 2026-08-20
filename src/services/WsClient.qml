@@ -98,7 +98,7 @@ QtObject {
         url: root.url
         active: true
 
-        onStatusChanged: {
+        onStatusChanged: function(status) {
             switch (status) {
             case WebSocket.Open:
                 console.log(

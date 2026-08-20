@@ -48,9 +48,7 @@ Md3Dialog {
             outlined: true
 
             onClicked: {
-                passwordField.focus = false
-                passwordField.focus = false
-                KeyboardController.clearFocus()
+                KeyboardController.hide()
                 root.close()
             }
         },

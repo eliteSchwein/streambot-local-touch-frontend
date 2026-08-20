@@ -133,8 +133,6 @@ ShellRoot {
             Md3Keyboard {
                 id: keyboard
 
-                parent: Overlay.overlay
-
                 anchors {
                     left: parent.left
                     right: parent.right
@@ -145,8 +143,6 @@ ShellRoot {
                 language: config.language
             }
 
-            // Qt Virtual Keyboard. It lives inside the kiosk window, so it
-            // overlays the UI instead of changing the Wayland exclusive zone.
 }
     }
 }

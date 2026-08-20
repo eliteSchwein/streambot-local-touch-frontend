@@ -6,7 +6,10 @@ QtObject {
     id: root
 
     property var target: null
-    property bool visible: target !== null
+    property var focusSink: null
+
+    readonly property bool visible:
+        target !== null
 
     function attach(item) {
         target = item
@@ -17,40 +20,34 @@ QtObject {
             target = null
     }
 
-    function clearFocus() {
-        if (target !== null) {
-            target.focus = false
-
-            if (target.parent !== null
-                && target.parent.forceActiveFocus !== undefined) {
-                target.parent.forceActiveFocus()
-            }
-        }
-
-        target = null
-    }
-
     function hide() {
-        clearFocus()
+        const oldTarget = target
+        target = null
+
+        if (oldTarget !== null)
+            oldTarget.focus = false
+
+        if (
+            focusSink !== null
+            && focusSink.forceActiveFocus !== undefined
+        ) {
+            focusSink.forceActiveFocus()
+        }
     }
 
     function insert(text) {
         if (target === null)
             return
 
-        if (target.insert !== undefined) {
-            target.insert(target.cursorPosition, text)
-            return
-        }
-
-        target.text += text
+        target.insert(
+            target.cursorPosition,
+            text
+        )
     }
 
     function backspace() {
         if (target === null)
             return
-
-        const pos = target.cursorPosition
 
         if (target.selectionStart !== target.selectionEnd) {
             target.remove(
@@ -59,6 +56,8 @@ QtObject {
             )
             return
         }
+
+        const pos = target.cursorPosition
 
         if (pos > 0)
             target.remove(pos - 1, pos)

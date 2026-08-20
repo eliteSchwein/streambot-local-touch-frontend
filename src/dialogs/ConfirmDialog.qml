@@ -6,6 +6,8 @@ import "../components/md3"
 Md3Dialog {
     id: root
 
+    z: 600000
+
     required property var i18n
 
     property string message: ""
