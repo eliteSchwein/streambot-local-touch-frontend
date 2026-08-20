@@ -56,6 +56,8 @@ def open_power_menu():
 
     command = [
         "/usr/bin/qs",
+        "--path",
+        "/usr/share/streambot-touch",
         "ipc",
         "call",
         "streambot-touch",
