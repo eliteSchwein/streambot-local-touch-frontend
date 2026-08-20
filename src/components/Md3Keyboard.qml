@@ -12,32 +12,36 @@ Item {
     property bool shift: false
     property bool symbols: false
 
-    readonly property var enRows: [
-        ["q","w","e","r","t","y","u","i","o","p"],
-        ["a","s","d","f","g","h","j","k","l"],
-        ["z","x","c","v","b","n","m"]
-    ]
-
-    readonly property var deRows: [
-        ["q","w","e","r","t","z","u","i","o","p","ü"],
-        ["a","s","d","f","g","h","j","k","l","ö","ä"],
-        ["y","x","c","v","b","n","m"]
-    ]
-
-    readonly property var symbolRows: [
-        ["1","2","3","4","5","6","7","8","9","0"],
-        ["@","#","€","_","&","-","+","(",")","/"],
-        ["*","\"",":",";","!","?","'","="]
-    ]
-
-    readonly property var rows:
+    readonly property var row1:
         symbols
-        ? symbolRows
-        : (language === "de" ? deRows : enRows)
+        ? ["1","2","3","4","5","6","7","8","9","0"]
+        : ["q","w","e","r","t",
+           language === "de" ? "z" : "y",
+           "u","i","o","p"]
 
-    z: 1000000
+    readonly property var row2:
+        symbols
+        ? ["@","#","€","_","&","-","+","(",")"]
+        : (
+            language === "de"
+            ? ["a","s","d","f","g","h","j","k","l","ö"]
+            : ["a","s","d","f","g","h","j","k","l"]
+        )
+
+    readonly property var row3:
+        symbols
+        ? ["*","\"","'",";",":","!","?","="]
+        : (
+            language === "de"
+            ? ["y","x","c","v","b","n","m","ä","ü"]
+            : ["z","x","c","v","b","n","m"]
+        )
+
     visible: KeyboardController.visible
-    height: visible ? Math.min(260, parent.height * 0.43) : 0
+    z: 1000000
+    height: visible
+        ? Math.min(250, parent.height * 0.42)
+        : 0
 
     Rectangle {
         anchors.fill: parent
@@ -47,92 +51,126 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 6
-        spacing: 4
+        spacing: 5
 
-        Repeater {
-            model: root.rows
+        // Row 1
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 4
 
-            RowLayout {
-                required property var modelData
+            Repeater {
+                model: root.row1
 
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: 4
+                Rectangle {
+                    required property string modelData
 
-                Item {
                     Layout.fillWidth: true
-                    Layout.preferredWidth: 0.25
-                }
+                    Layout.fillHeight: true
 
-                Repeater {
-                    model: modelData
+                    radius: 8
+                    color: keyTap.pressed
+                        ? Md3Theme.primary
+                        : Md3Theme.surfaceContainerHighest
 
-                    Rectangle {
-                        required property string modelData
-
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-
-                        radius: Md3Theme.radiusMedium
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.shift && !root.symbols
+                            ? modelData.toUpperCase()
+                            : modelData
                         color: keyTap.pressed
-                            ? Md3Theme.primary
-                            : Md3Theme.surfaceContainerHighest
+                            ? Md3Theme.primaryContent
+                            : Md3Theme.surfaceContent
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
 
-                        Text {
-                            anchors.centerIn: parent
-
-                            text:
+                    TapHandler {
+                        id: keyTap
+                        onTapped: {
+                            const value =
                                 root.shift && !root.symbols
                                 ? modelData.toUpperCase()
                                 : modelData
 
-                            color: keyTap.pressed
-                                ? Md3Theme.primaryContent
-                                : Md3Theme.surfaceContent
+                            KeyboardController.insert(value)
 
-                            font.pixelSize: 17
-                            font.weight: Font.Medium
-                        }
-
-                        TapHandler {
-                            id: keyTap
-
-                            onTapped: {
-                                const value =
-                                    root.shift && !root.symbols
-                                    ? modelData.toUpperCase()
-                                    : modelData
-
-                                KeyboardController.insert(value)
-
-                                if (root.shift)
-                                    root.shift = false
-                            }
+                            if (root.shift)
+                                root.shift = false
                         }
                     }
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0.25
                 }
             }
         }
 
+        // Row 2, slightly inset like Android/Gboard.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 4
+
+            Item { Layout.preferredWidth: 18 }
+
+            Repeater {
+                model: root.row2
+
+                Rectangle {
+                    required property string modelData
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 8
+
+                    color: keyTap2.pressed
+                        ? Md3Theme.primary
+                        : Md3Theme.surfaceContainerHighest
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.shift && !root.symbols
+                            ? modelData.toUpperCase()
+                            : modelData
+                        color: keyTap2.pressed
+                            ? Md3Theme.primaryContent
+                            : Md3Theme.surfaceContent
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+
+                    TapHandler {
+                        id: keyTap2
+                        onTapped: {
+                            const value =
+                                root.shift && !root.symbols
+                                ? modelData.toUpperCase()
+                                : modelData
+
+                            KeyboardController.insert(value)
+
+                            if (root.shift)
+                                root.shift = false
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.preferredWidth: 18 }
+        }
+
+        // Row 3: shift + letters + backspace.
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: 4
 
             Rectangle {
-                Layout.fillWidth: true
+                Layout.preferredWidth: 58
                 Layout.fillHeight: true
-                Layout.preferredWidth: 1.25
+                radius: 8
 
-                radius: Md3Theme.radiusMedium
                 color: shiftTap.pressed || root.shift
                     ? Md3Theme.primary
-                    : Md3Theme.surfaceContainerHighest
+                    : Md3Theme.surfaceContainerHigh
 
                 Text {
                     anchors.centerIn: parent
@@ -149,23 +187,92 @@ Item {
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredWidth: 1.4
+            Repeater {
+                model: root.row3
 
-                radius: Md3Theme.radiusMedium
+                Rectangle {
+                    required property string modelData
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 8
+
+                    color: keyTap3.pressed
+                        ? Md3Theme.primary
+                        : Md3Theme.surfaceContainerHighest
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.shift && !root.symbols
+                            ? modelData.toUpperCase()
+                            : modelData
+                        color: keyTap3.pressed
+                            ? Md3Theme.primaryContent
+                            : Md3Theme.surfaceContent
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+
+                    TapHandler {
+                        id: keyTap3
+                        onTapped: {
+                            const value =
+                                root.shift && !root.symbols
+                                ? modelData.toUpperCase()
+                                : modelData
+
+                            KeyboardController.insert(value)
+
+                            if (root.shift)
+                                root.shift = false
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.preferredWidth: 58
+                Layout.fillHeight: true
+                radius: 8
+
+                color: backspaceTap.pressed
+                    ? Md3Theme.primary
+                    : Md3Theme.surfaceContainerHigh
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "⌫"
+                    color: Md3Theme.surfaceContent
+                    font.pixelSize: 20
+                }
+
+                TapHandler {
+                    id: backspaceTap
+                    onTapped: KeyboardController.backspace()
+                }
+            }
+        }
+
+        // Bottom row: Android/Gboard-ish.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 4
+
+            Rectangle {
+                Layout.preferredWidth: 64
+                Layout.fillHeight: true
+                radius: 8
+
                 color: symbolsTap.pressed
                     ? Md3Theme.primary
-                    : Md3Theme.surfaceContainerHighest
+                    : Md3Theme.surfaceContainerHigh
 
                 Text {
                     anchors.centerIn: parent
                     text: root.symbols ? "ABC" : "?123"
-                    color: symbolsTap.pressed
-                        ? Md3Theme.primaryContent
-                        : Md3Theme.surfaceContent
-                    font.pixelSize: 13
+                    color: Md3Theme.surfaceContent
+                    font.pixelSize: 12
                     font.weight: Font.DemiBold
                 }
 
@@ -176,11 +283,31 @@ Item {
             }
 
             Rectangle {
+                Layout.preferredWidth: 48
+                Layout.fillHeight: true
+                radius: 8
+                color: commaTap.pressed
+                    ? Md3Theme.primary
+                    : Md3Theme.surfaceContainerHighest
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.language === "de" ? "," : ","
+                    color: Md3Theme.surfaceContent
+                    font.pixelSize: 18
+                }
+
+                TapHandler {
+                    id: commaTap
+                    onTapped: KeyboardController.insert(",")
+                }
+            }
+
+            Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredWidth: 4.5
+                radius: 8
 
-                radius: Md3Theme.radiusMedium
                 color: spaceTap.pressed
                     ? Md3Theme.primary
                     : Md3Theme.surfaceContainerHighest
@@ -188,10 +315,8 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: root.language === "de" ? "Deutsch" : "English"
-                    color: spaceTap.pressed
-                        ? Md3Theme.primaryContent
-                        : Md3Theme.surfaceVariantContent
-                    font.pixelSize: 12
+                    color: Md3Theme.surfaceVariantContent
+                    font.pixelSize: 11
                 }
 
                 TapHandler {
@@ -201,46 +326,39 @@ Item {
             }
 
             Rectangle {
-                Layout.fillWidth: true
+                Layout.preferredWidth: 48
                 Layout.fillHeight: true
-                Layout.preferredWidth: 1.25
-
-                radius: Md3Theme.radiusMedium
-                color: backspaceTap.pressed
+                radius: 8
+                color: periodTap.pressed
                     ? Md3Theme.primary
                     : Md3Theme.surfaceContainerHighest
 
                 Text {
                     anchors.centerIn: parent
-                    text: "⌫"
-                    color: backspaceTap.pressed
-                        ? Md3Theme.primaryContent
-                        : Md3Theme.surfaceContent
-                    font.pixelSize: 20
+                    text: "."
+                    color: Md3Theme.surfaceContent
+                    font.pixelSize: 18
                 }
 
                 TapHandler {
-                    id: backspaceTap
-                    onTapped: KeyboardController.backspace()
+                    id: periodTap
+                    onTapped: KeyboardController.insert(".")
                 }
             }
 
             Rectangle {
-                Layout.fillWidth: true
+                Layout.preferredWidth: 58
                 Layout.fillHeight: true
-                Layout.preferredWidth: 1.25
+                radius: 8
 
-                radius: Md3Theme.radiusMedium
                 color: hideTap.pressed
                     ? Md3Theme.primary
-                    : Md3Theme.surfaceContainerHighest
+                    : Md3Theme.surfaceContainerHigh
 
                 Text {
                     anchors.centerIn: parent
                     text: "⌄"
-                    color: hideTap.pressed
-                        ? Md3Theme.primaryContent
-                        : Md3Theme.surfaceContent
+                    color: Md3Theme.surfaceContent
                     font.pixelSize: 20
                 }
 

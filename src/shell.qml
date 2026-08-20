@@ -139,7 +139,7 @@ ShellRoot {
                     bottom: parent.bottom
                 }
 
-                z: 1000000
+                z: 10000000
                 language: config.language
             }
 

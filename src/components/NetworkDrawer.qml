@@ -6,6 +6,7 @@ import Quickshell.Networking
 
 import "md3"
 import "../dialogs"
+import "../services"
 
 Item {
     id: root
@@ -77,6 +78,7 @@ Item {
         z: 20
 
         DragHandler {
+            enabled: !KeyboardController.visible
             target: null
             property real startY: 0
 
@@ -92,6 +94,7 @@ Item {
         }
 
         TapHandler {
+            enabled: !KeyboardController.visible
             onTapped: root.open = true
         }
     }
@@ -501,6 +504,7 @@ Item {
                 }
 
                 DragHandler {
+                    enabled: !KeyboardController.visible
                     target: null
 
                     property real startY: 0
@@ -517,6 +521,7 @@ Item {
                 }
 
                 TapHandler {
+                    enabled: !KeyboardController.visible
                     onTapped: root.open = false
                 }
             }

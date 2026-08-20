@@ -44,7 +44,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: "#99000000"
-    }
+}
 
     FocusScope {
         id: dialogFocusSink
@@ -107,6 +107,8 @@ Item {
                 easing.type: Easing.OutCubic
             }
         }
+
+        // Tapping blank dialog surface dismisses keyboard focus.
 ColumnLayout {
             id: dialogLayout
 
