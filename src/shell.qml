@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 
 import "components"
 import "components/md3"
@@ -29,6 +30,14 @@ ShellRoot {
 
     DashboardStore {
         id: dashboardStore
+    }
+
+    IpcHandler {
+        target: "streambot-touch"
+
+        function openPowerMenu(): void {
+            settingsDrawer.openPowerMenu()
+        }
     }
 
     Connections {
@@ -142,6 +151,8 @@ ShellRoot {
                 height: 52
                 color: Md3Theme.surfaceContainer
 
+                // Keep actual page navigation centered regardless of
+                // the power button on the far right.
                 Row {
                     anchors.centerIn: parent
                     spacing: 10
@@ -178,9 +189,46 @@ ShellRoot {
                             appRoot.currentPage = 3
                     }
                 }
+
+                // Global power action, deliberately not part of the centered
+                // page-navigation Row.
+                Rectangle {
+                    id: navPowerButton
+
+                    anchors {
+                        right: parent.right
+                        rightMargin: 10
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    width: 40
+                    height: 40
+                    radius: 20
+
+                    color:
+                        navPowerTap.pressed
+                        ? Md3Theme.surfaceContainerHigh
+                        : "transparent"
+
+                    MdiIcon {
+                        anchors.centerIn: parent
+
+                        name: "power"
+                        size: 21
+                    }
+
+                    TapHandler {
+                        id: navPowerTap
+
+                        onTapped:
+                            settingsDrawer.openPowerMenu()
+                    }
+                }
             }
 
             NetworkDrawer {
+                id: settingsDrawer
+
                 anchors.fill: parent
 
                 i18n: i18n

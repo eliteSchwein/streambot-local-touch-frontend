@@ -32,6 +32,10 @@ Item {
             + config.restPort + "/commander"
         : ""
 
+    function openPowerMenu() {
+        powerMenuDialog.open()
+    }
+
     function refreshQr() {
         if (commanderUrl === "")
             return
@@ -399,54 +403,23 @@ Item {
 
                         title: root.i18n.text("language")
 
-                        RowLayout {
+                        Md3Select {
                             Layout.fillWidth: true
-                            spacing: 8
 
-                            Md3Select {
-                                Layout.fillWidth: true
+                            model: [
+                                root.i18n.text("english"),
+                                root.i18n.text("german")
+                            ]
 
-                                model: [
-                                    root.i18n.text("english"),
-                                    root.i18n.text("german")
-                                ]
+                            currentIndex:
+                                root.config.language === "de"
+                                ? 1
+                                : 0
 
-                                currentIndex:
-                                    root.config.language === "de"
-                                    ? 1
-                                    : 0
-
-                                onActivated: index => {
-                                    root.config.setLanguage(
-                                        index === 1 ? "de" : "en"
-                                    )
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.preferredWidth: 44
-                                Layout.preferredHeight: 44
-                                Layout.alignment: Qt.AlignVCenter
-
-                                radius: 22
-                                color:
-                                    powerTap.pressed
-                                    ? Md3Theme.surfaceContainerHigh
-                                    : Md3Theme.surfaceContainerHighest
-
-                                MdiIcon {
-                                    anchors.centerIn: parent
-
-                                    name: "power"
-                                    size: 21
-                                }
-
-                                TapHandler {
-                                    id: powerTap
-
-                                    onTapped:
-                                        powerMenuDialog.open()
-                                }
+                            onActivated: index => {
+                                root.config.setLanguage(
+                                    index === 1 ? "de" : "en"
+                                )
                             }
                         }
                     }
