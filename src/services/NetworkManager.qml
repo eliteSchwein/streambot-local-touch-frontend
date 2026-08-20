@@ -8,6 +8,7 @@ QtObject {
     property var wifiNetworks: []
     property var savedWifiConnections: []
     property var ethernetDevices: []
+    property bool ethernetEnabled: false
     property string primaryIp: ""
 
     signal error(string message)
@@ -52,6 +53,15 @@ QtObject {
             "sh",
             "-c",
             "ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i==\"src\") {print $(i+1); exit}}'"
+        ])
+    }
+
+
+    function setEthernetEnabled(enabled) {
+        ethernetToggleProcess.exec([
+            "nmcli",
+            "networking",
+            enabled ? "on" : "off"
         ])
     }
 
@@ -225,6 +235,7 @@ QtObject {
                 }
 
                 root.ethernetDevices = devices
+                root.ethernetEnabled = devices.some(device => device.state !== "unavailable" && device.state !== "unmanaged")
             }
         }
 
@@ -242,6 +253,10 @@ QtObject {
                 root.primaryIp = text.trim()
             }
         }
+    }
+
+    property Process ethernetToggleProcess: Process {
+        onExited: root.refresh()
     }
 
     property Process wifiToggleProcess: Process {

@@ -23,10 +23,17 @@
   "disconnect": "Trennen",
   "password": "Passwort",
   "commander": "Commander",
-  "primary_ip": "Prim\u00e4re IP",
+  "primary_ip": "Primäre IP",
   "no_ip": "Keine Netzwerkverbindung",
   "ethernet": "Ethernet",
   "wifi": "WLAN",
   "english": "Englisch",
-  "german": "Deutsch"
+  "german": "Deutsch",
+  "wifi_connect": "Mit WLAN verbinden",
+  "wifi_password_hint": "WLAN-Passwort eingeben",
+  "cancel": "Abbrechen",
+  "enabled": "Aktiviert",
+  "disabled": "Deaktiviert",
+  "saved": "Gespeichert",
+  "available": "Verfügbar"
 }

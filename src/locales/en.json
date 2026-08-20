@@ -28,5 +28,12 @@
   "ethernet": "Ethernet",
   "wifi": "Wi-Fi",
   "english": "English",
-  "german": "German"
+  "german": "German",
+  "wifi_connect": "Connect to Wi-Fi",
+  "wifi_password_hint": "Enter Wi-Fi password",
+  "cancel": "Cancel",
+  "enabled": "Enabled",
+  "disabled": "Disabled",
+  "saved": "Saved",
+  "available": "Available"
 }
