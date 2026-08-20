@@ -119,7 +119,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "♪"
+                        icon: "🔊"
                         selected: appRoot.currentPage === 1
 
                         onClicked:

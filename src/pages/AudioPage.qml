@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Layouts
 
 import "../components/audio"
-import "../components/md3"
 
 Item {
     id: root
@@ -18,73 +17,28 @@ Item {
     readonly property var names:
         interfaceNames()
 
-    ColumnLayout {
+    ListView {
+        id: interfaceList
+
         anchors.fill: parent
         anchors.margins: 10
 
+        clip: true
         spacing: 8
 
-        // Table-like header, matching the old touch layout.
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 28
+        model: root.names
 
-            spacing: 14
+        delegate: AudioInterfaceRow {
+            required property string modelData
 
-            Text {
-                Layout.preferredWidth: 115
+            width: interfaceList.width
 
-                text: root.i18n.text("audio_name")
-                color: Md3Theme.surfaceVariantContent
+            interfaceName: modelData
+            device: root.store.audio[modelData]
+            outputs: root.store.audioOutputs
 
-                font.pixelSize: 9
-                font.weight: Font.DemiBold
-            }
-
-            Text {
-                Layout.preferredWidth: 260
-
-                text: root.i18n.text("audio_volume")
-                color: Md3Theme.surfaceVariantContent
-
-                font.pixelSize: 9
-                font.weight: Font.DemiBold
-            }
-
-            Text {
-                Layout.fillWidth: true
-
-                text: root.i18n.text("audio_outputs")
-                color: Md3Theme.surfaceVariantContent
-
-                font.pixelSize: 9
-                font.weight: Font.DemiBold
-            }
-        }
-
-        ListView {
-            id: interfaceList
-
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            clip: true
-            spacing: 8
-
-            model: root.names
-
-            delegate: AudioInterfaceRow {
-                required property string modelData
-
-                width: interfaceList.width
-
-                interfaceName: modelData
-                device: root.store.audio[modelData]
-                outputs: root.store.audioOutputs
-
-                i18n: root.i18n
-                websocket: root.websocket
-            }
+            i18n: root.i18n
+            websocket: root.websocket
         }
     }
 }

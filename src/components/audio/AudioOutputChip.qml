@@ -7,15 +7,19 @@ Rectangle {
     id: root
 
     required property string text
+
     property bool checked: false
     property bool isDefault: false
 
     signal clicked()
 
-    implicitHeight: 32
-    implicitWidth: contentRow.implicitWidth + 22
+    implicitHeight: 34
+    implicitWidth: Math.max(
+        82,
+        contentRow.implicitWidth + 24
+    )
 
-    radius: 16
+    radius: 17
 
     color:
         checked
@@ -23,6 +27,7 @@ Rectangle {
         : Md3Theme.surfaceContainerHighest
 
     border.width: checked ? 2 : 1
+
     border.color:
         checked
         ? Md3Theme.primary
@@ -32,7 +37,7 @@ Rectangle {
         id: contentRow
 
         anchors.centerIn: parent
-        spacing: 5
+        spacing: 6
 
         Text {
             visible: root.checked
@@ -49,9 +54,12 @@ Rectangle {
             color: Md3Theme.surfaceContent
 
             font.pixelSize: 10
-            font.weight: root.checked
+            font.weight:
+                root.checked
                 ? Font.DemiBold
                 : Font.Normal
+
+            verticalAlignment: Text.AlignVCenter
         }
 
         Text {
@@ -64,6 +72,20 @@ Rectangle {
     }
 
     TapHandler {
-        onTapped: root.clicked()
+        id: tap
+
+        acceptedButtons: Qt.LeftButton
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+
+        onTapped: {
+            console.log(
+                "[audio] output chip:",
+                root.text,
+                "checked:",
+                root.checked
+            )
+
+            root.clicked()
+        }
     }
 }

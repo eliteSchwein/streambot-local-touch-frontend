@@ -159,12 +159,22 @@ Rectangle {
         if (!outputName)
             return
 
+        const linked =
+            !isSinkLinked(output)
+
+        console.log(
+            "[audio] link_sink:",
+            interfaceName,
+            outputName,
+            linked
+        )
+
         websocket.sendRpc(
             "link_sink",
             {
                 interface: interfaceName,
                 output: outputName,
-                linked: !isSinkLinked(output)
+                linked: linked
             }
         )
     }
@@ -295,7 +305,7 @@ Rectangle {
                 }
 
                 Md3IconButton {
-                    icon: root.muted ? "×" : "◉"
+                    icon: root.muted ? "🔇" : "🔊"
 
                     onClicked: {
                         if (root.muted) {
@@ -327,19 +337,19 @@ Rectangle {
         }
 
         // Outputs
-        Flickable {
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-
-            contentWidth: outputFlow.implicitWidth
-            contentHeight: height
-
-            clip: true
 
             Flow {
                 id: outputFlow
 
-                height: parent.height
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                }
+
                 spacing: 6
 
                 Repeater {
