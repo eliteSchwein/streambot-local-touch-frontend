@@ -200,28 +200,59 @@ Rectangle {
                     usedBytes - categorizedBytes
                 )
 
-            Row {
+            Item {
                 anchors.fill: parent
-                spacing: 0
 
-                Repeater {
-                    model: usageBar.segments
+                // The bar itself is clipped by usageBar's rounded shape.
+                // This keeps the first colored segment rounded on the left
+                // instead of exposing a square edge.
+                Row {
+                    anchors.fill: parent
+                    spacing: 0
 
-                    delegate: Rectangle {
-                        required property var modelData
+                    Repeater {
+                        model: usageBar.segments
 
+                        delegate: Rectangle {
+                            required property var modelData
+
+                            width:
+                                usageBar.totalBytes > 0
+                                ? usageBar.width
+                                    * Math.min(
+                                        1,
+                                        Number(modelData[1] ?? 0)
+                                        / usageBar.totalBytes
+                                    )
+                                : 0
+
+                            height: usageBar.height
+                            color: modelData[2]
+
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: 300
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
                         width:
                             usageBar.totalBytes > 0
                             ? usageBar.width
                                 * Math.min(
                                     1,
-                                    Number(modelData[1] ?? 0)
+                                    usageBar.uncategorizedUsedBytes
                                     / usageBar.totalBytes
                                 )
                             : 0
 
                         height: usageBar.height
-                        color: modelData[2]
+
+                        // Used disk space not covered by the configured
+                        // StreamDing folders.
+                        color: Md3Theme.primary
 
                         Behavior on width {
                             NumberAnimation {
@@ -231,28 +262,32 @@ Rectangle {
                     }
                 }
 
+                // Explicit rounded cap on the left because Qt's clip on a
+                // rounded Rectangle does not always clip child content to
+                // the radius on this rendering path.
                 Rectangle {
-                    width:
-                        usageBar.totalBytes > 0
-                        ? usageBar.width
-                            * Math.min(
-                                1,
-                                usageBar.uncategorizedUsedBytes
-                                / usageBar.totalBytes
-                            )
-                        : 0
+                    visible:
+                        usageBar.usedBytes > 0
 
-                    height: usageBar.height
-
-                    // Used disk space not covered by the configured
-                    // StreamDing folders.
-                    color: Md3Theme.primary
-
-                    Behavior on width {
-                        NumberAnimation {
-                            duration: 300
-                        }
+                    anchors {
+                        left: parent.left
+                        top: parent.top
+                        bottom: parent.bottom
                     }
+
+                    width:
+                        Math.min(
+                            usageBar.height,
+                            parent.width
+                        )
+
+                    radius:
+                        usageBar.radius
+
+                    color:
+                        usageBar.segments.length > 0
+                        ? usageBar.segments[0][2]
+                        : Md3Theme.primary
                 }
             }
         }
