@@ -2,3 +2,4 @@ AudioOutputChip 1.0 AudioOutputChip.qml
 AudioInterfaceRow 1.0 AudioInterfaceRow.qml
 AudioLinkButton 1.0 AudioLinkButton.qml
 AudioControlButton 1.0 AudioControlButton.qml
+AudioVolumeOsd 1.0 AudioVolumeOsd.qml
