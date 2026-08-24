@@ -49,7 +49,7 @@ ShellRoot {
         target: "streambot-touch"
 
         function openPowerMenu(): void {
-            settingsDrawer.openPowerMenu()
+            powerMenu.open()
         }
     }
 
@@ -238,8 +238,8 @@ ShellRoot {
 
                     color:
                         navPowerTap.pressed
-                        ? Md3Theme.surfaceContainerHigh
-                        : "transparent"
+                            ? Md3Theme.surfaceContainerHigh
+                            : "transparent"
 
                     MdiIcon {
                         anchors.centerIn: parent
@@ -252,7 +252,7 @@ ShellRoot {
                         id: navPowerTap
 
                         onTapped:
-                            settingsDrawer.openPowerMenu()
+                            powerMenu.open()
                     }
                 }
             }
@@ -278,6 +278,17 @@ ShellRoot {
                 backendStatus: backendStatus
             }
 
+            // Global top-most dialog. Keep this outside NetworkDrawer so its z
+            // is compared directly with ConnectDialog and Md3Keyboard.
+            PowerMenuDialog {
+                id: powerMenu
+
+                anchors.fill: parent
+                z: 20000000
+
+                i18n: i18n
+            }
+
             Md3Keyboard {
                 id: keyboard
 
@@ -291,6 +302,6 @@ ShellRoot {
                 language: config.language
             }
 
-}
+        }
     }
 }
