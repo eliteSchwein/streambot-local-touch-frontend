@@ -308,7 +308,7 @@ ShellRoot {
                     horizontalCenter: parent.horizontalCenter
                 }
 
-                websocket: websocket
+                store: dashboardStore
 
                 // The controls already show the live value on the Audio page.
                 suppressed: appRoot.currentPage === 1

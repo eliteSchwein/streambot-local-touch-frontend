@@ -6,7 +6,7 @@ import "../md3"
 Item {
     id: root
 
-    required property var websocket
+    required property var store
     property bool suppressed: false
 
     // Don't show an OSD for the initial state sent after websocket registration.
@@ -105,6 +105,12 @@ Item {
     function showOsd(name, type, value, isMuted) {
         if (root.suppressed)
             return
+
+        console.log(
+            "[audio-osd]",
+            name,
+            Math.round((Number(value) || 0) * 100) + "%"
+        )
 
         root.displayName = name
         root.iconType = type
@@ -247,22 +253,37 @@ Item {
         }
     }
 
-    Connections {
-        target: root.websocket
+    function snapshotStore() {
+        const audio =
+            root.store && root.store.audio
+                ? root.store.audio
+                : ({})
 
-        function onJsonReceived(data) {
-            root.handleMessage(data)
-        }
+        const outputs =
+            root.store && Array.isArray(root.store.audioOutputs)
+                ? root.store.audioOutputs
+                : []
 
-        function onConnectionChanged(connected) {
-            if (!connected) {
-                root.virtualSnapshotReady = false
-                root.physicalSnapshotReady = false
-                root.virtualVolumes = ({})
-                root.physicalVolumes = ({})
-            }
-        }
+        // Always compare/update snapshots, even while suppressed. This prevents
+        // a volume change made on the Audio page from popping up later when
+        // the user leaves that page.
+        root.handleVirtualAudio(audio)
+        root.handlePhysicalAudio(outputs)
     }
+
+    Timer {
+        id: storeWatchTimer
+
+        interval: 100
+        repeat: true
+        running: true
+
+        onTriggered:
+            root.snapshotStore()
+    }
+
+    Component.onCompleted:
+        Qt.callLater(root.snapshotStore)
 
     anchors {
         top: parent.top
