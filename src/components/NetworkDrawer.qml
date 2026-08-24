@@ -17,7 +17,6 @@ Item {
 
     property bool open: false
 
-    anchors.fill: parent
     z: 1000
 
     readonly property string runtimeDir:
@@ -27,9 +26,9 @@ Item {
         runtimeDir + "/streambot-touch-commander.png"
 
     readonly property string commanderUrl:
-        network.primaryIp !== ""
+            network.primaryIp !== ""
         ? "http://" + network.primaryIp + ":"
-            + config.restPort + "/commander"
+        + config.restPort + "/commander"
         : ""
 
     function openPowerMenu() {
@@ -70,7 +69,8 @@ Item {
         }
     }
 
-    // Android-like top pull-down gesture.
+    // Pull down from the top edge to open.
+    // The panel follows the finger instead of only snapping after release.
     Item {
         anchors {
             top: parent.top
@@ -78,38 +78,63 @@ Item {
             right: parent.right
         }
 
-        height: root.open ? 0 : 8
+        height: root.open ? 0 : 16
         z: 20
 
         DragHandler {
-            enabled: !KeyboardController.visible
+            id: openDrag
+
+            enabled: !root.open && !KeyboardController.visible
             target: null
-            property real startY: 0
+            dragThreshold: 2
+
+            // Once this becomes a drag, it must beat buttons/items below it.
+            grabPermissions: PointerHandler.CanTakeOverFromAnything
+
+            xAxis.enabled: false
 
             onActiveChanged: {
-                if (active) {
-                    startY = centroid.position.y
-                } else if (
-                    centroid.position.y - startY > 28
-                ) {
-                    root.open = true
+                if (!active) {
+                    root.open =
+                        activeTranslation.y
+                        > Math.min(64, drawer.height * 0.12)
                 }
             }
         }
-
     }
 
     Rectangle {
+        id: drawer
+
         width: parent.width
         height: parent.height
 
-        y: root.open ? 0 : -height
+        // Follow the finger in both directions.
+        y: {
+            if (openDrag.active) {
+                return Math.min(
+                    0,
+                    -height + Math.max(0, openDrag.activeTranslation.y)
+                )
+            }
+
+            if (closeDrag.active) {
+                return Math.max(
+                    -height,
+                    Math.min(0, closeDrag.activeTranslation.y)
+                )
+            }
+
+            return root.open ? 0 : -height
+        }
 
         color: Md3Theme.background
 
         Behavior on y {
+            enabled: !openDrag.active && !closeDrag.active
+
             NumberAnimation {
-                duration: 210
+                duration: 180
                 easing.type: Easing.OutCubic
             }
         }
@@ -175,13 +200,13 @@ Item {
 
                                             text:
                                                 modelData.connected
-                                                ? root.i18n.text("connected")
-                                                : root.i18n.text("disconnected")
+                                                    ? root.i18n.text("connected")
+                                                    : root.i18n.text("disconnected")
 
                                             color:
                                                 modelData.connected
-                                                ? Md3Theme.success
-                                                : Md3Theme.surfaceVariantContent
+                                                    ? Md3Theme.success
+                                                    : Md3Theme.surfaceVariantContent
 
                                             font.pixelSize: 10
                                         }
@@ -229,9 +254,9 @@ Item {
 
                             Md3Button {
                                 text: root.i18n.text("saved_wifi")
-                        implicitHeight: 34
-                        leftPadding: 10
-                        rightPadding: 10
+                                implicitHeight: 34
+                                leftPadding: 10
+                                rightPadding: 10
                                 outlined: true
 
                                 onClicked: {
@@ -303,8 +328,8 @@ Item {
 
                                     color:
                                         modelData.connected
-                                        ? Md3Theme.surfaceContainerHigh
-                                        : Md3Theme.surfaceContainerHighest
+                                            ? Md3Theme.surfaceContainerHigh
+                                            : Md3Theme.surfaceContainerHighest
 
                                     RowLayout {
                                         anchors.fill: parent
@@ -324,8 +349,8 @@ Item {
                                                 font.pixelSize: 12
                                                 font.weight:
                                                     modelData.connected
-                                                    ? Font.DemiBold
-                                                    : Font.Normal
+                                                        ? Font.DemiBold
+                                                        : Font.Normal
 
                                                 elide: Text.ElideRight
                                             }
@@ -335,8 +360,8 @@ Item {
 
                                                 text:
                                                     modelData.known
-                                                    ? root.i18n.text("saved")
-                                                    : ""
+                                                        ? root.i18n.text("saved")
+                                                        : ""
 
                                                 visible: text !== ""
 
@@ -412,13 +437,13 @@ Item {
                             ]
 
                             currentIndex:
-                                root.config.language === "de"
+                                    root.config.language === "de"
                                 ? 1
                                 : 0
 
                             onActivated: index => {
                                 root.config.setLanguage(
-                                    index === 1 ? "de" : "en"
+                                        index === 1 ? "de" : "en"
                                 )
                             }
                         }
@@ -458,9 +483,9 @@ Item {
                                     cache: false
 
                                     source:
-                                        root.commanderUrl !== ""
+                                            root.commanderUrl !== ""
                                         ? "file://" + root.qrPath
-                                            + "?v=" + revision
+                                        + "?v=" + revision
                                         : ""
                                 }
                             }
@@ -469,7 +494,7 @@ Item {
                                 Layout.fillWidth: true
 
                                 text:
-                                    root.commanderUrl !== ""
+                                        root.commanderUrl !== ""
                                     ? root.commanderUrl
                                     : root.i18n.text("no_ip")
 
@@ -491,10 +516,12 @@ Item {
                 }
             }
 
-            // Upward gesture / tap to close.
+            // Bottom handle: drag upward to close, or tap it.
+            // Keep the whole hit area inside the drawer so it cannot overlap
+            // the shell navigation bar.
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 18
+                Layout.preferredHeight: 28
 
                 Rectangle {
                     width: 48
@@ -507,24 +534,32 @@ Item {
                 }
 
                 DragHandler {
-                    enabled: !KeyboardController.visible
-                    target: null
+                    id: closeDrag
 
-                    property real startY: 0
+                    enabled: root.open && !KeyboardController.visible
+                    target: null
+                    dragThreshold: 2
+
+                    // Steal the gesture from any button below as soon as it
+                    // turns into a drag, and don't approve another takeover.
+                    grabPermissions: PointerHandler.CanTakeOverFromAnything
+
+                    xAxis.enabled: false
 
                     onActiveChanged: {
-                        if (active) {
-                            startY = centroid.position.y
-                        } else if (
-                            centroid.position.y - startY < -28
-                        ) {
-                            root.open = false
+                        if (!active) {
+                            root.open = !(
+                                activeTranslation.y
+                                < -Math.min(64, drawer.height * 0.12)
+                            )
                         }
                     }
                 }
 
                 TapHandler {
-                    enabled: !KeyboardController.visible
+                    enabled: root.open && !KeyboardController.visible
+                    gesturePolicy: TapHandler.WithinBounds
+
                     onTapped: root.open = false
                 }
             }

@@ -260,8 +260,8 @@ ShellRoot {
             NetworkDrawer {
                 id: settingsDrawer
 
-                // Keep the drawer and its bottom drag/close handle above the
-                // navigation bar instead of overlapping its pointer area.
+                // The drawer must stop above navigation. Its bottom drag
+                // handle therefore never shares a touch area with nav buttons.
                 anchors {
                     top: parent.top
                     left: parent.left
