@@ -158,5 +158,6 @@
   "speedtest_stage_download": "Download",
   "speedtest_stage_upload": "Upload",
   "speedtest_stage_finished": "Fertig",
-  "speedtest_stage_error": "Fehler"
+  "speedtest_stage_error": "Fehler",
+  "speedtest_start": "Speedtest starten"
 }

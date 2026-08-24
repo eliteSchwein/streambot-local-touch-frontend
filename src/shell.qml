@@ -243,7 +243,9 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "speedometer"
+                        // "swap-vertical" reads as network transfer and avoids
+                        // the unresolved speedometer glyph.
+                        icon: "swap-vertical"
                         selected: appRoot.currentPage === 5
 
                         onClicked:

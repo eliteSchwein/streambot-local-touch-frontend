@@ -146,53 +146,198 @@ Item {
             root.starting = false
     }
 
-    ColumnLayout {
+    Rectangle {
         anchors {
             fill: parent
-            margins: 18
+            margins: 10
         }
 
-        spacing: 14
+        radius: Md3Theme.radiusLarge
+        color: Md3Theme.surfaceContainer
+        border.width: 1
+        border.color: Md3Theme.outlineVariant
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 12
+        ColumnLayout {
+            anchors {
+                fill: parent
+                margins: 12
+            }
 
-            ColumnLayout {
+            spacing: 8
+
+            RowLayout {
                 Layout.fillWidth: true
-                spacing: 2
+                spacing: 8
 
                 Text {
+                    Layout.fillWidth: true
+
                     text: root.tr(
                         "speedtest_title",
                         "Speedtest"
                     )
 
-                    color: Md3Theme.onBackground
-                    font.pixelSize: 26
+                    color: Md3Theme.surfaceContent
+                    font.pixelSize: 12
                     font.weight: Font.DemiBold
                 }
 
-                Text {
-                    text: root.tr(
-                        "speedtest_description",
-                        "Test the backend network connection."
+                Rectangle {
+                    Layout.preferredHeight: 24
+                    Layout.preferredWidth: Math.max(
+                        74,
+                        stageLabel.implicitWidth + 34
                     )
 
-                    color: Md3Theme.onSurfaceVariant
-                    font.pixelSize: 13
+                    radius: 12
+
+                    color:
+                        root.running
+                            ? Md3Theme.primaryContainer
+                            : Md3Theme.surfaceContainerHigh
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 5
+
+                        MdiIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            name:
+                                root.running
+                                    ? "progress-clock"
+                                    : "check-circle-outline"
+
+                            size: 15
+                        }
+
+                        Text {
+                            id: stageLabel
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            text: root.stageText()
+
+                            color:
+                                root.running
+                                    ? Md3Theme.onPrimaryContainer
+                                    : Md3Theme.onSurfaceVariant
+
+                            font.pixelSize: 12
+                            font.weight: Font.Medium
+                        }
+                    }
+                }
+            }
+
+            Text {
+                Layout.fillWidth: true
+
+                text: root.tr(
+                    "speedtest_description",
+                    "Test the backend network connection."
+                )
+
+                color: Md3Theme.onSurfaceVariant
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: Md3Theme.outlineVariant
+            }
+
+            MetricRow {
+                iconName: "timer-outline"
+                title: root.tr("speedtest_ping", "Ping")
+                value: root.formatPing(root.pingMs)
+                active: root.stage === "ping"
+            }
+
+            MetricRow {
+                iconName: "download"
+                title: root.tr(
+                    "speedtest_download",
+                    "Download"
+                )
+                value: root.formatMbps(root.downloadMbps)
+                active: root.stage === "download"
+            }
+
+            MetricRow {
+                iconName: "upload"
+                title: root.tr(
+                    "speedtest_upload",
+                    "Upload"
+                )
+                value: root.formatMbps(root.uploadMbps)
+                active: root.stage === "upload"
+            }
+
+            Item {
+                Layout.fillHeight: true
+            }
+
+            Rectangle {
+                visible: root.errorText.length > 0
+
+                Layout.fillWidth: true
+                Layout.preferredHeight: visible ? 38 : 0
+
+                radius: Md3Theme.radiusMedium
+                color: Md3Theme.errorContainer
+
+                RowLayout {
+                    anchors {
+                        fill: parent
+                        leftMargin: 10
+                        rightMargin: 10
+                    }
+
+                    spacing: 6
+
+                    MdiIcon {
+                        name: "alert-circle-outline"
+                        size: 17
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+
+                        text: root.errorText
+                        color: Md3Theme.onErrorContainer
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
                 }
             }
 
             Rectangle {
-                Layout.preferredWidth: 126
-                Layout.preferredHeight: 34
+                id: runButton
 
-                radius: 17
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+
+                radius: Md3Theme.radiusMedium
+
                 color:
-                    root.running
+                    runTap.pressed
                         ? Md3Theme.primaryContainer
-                        : Md3Theme.surfaceContainerHigh
+                        : (
+                                root.running
+                                || root.starting
+                                || !root.websocket.connected
+                                ? Md3Theme.surfaceContainerHighest
+                                : Md3Theme.primary
+                        )
+
+                opacity:
+                        root.running
+                    || root.starting
+                    || !root.websocket.connected
+                    ? 0.72
+                    : 1.0
 
                 Row {
                     anchors.centerIn: parent
@@ -201,213 +346,81 @@ Item {
                     MdiIcon {
                         anchors.verticalCenter: parent.verticalCenter
 
+                        // "play-circle-outline" gives the action a clear
+                        // start-button appearance instead of a bare play glyph.
                         name:
-                            root.running
-                                ? "speedometer"
-                                : "check-circle-outline"
+                                root.running || root.starting
+                            ? "progress-clock"
+                            : "play-circle-outline"
 
-                        size: 17
+                        size: 18
                     }
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
 
-                        text: root.stageText()
-                        color:
+                        text:
                             root.running
-                                ? Md3Theme.onPrimaryContainer
-                                : Md3Theme.onSurfaceVariant
+                                ? root.tr(
+                                    "speedtest_running",
+                                    "Speedtest running"
+                                )
+                                : (
+                                    root.starting
+                                        ? root.tr(
+                                            "speedtest_starting",
+                                            "Starting…"
+                                        )
+                                        : root.tr(
+                                            "speedtest_run",
+                                            "Run speedtest"
+                                        )
+                                )
 
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                    }
-                }
-            }
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 12
-
-            MetricCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                iconName: "timer-outline"
-                title: root.tr("speedtest_ping", "Ping")
-                value: root.formatPing(root.pingMs)
-                active: root.stage === "ping"
-            }
-
-            MetricCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                iconName: "download"
-                title: root.tr(
-                    "speedtest_download",
-                    "Download"
-                )
-                value:
-                    root.formatMbps(
-                        root.downloadMbps
-                    )
-                active: root.stage === "download"
-            }
-
-            MetricCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                iconName: "upload"
-                title: root.tr(
-                    "speedtest_upload",
-                    "Upload"
-                )
-                value:
-                    root.formatMbps(
-                        root.uploadMbps
-                    )
-                active: root.stage === "upload"
-            }
-        }
-
-        Rectangle {
-            visible: root.errorText.length > 0
-
-            Layout.fillWidth: true
-            Layout.preferredHeight:
-                visible ? 46 : 0
-
-            radius: 12
-            color: Md3Theme.errorContainer
-
-            RowLayout {
-                anchors {
-                    fill: parent
-                    leftMargin: 14
-                    rightMargin: 14
-                }
-
-                spacing: 8
-
-                MdiIcon {
-                    name: "alert-circle-outline"
-                    size: 20
-                }
-
-                Text {
-                    Layout.fillWidth: true
-
-                    text: root.errorText
-                    color: Md3Theme.onErrorContainer
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
-                }
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 56
-
-            radius: 18
-
-            color:
-                runTap.pressed
-                    ? Md3Theme.primaryContainer
-                    : (
-                        root.running
-                        || root.starting
-                        || !root.websocket.connected
-                            ? Md3Theme.surfaceContainerHighest
-                            : Md3Theme.primary
-                    )
-
-            opacity:
-                root.running
-                || root.starting
-                || !root.websocket.connected
-                    ? 0.72
-                    : 1.0
-
-            Row {
-                anchors.centerIn: parent
-                spacing: 9
-
-                MdiIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    name:
-                        root.running || root.starting
-                            ? "speedometer"
-                            : "play"
-
-                    size: 22
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    text:
-                        root.running
-                            ? root.tr(
-                                "speedtest_running",
-                                "Speedtest running"
-                            )
-                            : (
-                                root.starting
-                                    ? root.tr(
-                                        "speedtest_starting",
-                                        "Starting…"
-                                    )
-                                    : root.tr(
-                                        "speedtest_run",
-                                        "Run speedtest"
-                                    )
-                            )
-
-                    color:
-                        root.running
-                        || root.starting
-                        || !root.websocket.connected
+                        color:
+                                root.running
+                            || root.starting
+                            || !root.websocket.connected
                             ? Md3Theme.onSurfaceVariant
                             : Md3Theme.onPrimary
 
-                    font.pixelSize: 15
-                    font.weight: Font.DemiBold
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                    }
                 }
-            }
 
-            TapHandler {
-                id: runTap
+                TapHandler {
+                    id: runTap
 
-                enabled:
-                    !root.running
-                    && !root.starting
-                    && root.websocket.connected
+                    enabled:
+                        !root.running
+                        && !root.starting
+                        && root.websocket.connected
 
-                onTapped:
-                    root.startSpeedtest()
+                    onTapped:
+                        root.startSpeedtest()
+                }
             }
         }
     }
 
-    component MetricCard: Rectangle {
+    component MetricRow: Rectangle {
         id: metric
 
-        property string iconName: ""
-        property string title: ""
-        property string value: "—"
+        required property string iconName
+        required property string title
+        required property string value
         property bool active: false
 
-        radius: 20
+        Layout.fillWidth: true
+        Layout.preferredHeight: 52
+
+        radius: Md3Theme.radiusMedium
 
         color:
             active
                 ? Md3Theme.primaryContainer
-                : Md3Theme.surfaceContainer
+                : Md3Theme.surfaceContainerHigh
 
         border.width: 1
         border.color:
@@ -415,40 +428,43 @@ Item {
                 ? Md3Theme.primary
                 : Md3Theme.outlineVariant
 
-        Column {
-            anchors.centerIn: parent
-            spacing: 10
+        RowLayout {
+            anchors {
+                fill: parent
+                leftMargin: 10
+                rightMargin: 10
+            }
+
+            spacing: 8
 
             MdiIcon {
-                anchors.horizontalCenter: parent.horizontalCenter
-
                 name: metric.iconName
-                size: 30
+                size: 18
             }
 
             Text {
-                anchors.horizontalCenter: parent.horizontalCenter
+                Layout.fillWidth: true
 
                 text: metric.title
+
                 color:
                     metric.active
                         ? Md3Theme.onPrimaryContainer
                         : Md3Theme.onSurfaceVariant
 
-                font.pixelSize: 13
+                font.pixelSize: 12
             }
 
             Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-
                 text: metric.value
+
                 color:
                     metric.active
                         ? Md3Theme.onPrimaryContainer
                         : Md3Theme.onSurface
 
-                font.pixelSize: 27
-                font.weight: Font.Bold
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
             }
         }
     }
