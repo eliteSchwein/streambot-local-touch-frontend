@@ -173,6 +173,11 @@ ShellRoot {
                 height: 52
                 color: Md3Theme.surfaceContainer
 
+                // While the drawer is open, its bottom gesture area overlaps
+                // the nav visually. Disable the whole nav subtree so taps
+                // cannot leak through and steal the drag gesture.
+                enabled: !settingsDrawer.open
+
                 // Keep actual page navigation centered regardless of
                 // the power button on the far right.
                 Row {
@@ -260,10 +265,7 @@ ShellRoot {
             NetworkDrawer {
                 id: settingsDrawer
 
-                // Drawer is fullscreen again. Only its close handle is lifted
-                // above the navigation bar.
                 anchors.fill: parent
-                bottomHandleInset: navigation.height
 
                 i18n: i18n
                 config: config

@@ -17,10 +17,6 @@ Item {
 
     property bool open: false
 
-    // Keep the close handle above shell controls such as the 52px nav bar,
-    // while the drawer itself remains truly fullscreen.
-    property real bottomHandleInset: 0
-
     z: 1000
 
     readonly property string runtimeDir:
@@ -525,7 +521,7 @@ Item {
         id: closeGestureArea
 
         x: 0
-        y: drawer.y + drawer.height - root.bottomHandleInset - height
+        y: drawer.y + drawer.height - height
         width: root.width
         height: 28
         z: 40
