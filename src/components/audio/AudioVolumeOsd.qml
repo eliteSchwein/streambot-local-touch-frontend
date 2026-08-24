@@ -83,7 +83,7 @@ Item {
             return "bell-outline"
 
         if (normalized === "tts")
-            return "account-voice"
+            return "message"
 
         if (normalized === "music")
             return "music"
