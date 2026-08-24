@@ -1,12 +1,13 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 
 import "../md3"
 
 Item {
     id: root
 
-    required property var store
+    required property var websocket
     property bool suppressed: false
 
     // Don't show an OSD for the initial state sent after websocket registration.
@@ -20,6 +21,14 @@ Item {
     property string iconType: "output"
     property real volume: 0
     property bool muted: false
+
+    property string targetKind: ""
+    property string targetId: ""
+    property real minVolume: 0
+    property real maxVolume: 1
+    property real stepVolume: 0.05
+    property real previousVolume: 0.2
+    property bool interacting: false
 
     readonly property int percent:
         Math.round(
@@ -102,31 +111,169 @@ Item {
         )
     }
 
-    function showOsd(name, type, value, isMuted) {
+    function showOsd(
+        name,
+        type,
+        value,
+        isMuted,
+        kind,
+        id,
+        minValue,
+        maxValue,
+        stepValue,
+        previousValue
+    ) {
         if (root.suppressed)
             return
 
-        console.log(
-            "[audio-osd]",
-            name,
-            Math.round((Number(value) || 0) * 100) + "%"
-        )
-
         root.displayName = name
         root.iconType = type
+        root.targetKind = String(kind ?? "")
+        root.targetId = String(id ?? "")
+
+        root.minVolume =
+            Number.isFinite(Number(minValue))
+                ? Number(minValue)
+                : 0
+
+        root.maxVolume =
+            Number.isFinite(Number(maxValue))
+                ? Number(maxValue)
+                : 1
+
+        root.stepVolume =
+            Number.isFinite(Number(stepValue))
+            && Number(stepValue) > 0
+                ? Number(stepValue)
+                : (
+                    root.targetKind === "virtual"
+                        ? 0.01
+                        : 0.05
+                )
+
         root.volume = Math.max(
-            0,
-            Math.min(1, Number(value) || 0)
+            root.minVolume,
+            Math.min(
+                root.maxVolume,
+                Number(value) || 0
+            )
         )
-        root.muted = isMuted === true || root.volume <= 0
+
+        root.muted =
+            isMuted === true
+            || root.volume <= root.minVolume
+
+        const remembered =
+            Number(previousValue)
+
+        if (Number.isFinite(remembered) && remembered > root.minVolume) {
+            root.previousVolume = remembered
+        } else if (root.volume > root.minVolume) {
+            root.previousVolume = root.volume
+        }
 
         iconCanvas.requestPaint()
-
-        hideTimer.restart()
 
         showAnimation.stop()
         hideAnimation.stop()
         showAnimation.start()
+
+        root.restartHideTimer()
+    }
+
+    function restartHideTimer() {
+        hideTimer.stop()
+
+        if (!root.interacting && !root.suppressed)
+            hideTimer.start()
+    }
+
+    function clampVolume(value) {
+        return Math.max(
+            root.minVolume,
+            Math.min(root.maxVolume, Number(value))
+        )
+    }
+
+    function setVolume(value) {
+        const safeValue =
+            root.clampVolume(value)
+
+        if (safeValue > root.minVolume)
+            root.previousVolume = safeValue
+
+        root.volume = safeValue
+        root.muted =
+            safeValue <= root.minVolume
+
+        iconCanvas.requestPaint()
+        root.restartHideTimer()
+
+        if (!root.targetId)
+            return
+
+        if (root.targetKind === "virtual") {
+            root.websocket.sendRpc(
+                "set_volume",
+                {
+                    interface: root.targetId,
+                    volume: safeValue
+                }
+            )
+            return
+        }
+
+        if (root.targetKind === "physical") {
+            pactlProcess.command = [
+                "pactl",
+                "set-sink-volume",
+                root.targetId,
+                Math.round(safeValue * 100) + "%"
+            ]
+            pactlProcess.running = true
+        }
+    }
+
+    function stepVolume(direction) {
+        root.setVolume(
+            root.volume
+            + root.stepVolume * direction
+        )
+    }
+
+    function toggleMute() {
+        root.restartHideTimer()
+
+        if (!root.targetId)
+            return
+
+        if (root.targetKind === "physical") {
+            pactlProcess.command = [
+                "pactl",
+                "set-sink-mute",
+                root.targetId,
+                "toggle"
+            ]
+            pactlProcess.running = true
+            return
+        }
+
+        if (root.muted) {
+            root.setVolume(
+                Math.max(
+                    root.previousVolume,
+                    root.minVolume + root.stepVolume
+                )
+            )
+        } else {
+            root.previousVolume =
+                Math.max(
+                    root.volume,
+                    root.minVolume + root.stepVolume
+                )
+
+            root.setVolume(root.minVolume)
+        }
     }
 
     function handleVirtualAudio(params) {
@@ -166,11 +313,19 @@ Item {
                 ) > 0.0005
                 || before.muted !== after.muted
             ) {
+                const device = params[name]
+
                 root.showOsd(
                     root.labelForInterface(name),
                     root.iconForInterface(name),
                     after.volume,
-                    after.muted
+                    after.muted,
+                    "virtual",
+                    name,
+                    Number(device && device.min_range ?? 0),
+                    Number(device && device.max_range ?? 1),
+                    Number(device && device.steps_range ?? 0.01),
+                    Number(device && device.current_volume ?? after.volume)
                 )
             }
         }
@@ -223,7 +378,13 @@ Item {
                     after.label,
                     "output",
                     after.volume,
-                    after.muted
+                    after.muted,
+                    "physical",
+                    key,
+                    0,
+                    1,
+                    0.05,
+                    after.volume
                 )
             }
         }
@@ -253,37 +414,37 @@ Item {
         }
     }
 
-    function snapshotStore() {
-        const audio =
-            root.store && root.store.audio
-                ? root.store.audio
-                : ({})
+    Connections {
+        target: root.websocket
 
-        const outputs =
-            root.store && Array.isArray(root.store.audioOutputs)
-                ? root.store.audioOutputs
-                : []
+        function onJsonReceived(data) {
+            root.handleMessage(data)
+        }
 
-        // Always compare/update snapshots, even while suppressed. This prevents
-        // a volume change made on the Audio page from popping up later when
-        // the user leaves that page.
-        root.handleVirtualAudio(audio)
-        root.handlePhysicalAudio(outputs)
+        function onConnectionChanged(connected) {
+            if (!connected) {
+                root.virtualSnapshotReady = false
+                root.physicalSnapshotReady = false
+                root.virtualVolumes = ({})
+                root.physicalVolumes = ({})
+            }
+        }
+    }
+
+    Process {
+        id: pactlProcess
+        running: false
     }
 
     Timer {
-        id: storeWatchTimer
+        id: volumeSendTimer
 
-        interval: 100
-        repeat: true
-        running: true
+        interval: 120
+        repeat: false
 
         onTriggered:
-            root.snapshotStore()
+            root.setVolume(volumeSlider.value)
     }
-
-    Component.onCompleted:
-        Qt.callLater(root.snapshotStore)
 
     anchors {
         top: parent.top
@@ -291,13 +452,15 @@ Item {
         topMargin: 16
     }
 
-    width: Math.min(360, parent.width - 24)
-    height: 78
+    width: Math.min(410, parent.width - 24)
+    height: 148
 
     transform: Scale {
         id: osdScale
+
         origin.x: root.width / 2
         origin.y: 0
+
         xScale: 0.96
         yScale: 0.96
     }
@@ -311,192 +474,275 @@ Item {
         border.width: 1
         border.color: Md3Theme.outlineVariant
 
-        RowLayout {
+        ColumnLayout {
             anchors {
                 fill: parent
                 margins: 12
             }
 
-            spacing: 12
+            spacing: 7
 
-            Rectangle {
-                Layout.preferredWidth: 46
-                Layout.preferredHeight: 46
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
 
-                radius: 23
-                color: Md3Theme.primary
+                Rectangle {
+                    Layout.preferredWidth: 38
+                    Layout.preferredHeight: 38
 
-                Canvas {
-                    id: iconCanvas
+                    radius: 19
+                    color: Md3Theme.primary
 
-                    anchors.centerIn: parent
-                    width: 27
-                    height: 27
+                    Canvas {
+                        id: iconCanvas
 
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.reset()
+                        anchors.centerIn: parent
+                        width: 24
+                        height: 24
 
-                        ctx.strokeStyle =
-                            Md3Theme.primaryContent
-                        ctx.fillStyle =
-                            Md3Theme.primaryContent
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.reset()
 
-                        ctx.lineWidth = 2
-                        ctx.lineCap = "round"
-                        ctx.lineJoin = "round"
+                            ctx.strokeStyle =
+                                Md3Theme.primaryContent
+                            ctx.fillStyle =
+                                Md3Theme.primaryContent
 
-                        if (root.iconType === "music") {
-                            // Music note.
+                            ctx.lineWidth = 2
+                            ctx.lineCap = "round"
+                            ctx.lineJoin = "round"
+
+                            if (root.iconType === "music") {
+                                ctx.beginPath()
+                                ctx.moveTo(13, 4)
+                                ctx.lineTo(13, 16)
+                                ctx.moveTo(13, 6)
+                                ctx.lineTo(20, 4)
+                                ctx.lineTo(20, 14)
+                                ctx.stroke()
+
+                                ctx.beginPath()
+                                ctx.arc(9, 18, 3.5, 0, Math.PI * 2)
+                                ctx.fill()
+
+                                ctx.beginPath()
+                                ctx.arc(17, 16, 3.5, 0, Math.PI * 2)
+                                ctx.fill()
+                                return
+                            }
+
+                            if (root.iconType === "tts") {
+                                ctx.strokeRect(3, 5, 18, 12)
+
+                                ctx.beginPath()
+                                ctx.moveTo(8, 17)
+                                ctx.lineTo(6, 21)
+                                ctx.lineTo(11, 17)
+                                ctx.stroke()
+
+                                ctx.beginPath()
+                                ctx.moveTo(8, 9)
+                                ctx.lineTo(8, 13)
+                                ctx.moveTo(12, 8)
+                                ctx.lineTo(12, 14)
+                                ctx.moveTo(16, 9)
+                                ctx.lineTo(16, 13)
+                                ctx.stroke()
+                                return
+                            }
+
+                            if (root.iconType === "alert") {
+                                ctx.beginPath()
+                                ctx.moveTo(6, 16)
+                                ctx.lineTo(18, 16)
+                                ctx.quadraticCurveTo(16, 14, 16, 10)
+                                ctx.quadraticCurveTo(16, 6, 12, 6)
+                                ctx.quadraticCurveTo(8, 6, 8, 10)
+                                ctx.quadraticCurveTo(8, 14, 6, 16)
+                                ctx.closePath()
+                                ctx.stroke()
+
+                                ctx.beginPath()
+                                ctx.arc(12, 19, 1.4, 0, Math.PI * 2)
+                                ctx.fill()
+                                return
+                            }
+
+                            ctx.fillRect(2, 8, 5, 6)
+
                             ctx.beginPath()
-                            ctx.moveTo(15, 5)
-                            ctx.lineTo(15, 18)
-                            ctx.moveTo(15, 7)
-                            ctx.lineTo(22, 5)
-                            ctx.lineTo(22, 16)
-                            ctx.stroke()
-
-                            ctx.beginPath()
-                            ctx.arc(11, 20, 4, 0, Math.PI * 2)
-                            ctx.fill()
-
-                            ctx.beginPath()
-                            ctx.arc(18, 18, 4, 0, Math.PI * 2)
-                            ctx.fill()
-                            return
-                        }
-
-                        if (root.iconType === "tts") {
-                            // Speech bubble with TTS-ish sound bars.
-                            ctx.strokeRect(3, 5, 20, 14)
-
-                            ctx.beginPath()
-                            ctx.moveTo(8, 19)
-                            ctx.lineTo(6, 23)
-                            ctx.lineTo(12, 19)
-                            ctx.stroke()
-
-                            ctx.beginPath()
-                            ctx.moveTo(8, 10)
-                            ctx.lineTo(8, 14)
-                            ctx.moveTo(12, 9)
-                            ctx.lineTo(12, 15)
-                            ctx.moveTo(16, 10)
-                            ctx.lineTo(16, 14)
-                            ctx.moveTo(20, 11)
-                            ctx.lineTo(20, 13)
-                            ctx.stroke()
-                            return
-                        }
-
-                        if (root.iconType === "alert") {
-                            // Bell.
-                            ctx.beginPath()
-                            ctx.moveTo(7, 18)
-                            ctx.lineTo(20, 18)
-                            ctx.quadraticCurveTo(18, 16, 18, 12)
-                            ctx.quadraticCurveTo(18, 7, 13.5, 7)
-                            ctx.quadraticCurveTo(9, 7, 9, 12)
-                            ctx.quadraticCurveTo(9, 16, 7, 18)
+                            ctx.moveTo(7, 8)
+                            ctx.lineTo(12, 5)
+                            ctx.lineTo(12, 17)
+                            ctx.lineTo(7, 14)
                             ctx.closePath()
-                            ctx.stroke()
-
-                            ctx.beginPath()
-                            ctx.arc(13.5, 21, 1.5, 0, Math.PI * 2)
                             ctx.fill()
-                            return
+
+                            if (root.muted) {
+                                ctx.beginPath()
+                                ctx.moveTo(15, 8)
+                                ctx.lineTo(21, 15)
+                                ctx.moveTo(21, 8)
+                                ctx.lineTo(15, 15)
+                                ctx.stroke()
+                            } else {
+                                ctx.beginPath()
+                                ctx.arc(12, 11, 4, -0.75, 0.75)
+                                ctx.stroke()
+
+                                ctx.beginPath()
+                                ctx.arc(12, 11, 7, -0.7, 0.7)
+                                ctx.stroke()
+                            }
                         }
 
-                        // Physical output / generic speaker.
-                        ctx.fillRect(3, 10, 6, 7)
-
-                        ctx.beginPath()
-                        ctx.moveTo(9, 10)
-                        ctx.lineTo(15, 6)
-                        ctx.lineTo(15, 21)
-                        ctx.lineTo(9, 17)
-                        ctx.closePath()
-                        ctx.fill()
-
-                        if (!root.muted) {
-                            ctx.beginPath()
-                            ctx.arc(15, 13.5, 5, -0.75, 0.75)
-                            ctx.stroke()
-
-                            ctx.beginPath()
-                            ctx.arc(15, 13.5, 8, -0.7, 0.7)
-                            ctx.stroke()
-                        } else {
-                            ctx.beginPath()
-                            ctx.moveTo(18, 10)
-                            ctx.lineTo(24, 17)
-                            ctx.moveTo(24, 10)
-                            ctx.lineTo(18, 17)
-                            ctx.stroke()
-                        }
+                        Component.onCompleted:
+                            requestPaint()
                     }
+                }
 
-                    Component.onCompleted:
-                        requestPaint()
+                Text {
+                    Layout.fillWidth: true
+
+                    text: root.displayName
+                    color: Md3Theme.surfaceContent
+
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    text: root.percent + "%"
+                    color: Md3Theme.surfaceContent
+
+                    font.pixelSize: 16
+                    font.weight: Font.Bold
                 }
             }
 
-            ColumnLayout {
+            Md3Slider {
+                id: volumeSlider
+
                 Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredHeight: 28
 
-                spacing: 6
+                from: root.minVolume
+                to: root.maxVolume
+                stepSize: root.stepVolume
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
+                value: root.volume
+                enabled: !root.muted
 
-                    Text {
-                        Layout.fillWidth: true
+                onMoved: {
+                    root.volume = value
+                    root.muted =
+                        value <= root.minVolume
 
-                        text: root.displayName
-                        color: Md3Theme.surfaceContent
+                    volumeSendTimer.restart()
+                    root.restartHideTimer()
+                }
 
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
+                onPressedChanged: {
+                    root.interacting = pressed
 
-                        elide: Text.ElideRight
+                    if (pressed) {
+                        hideTimer.stop()
+                        return
                     }
 
-                    Text {
-                        text: root.percent + "%"
-                        color: Md3Theme.surfaceContent
+                    volumeSendTimer.stop()
+                    root.setVolume(value)
+                    root.restartHideTimer()
+                }
+            }
 
-                        font.pixelSize: 14
-                        font.weight: Font.Bold
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 12
+
+                AudioControlButton {
+                    icon: "minus"
+                    enabled: !root.muted
+
+                    onClicked: {
+                        root.stepVolume(-1)
+                        root.restartHideTimer()
                     }
                 }
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 6
+                    Layout.maximumWidth: 128
+                    Layout.preferredHeight: 34
 
-                    radius: 3
-                    color: Md3Theme.surfaceContainerHighest
+                    radius: 17
 
-                    Rectangle {
-                        width:
-                            parent.width
-                            * Math.max(
-                                0,
-                                Math.min(1, root.volume)
-                            )
+                    color:
+                        root.muted
+                            ? Md3Theme.primary
+                            : muteTap.pressed
+                                ? Md3Theme.surfaceContainerHigh
+                                : Md3Theme.surfaceContainerHighest
 
-                        height: parent.height
-                        radius: 3
-                        color: Md3Theme.primary
+                    border.width:
+                        root.muted
+                            ? 0
+                            : 1
 
-                        Behavior on width {
-                            NumberAnimation {
-                                duration: 90
-                                easing.type: Easing.OutCubic
-                            }
+                    border.color:
+                        Md3Theme.outlineVariant
+
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        MdiIcon {
+                            name:
+                                root.muted
+                                    ? "volume-off"
+                                    : "volume-high"
+
+                            size: 17
+                            selected: root.muted
                         }
+
+                        Text {
+                            text:
+                                root.muted
+                                    ? "Mute"
+                                    : root.percent + "%"
+
+                            color:
+                                root.muted
+                                    ? Md3Theme.primaryContent
+                                    : Md3Theme.surfaceContent
+
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    TapHandler {
+                        id: muteTap
+
+                        onTapped: {
+                            root.toggleMute()
+                            root.restartHideTimer()
+                        }
+                    }
+                }
+
+                AudioControlButton {
+                    icon: "plus"
+                    enabled: !root.muted
+
+                    onClicked: {
+                        root.stepVolume(1)
+                        root.restartHideTimer()
                     }
                 }
             }
@@ -506,11 +752,17 @@ Item {
     Timer {
         id: hideTimer
 
-        interval: 1400
+        interval: 5000
         repeat: false
 
-        onTriggered:
+        onTriggered: {
+            if (root.interacting) {
+                restart()
+                return
+            }
+
             hideAnimation.start()
+        }
     }
 
     ParallelAnimation {
