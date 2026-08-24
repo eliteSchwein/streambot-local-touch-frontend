@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 
 import "components"
+import "components/audio"
 import "components/md3"
 import "dialogs"
 import "pages"
@@ -297,6 +298,20 @@ ShellRoot {
                 i18n: i18n
                 config: config
                 network: network
+            }
+
+            AudioVolumeOsd {
+                id: audioVolumeOsd
+
+                anchors {
+                    top: parent.top
+                    horizontalCenter: parent.horizontalCenter
+                }
+
+                websocket: websocket
+
+                // The controls already show the live value on the Audio page.
+                suppressed: appRoot.currentPage === 1
             }
 
             ConnectDialog {
