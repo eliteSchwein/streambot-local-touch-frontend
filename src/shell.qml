@@ -303,10 +303,7 @@ ShellRoot {
             AudioVolumeOsd {
                 id: audioVolumeOsd
 
-                anchors {
-                    top: parent.top
-                    horizontalCenter: parent.horizontalCenter
-                }
+                anchors.fill: parent
 
                 websocket: websocket
 

@@ -29,6 +29,7 @@ Item {
     property real stepVolume: 0.05
     property real previousVolume: 0.2
     property bool interacting: false
+    property bool shown: false
 
     readonly property int percent:
         Math.round(
@@ -38,8 +39,9 @@ Item {
             ) * 100
         )
 
-    visible: opacity > 0
-    opacity: 0
+    anchors.fill: parent
+
+    visible: root.shown && !root.suppressed
     z: 7000000
 
     function effectiveVolume(device) {
@@ -66,15 +68,15 @@ Item {
             String(name ?? "").trim().toLowerCase()
 
         if (normalized === "alert")
-            return "alert"
+            return "bell-outline"
 
         if (normalized === "tts")
-            return "tts"
+            return "account-voice"
 
         if (normalized === "music")
             return "music"
 
-        return "output"
+        return "volume-high"
     }
 
     function labelForInterface(name) {
@@ -142,14 +144,14 @@ Item {
                 : 1
 
         root.stepVolume =
-                Number.isFinite(Number(stepValue))
+            Number.isFinite(Number(stepValue))
             && Number(stepValue) > 0
-            ? Number(stepValue)
-            : (
+                ? Number(stepValue)
+                : (
                     root.targetKind === "virtual"
-                    ? 0.01
-                    : 0.05
-            )
+                        ? 0.01
+                        : 0.05
+                )
 
         root.volume = Math.max(
             root.minVolume,
@@ -172,12 +174,8 @@ Item {
             root.previousVolume = root.volume
         }
 
-        iconCanvas.requestPaint()
 
-        showAnimation.stop()
-        hideAnimation.stop()
-        showAnimation.start()
-
+        root.shown = true
         root.restartHideTimer()
     }
 
@@ -186,6 +184,13 @@ Item {
 
         if (!root.interacting && !root.suppressed)
             hideTimer.start()
+    }
+
+    function dismiss() {
+        hideTimer.stop()
+        volumeSendTimer.stop()
+        root.interacting = false
+        root.shown = false
     }
 
     function clampVolume(value) {
@@ -206,7 +211,6 @@ Item {
         root.muted =
             safeValue <= root.minVolume
 
-        iconCanvas.requestPaint()
         root.restartHideTimer()
 
         if (!root.targetId)
@@ -248,6 +252,8 @@ Item {
             return
 
         if (root.targetKind === "physical") {
+            root.muted = !root.muted
+
             pactlProcess.command = [
                 "pactl",
                 "set-sink-mute",
@@ -255,6 +261,7 @@ Item {
                 "toggle"
             ]
             pactlProcess.running = true
+            root.restartHideTimer()
             return
         }
 
@@ -408,9 +415,7 @@ Item {
     onSuppressedChanged: {
         if (suppressed) {
             hideTimer.stop()
-            showAnimation.stop()
-            hideAnimation.stop()
-            opacity = 0
+            root.shown = false
         }
     }
 
@@ -438,35 +443,38 @@ Item {
 
     Timer {
         id: volumeSendTimer
-
-        interval: 120
+        interval: 100
         repeat: false
 
         onTriggered:
             root.setVolume(volumeSlider.value)
     }
 
-    anchors {
-        top: parent.top
-        horizontalCenter: parent.horizontalCenter
-        topMargin: 16
-    }
+    // Transparent full-screen dismiss layer. This exists only while the OSD
+    // is visible and prevents clicks from leaking to the UI below.
+    MouseArea {
+        anchors.fill: parent
+        z: 0
 
-    width: Math.min(410, parent.width - 24)
-    height: 148
+        enabled: root.visible
 
-    transform: Scale {
-        id: osdScale
-
-        origin.x: root.width / 2
-        origin.y: 0
-
-        xScale: 0.96
-        yScale: 0.96
+        onClicked:
+            root.dismiss()
     }
 
     Rectangle {
-        anchors.fill: parent
+        id: card
+
+        z: 1
+
+        anchors {
+            top: parent.top
+            horizontalCenter: parent.horizontalCenter
+            topMargin: 12
+        }
+
+        width: Math.min(360, parent.width - 20)
+        height: 108
 
         radius: Md3Theme.radiusLarge
         color: Md3Theme.surfaceContainerHigh
@@ -474,132 +482,28 @@ Item {
         border.width: 1
         border.color: Md3Theme.outlineVariant
 
+        // Consume clicks on otherwise empty card space so the backdrop does
+        // not dismiss while interacting with the OSD itself.
+        MouseArea {
+            anchors.fill: parent
+        }
+
         ColumnLayout {
             anchors {
                 fill: parent
-                margins: 12
+                margins: 9
             }
 
-            spacing: 7
+            spacing: 5
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                Layout.preferredHeight: 27
+                spacing: 7
 
-                Rectangle {
-                    Layout.preferredWidth: 38
-                    Layout.preferredHeight: 38
-
-                    radius: 19
-                    color: Md3Theme.primary
-
-                    Canvas {
-                        id: iconCanvas
-
-                        anchors.centerIn: parent
-                        width: 24
-                        height: 24
-
-                        onPaint: {
-                            const ctx = getContext("2d")
-                            ctx.reset()
-
-                            ctx.strokeStyle =
-                                Md3Theme.primaryContent
-                            ctx.fillStyle =
-                                Md3Theme.primaryContent
-
-                            ctx.lineWidth = 2
-                            ctx.lineCap = "round"
-                            ctx.lineJoin = "round"
-
-                            if (root.iconType === "music") {
-                                ctx.beginPath()
-                                ctx.moveTo(13, 4)
-                                ctx.lineTo(13, 16)
-                                ctx.moveTo(13, 6)
-                                ctx.lineTo(20, 4)
-                                ctx.lineTo(20, 14)
-                                ctx.stroke()
-
-                                ctx.beginPath()
-                                ctx.arc(9, 18, 3.5, 0, Math.PI * 2)
-                                ctx.fill()
-
-                                ctx.beginPath()
-                                ctx.arc(17, 16, 3.5, 0, Math.PI * 2)
-                                ctx.fill()
-                                return
-                            }
-
-                            if (root.iconType === "tts") {
-                                ctx.strokeRect(3, 5, 18, 12)
-
-                                ctx.beginPath()
-                                ctx.moveTo(8, 17)
-                                ctx.lineTo(6, 21)
-                                ctx.lineTo(11, 17)
-                                ctx.stroke()
-
-                                ctx.beginPath()
-                                ctx.moveTo(8, 9)
-                                ctx.lineTo(8, 13)
-                                ctx.moveTo(12, 8)
-                                ctx.lineTo(12, 14)
-                                ctx.moveTo(16, 9)
-                                ctx.lineTo(16, 13)
-                                ctx.stroke()
-                                return
-                            }
-
-                            if (root.iconType === "alert") {
-                                ctx.beginPath()
-                                ctx.moveTo(6, 16)
-                                ctx.lineTo(18, 16)
-                                ctx.quadraticCurveTo(16, 14, 16, 10)
-                                ctx.quadraticCurveTo(16, 6, 12, 6)
-                                ctx.quadraticCurveTo(8, 6, 8, 10)
-                                ctx.quadraticCurveTo(8, 14, 6, 16)
-                                ctx.closePath()
-                                ctx.stroke()
-
-                                ctx.beginPath()
-                                ctx.arc(12, 19, 1.4, 0, Math.PI * 2)
-                                ctx.fill()
-                                return
-                            }
-
-                            ctx.fillRect(2, 8, 5, 6)
-
-                            ctx.beginPath()
-                            ctx.moveTo(7, 8)
-                            ctx.lineTo(12, 5)
-                            ctx.lineTo(12, 17)
-                            ctx.lineTo(7, 14)
-                            ctx.closePath()
-                            ctx.fill()
-
-                            if (root.muted) {
-                                ctx.beginPath()
-                                ctx.moveTo(15, 8)
-                                ctx.lineTo(21, 15)
-                                ctx.moveTo(21, 8)
-                                ctx.lineTo(15, 15)
-                                ctx.stroke()
-                            } else {
-                                ctx.beginPath()
-                                ctx.arc(12, 11, 4, -0.75, 0.75)
-                                ctx.stroke()
-
-                                ctx.beginPath()
-                                ctx.arc(12, 11, 7, -0.7, 0.7)
-                                ctx.stroke()
-                            }
-                        }
-
-                        Component.onCompleted:
-                            requestPaint()
-                    }
+                MdiIcon {
+                    name: root.iconType
+                    size: 21
                 }
 
                 Text {
@@ -608,7 +512,7 @@ Item {
                     text: root.displayName
                     color: Md3Theme.surfaceContent
 
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                     font.weight: Font.DemiBold
 
                     elide: Text.ElideRight
@@ -618,8 +522,46 @@ Item {
                     text: root.percent + "%"
                     color: Md3Theme.surfaceContent
 
-                    font.pixelSize: 16
+                    font.pixelSize: 13
                     font.weight: Font.Bold
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 28
+                    Layout.preferredHeight: 28
+
+                    radius: 14
+
+                    color:
+                        root.muted
+                            ? Md3Theme.primary
+                            : muteTap.pressed
+                                ? Md3Theme.surfaceContainerHigh
+                                : Md3Theme.surfaceContainerHighest
+
+                    border.width: root.muted ? 0 : 1
+                    border.color: Md3Theme.outlineVariant
+
+                    MdiIcon {
+                        anchors.centerIn: parent
+
+                        name:
+                            root.muted
+                                ? "volume-off"
+                                : "volume-high"
+
+                        size: 17
+                        selected: root.muted
+                    }
+
+                    TapHandler {
+                        id: muteTap
+
+                        onTapped: {
+                            root.toggleMute()
+                            root.restartHideTimer()
+                        }
+                    }
                 }
             }
 
@@ -627,7 +569,7 @@ Item {
                 id: volumeSlider
 
                 Layout.fillWidth: true
-                Layout.preferredHeight: 28
+                Layout.preferredHeight: 26
 
                 from: root.minVolume
                 to: root.maxVolume
@@ -638,9 +580,6 @@ Item {
 
                 onMoved: {
                     root.volume = value
-                    root.muted =
-                        value <= root.minVolume
-
                     volumeSendTimer.restart()
                     root.restartHideTimer()
                 }
@@ -661,88 +600,89 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 12
-
-                AudioControlButton {
-                    icon: "minus"
-                    enabled: !root.muted
-
-                    onClicked: {
-                        root.stepVolume(-1)
-                        root.restartHideTimer()
-                    }
-                }
+                Layout.preferredHeight: 28
+                spacing: 7
 
                 Rectangle {
-                    Layout.fillWidth: true
-                    Layout.maximumWidth: 128
-                    Layout.preferredHeight: 34
-
-                    radius: 17
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 28
+                    radius: 14
 
                     color:
-                        root.muted
-                            ? Md3Theme.primary
-                            : muteTap.pressed
-                                ? Md3Theme.surfaceContainerHigh
-                                : Md3Theme.surfaceContainerHighest
+                        minusTap.pressed
+                            ? Md3Theme.surfaceContainerHigh
+                            : Md3Theme.surfaceContainerHighest
 
-                    border.width:
-                        root.muted
-                            ? 0
-                            : 1
+                    border.width: 1
+                    border.color: Md3Theme.outlineVariant
 
-                    border.color:
-                        Md3Theme.outlineVariant
+                    opacity: root.muted ? 0.45 : 1
 
-                    RowLayout {
+                    MdiIcon {
                         anchors.centerIn: parent
-                        spacing: 6
-
-                        MdiIcon {
-                            name:
-                                root.muted
-                                    ? "volume-off"
-                                    : "volume-high"
-
-                            size: 17
-                            selected: root.muted
-                        }
-
-                        Text {
-                            text:
-                                root.muted
-                                    ? "Mute"
-                                    : root.percent + "%"
-
-                            color:
-                                root.muted
-                                    ? Md3Theme.primaryContent
-                                    : Md3Theme.surfaceContent
-
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
+                        name: "minus"
+                        size: 17
                     }
 
                     TapHandler {
-                        id: muteTap
+                        id: minusTap
+                        enabled: !root.muted
 
                         onTapped: {
-                            root.toggleMute()
+                            root.stepVolume(-1)
                             root.restartHideTimer()
                         }
                     }
                 }
 
-                AudioControlButton {
-                    icon: "plus"
-                    enabled: !root.muted
+                Item {
+                    Layout.fillWidth: true
+                }
 
-                    onClicked: {
-                        root.stepVolume(1)
-                        root.restartHideTimer()
+                Text {
+                    text:
+                        root.muted
+                            ? "0%"
+                            : root.percent + "%"
+
+                    color: Md3Theme.surfaceVariantContent
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 28
+                    radius: 14
+
+                    color:
+                        plusTap.pressed
+                            ? Md3Theme.surfaceContainerHigh
+                            : Md3Theme.surfaceContainerHighest
+
+                    border.width: 1
+                    border.color: Md3Theme.outlineVariant
+
+                    opacity: root.muted ? 0.45 : 1
+
+                    MdiIcon {
+                        anchors.centerIn: parent
+                        name: "plus"
+                        size: 17
+                    }
+
+                    TapHandler {
+                        id: plusTap
+                        enabled: !root.muted
+
+                        onTapped: {
+                            root.stepVolume(1)
+                            root.restartHideTimer()
+                        }
                     }
                 }
             }
@@ -752,7 +692,7 @@ Item {
     Timer {
         id: hideTimer
 
-        interval: 5000
+        interval: 8000
         repeat: false
 
         onTriggered: {
@@ -761,66 +701,7 @@ Item {
                 return
             }
 
-            hideAnimation.start()
-        }
-    }
-
-    ParallelAnimation {
-        id: showAnimation
-
-        NumberAnimation {
-            target: root
-            property: "opacity"
-            from: root.opacity
-            to: 1
-            duration: 110
-            easing.type: Easing.OutCubic
-        }
-
-        NumberAnimation {
-            target: osdScale
-            property: "xScale"
-            from: osdScale.xScale
-            to: 1
-            duration: 130
-            easing.type: Easing.OutCubic
-        }
-
-        NumberAnimation {
-            target: osdScale
-            property: "yScale"
-            from: osdScale.yScale
-            to: 1
-            duration: 130
-            easing.type: Easing.OutCubic
-        }
-    }
-
-    ParallelAnimation {
-        id: hideAnimation
-
-        NumberAnimation {
-            target: root
-            property: "opacity"
-            to: 0
-            duration: 160
-            easing.type: Easing.InCubic
-        }
-
-        NumberAnimation {
-            target: osdScale
-            property: "xScale"
-            to: 0.97
-            duration: 160
-            easing.type: Easing.InCubic
-        }
-
-        NumberAnimation {
-            target: osdScale
-            property: "yScale"
-            to: 0.97
-            duration: 160
-            easing.type: Easing.InCubic
+            root.dismiss()
         }
     }
 }
