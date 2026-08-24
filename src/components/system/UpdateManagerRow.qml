@@ -13,8 +13,8 @@ Rectangle {
             managerName === "system"
         && Array.isArray(manager.updates)
         && manager.updates.length > 0
-        ? 78
-        : 58
+        ? 70
+        : 52
 
     radius: Md3Theme.radiusMedium
     color: manager.update_available === true
@@ -41,8 +41,8 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 6
-        spacing: 8
+        anchors.margins: 3
+        spacing: 6
 
         MdiIcon {
             name: root.manager.type === "git"
@@ -67,8 +67,8 @@ Rectangle {
 
                 Rectangle {
                     implicitWidth: statusText.implicitWidth + 14
-                    implicitHeight: 22
-                    radius: 11
+                    implicitHeight: 20
+                    radius: 10
                     color: root.manager.update_available === true
                         ? Md3Theme.error
                         : Md3Theme.surfaceContainerHighest
@@ -121,8 +121,8 @@ Rectangle {
 
         Rectangle {
             implicitWidth: 72
-            implicitHeight: 32
-            radius: 16
+            implicitHeight: 28
+            radius: 14
             color:
                     root.manager.update_available === true
                 && !root.manager.checking
