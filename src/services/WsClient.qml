@@ -105,54 +105,106 @@ QtObject {
         )
     }
 
+    function connectNow() {
+        reconnectTimer.stop()
+
+        if (!enabled) {
+            socket.active = false
+            return
+        }
+
+        if (
+            socket.status === WebSocket.Open
+            || socket.status === WebSocket.Connecting
+        ) {
+            return
+        }
+
+        // Always force a fresh socket. Do this over two event-loop turns so
+        // QtWebSockets fully tears down a stale connection from a backend
+        // restart before opening the next one.
+        socket.active = false
+
+        Qt.callLater(function() {
+            if (root.enabled)
+                root.socket.active = true
+        })
+    }
+
     function reconnect() {
         reconnectTimer.stop()
+
+        if (!enabled) {
+            socket.active = false
+            return
+        }
+
         socket.active = false
         reconnectTimer.restart()
     }
 
+    onEnabledChanged: {
+        if (!enabled) {
+            reconnectTimer.stop()
+            socket.active = false
+            return
+        }
+
+        Qt.callLater(connectNow)
+    }
+
+    onUrlChanged: {
+        if (enabled)
+            reconnect()
+    }
+
+    Component.onCompleted: {
+        if (enabled)
+            Qt.callLater(connectNow)
+    }
+
     property WebSocket socket: WebSocket {
         url: root.url
-        active: root.enabled
+        active: false
 
         onStatusChanged: function(status) {
             switch (status) {
-            case WebSocket.Open:
-                console.log(
-                    "[websocket] connected:",
-                    root.url
-                )
+                case WebSocket.Open:
+                    console.log(
+                        "[websocket] connected:",
+                        root.url
+                    )
 
-                root.everConnected = true
-                root.reconnectTimer.stop()
-                root.connectionChanged(true)
-                Qt.callLater(root.registerEndpoints)
-                break
+                    root.everConnected = true
+                    root.reconnectTimer.stop()
+                    root.connectionChanged(true)
+                    Qt.callLater(root.registerEndpoints)
+                    break
 
-            case WebSocket.Closed:
-                root.connectionChanged(false)
+                case WebSocket.Closed:
+                    root.connectionChanged(false)
 
-                if (
-                    root.autoReconnect
-                    && root.enabled
-                ) {
-                    root.reconnectTimer.restart()
-                }
+                    if (
+                        root.autoReconnect
+                        && root.enabled
+                    ) {
+                        root.reconnectTimer.restart()
+                    }
 
-                break
+                    break
 
-            case WebSocket.Error:
-                root.socketError(errorString)
-                root.connectionChanged(false)
+                case WebSocket.Error:
+                    root.socketError(errorString)
+                    root.connectionChanged(false)
 
-                if (
-                    root.autoReconnect
-                    && root.enabled
-                ) {
-                    root.reconnectTimer.restart()
-                }
+                    if (
+                        root.autoReconnect
+                        && root.enabled
+                    ) {
+                        root.reconnectTimer.restart()
+                    }
 
-                break
+                    break
             }
         }
 
@@ -196,8 +248,7 @@ QtObject {
                 return
             }
 
-            root.socket.active = false
-            root.socket.active = true
+            root.connectNow()
         }
     }
 }
