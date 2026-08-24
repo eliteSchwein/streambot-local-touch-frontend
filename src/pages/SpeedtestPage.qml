@@ -196,28 +196,10 @@ Item {
             }
         }
 
-        Text {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 18
-
-            text:
-                root.errorText.length > 0
-                    ? root.errorText
-                    : root.stageText()
-
-            color:
-                root.errorText.length > 0
-                    ? Md3Theme.error
-                    : Md3Theme.surfaceVariantContent
-
-            font.pixelSize: 12
-            elide: Text.ElideRight
-        }
-
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 32
-            radius: 16
+            Layout.preferredHeight: 44
+            radius: 22
 
             readonly property bool canStart:
                 !root.running
@@ -299,7 +281,8 @@ Item {
 
                 text: metric.title
                 color: Md3Theme.surfaceVariantContent
-                font.pixelSize: 12
+                font.pixelSize: 14
+                font.weight: Font.Medium
             }
 
             Text {
