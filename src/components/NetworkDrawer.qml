@@ -69,37 +69,53 @@ Item {
         }
     }
 
-    // Pull down from the top edge to open.
-    // The panel follows the finger instead of only snapping after release.
+    function settleDrawer(openState) {
+        root.open = openState
+        settleAnimation.stop()
+        settleAnimation.to = openState ? 0 : -drawer.height
+        settleAnimation.restart()
+    }
+
+    // Android-style edge pull: the drawer itself follows the finger 1:1.
     Item {
+        id: openGestureArea
+
         anchors {
             top: parent.top
             left: parent.left
             right: parent.right
         }
 
-        height: root.open ? 0 : 16
-        z: 20
+        height: root.open ? 0 : 20
+        z: 30
 
         DragHandler {
             id: openDrag
 
             enabled: !root.open && !KeyboardController.visible
-            target: null
-            dragThreshold: 2
-
-            // Once this becomes a drag, it must beat buttons/items below it.
-            grabPermissions: PointerHandler.CanTakeOverFromAnything
+            target: drawer
+            dragThreshold: 0
+            snapMode: DragHandler.NoSnap
 
             xAxis.enabled: false
+            yAxis.minimum: -drawer.height
+            yAxis.maximum: 0
+
+            property real lastVelocityY: 0
 
             onActiveChanged: {
-                if (!active) {
-                    root.open =
-                        activeTranslation.y
-                        > Math.min(64, drawer.height * 0.12)
+                if (active) {
+                    settleAnimation.stop()
+                    lastVelocityY = 0
+                } else {
+                    const fastDown = lastVelocityY > 850
+                    const farEnough = drawer.y > -drawer.height * 0.72
+                    root.settleDrawer(fastDown || farEnough)
                 }
             }
+
+            onActiveTranslationChanged:
+                lastVelocityY = centroid.velocity.y
         }
     }
 
@@ -109,35 +125,10 @@ Item {
         width: parent.width
         height: parent.height
 
-        // Follow the finger in both directions.
-        y: {
-            if (openDrag.active) {
-                return Math.min(
-                    0,
-                    -height + Math.max(0, openDrag.activeTranslation.y)
-                )
-            }
-
-            if (closeDrag.active) {
-                return Math.max(
-                    -height,
-                    Math.min(0, closeDrag.activeTranslation.y)
-                )
-            }
-
-            return root.open ? 0 : -height
-        }
+        y: -height
+        z: 10
 
         color: Md3Theme.background
-
-        Behavior on y {
-            enabled: !openDrag.active && !closeDrag.active
-
-            NumberAnimation {
-                duration: 180
-                easing.type: Easing.OutCubic
-            }
-        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -516,54 +507,78 @@ Item {
                 }
             }
 
-            // Bottom handle: drag upward to close, or tap it.
-            // Keep the whole hit area inside the drawer so it cannot overlap
-            // the shell navigation bar.
+            // Space reserved for the external drag handle below.
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 28
-
-                Rectangle {
-                    width: 48
-                    height: 5
-                    radius: 3
-
-                    anchors.centerIn: parent
-
-                    color: Md3Theme.surfaceVariantContent
-                }
-
-                DragHandler {
-                    id: closeDrag
-
-                    enabled: root.open && !KeyboardController.visible
-                    target: null
-                    dragThreshold: 2
-
-                    // Steal the gesture from any button below as soon as it
-                    // turns into a drag, and don't approve another takeover.
-                    grabPermissions: PointerHandler.CanTakeOverFromAnything
-
-                    xAxis.enabled: false
-
-                    onActiveChanged: {
-                        if (!active) {
-                            root.open = !(
-                                activeTranslation.y
-                                < -Math.min(64, drawer.height * 0.12)
-                            )
-                        }
-                    }
-                }
-
-                TapHandler {
-                    enabled: root.open && !KeyboardController.visible
-                    gesturePolicy: TapHandler.WithinBounds
-
-                    onTapped: root.open = false
-                }
             }
         }
+    }
+
+    // The close handle is a sibling of the moving drawer. This avoids
+    // coordinate/grab weirdness from dragging an ancestor of the handler.
+    Item {
+        id: closeGestureArea
+
+        x: 0
+        y: drawer.y + drawer.height - height
+        width: root.width
+        height: 28
+        z: 40
+
+        visible: root.open || closeDrag.active
+
+        Rectangle {
+            width: 48
+            height: 5
+            radius: 3
+            anchors.centerIn: parent
+            color: Md3Theme.surfaceVariantContent
+        }
+
+        DragHandler {
+            id: closeDrag
+
+            enabled: root.open && !KeyboardController.visible
+            target: drawer
+            dragThreshold: 0
+            snapMode: DragHandler.NoSnap
+
+            xAxis.enabled: false
+            yAxis.minimum: -drawer.height
+            yAxis.maximum: 0
+
+            property real lastVelocityY: 0
+
+            onActiveChanged: {
+                if (active) {
+                    settleAnimation.stop()
+                    lastVelocityY = 0
+                } else {
+                    const fastUp = lastVelocityY < -850
+                    const farEnough = drawer.y < -drawer.height * 0.28
+                    root.settleDrawer(!(fastUp || farEnough))
+                }
+            }
+
+            onActiveTranslationChanged:
+                lastVelocityY = centroid.velocity.y
+        }
+
+        TapHandler {
+            enabled: root.open && !KeyboardController.visible
+            gesturePolicy: TapHandler.DragThreshold
+            onTapped: root.settleDrawer(false)
+        }
+    }
+
+    NumberAnimation {
+        id: settleAnimation
+
+        target: drawer
+        property: "y"
+        duration: 190
+        easing.type: Easing.OutCubic
     }
 
     PowerMenuDialog {
