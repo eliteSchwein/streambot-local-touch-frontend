@@ -260,7 +260,14 @@ ShellRoot {
             NetworkDrawer {
                 id: settingsDrawer
 
-                anchors.fill: parent
+                // Keep the drawer and its bottom drag/close handle above the
+                // navigation bar instead of overlapping its pointer area.
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
 
                 i18n: i18n
                 config: config
