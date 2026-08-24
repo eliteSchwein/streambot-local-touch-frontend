@@ -40,16 +40,16 @@ Item {
         )
 
     readonly property real volumeFraction:
-        root.maxVolume > root.minVolume
-            ? Math.max(
-                0,
-                Math.min(
-                    1,
-                    (root.volume - root.minVolume)
-                    / (root.maxVolume - root.minVolume)
-                )
+            root.maxVolume > root.minVolume
+        ? Math.max(
+            0,
+            Math.min(
+                1,
+                (root.volume - root.minVolume)
+                / (root.maxVolume - root.minVolume)
             )
-            : 0
+        )
+        : 0
 
     anchors.fill: parent
 
@@ -156,14 +156,14 @@ Item {
                 : 1
 
         root.stepVolume =
-            Number.isFinite(Number(stepValue))
+                Number.isFinite(Number(stepValue))
             && Number(stepValue) > 0
-                ? Number(stepValue)
-                : (
+            ? Number(stepValue)
+            : (
                     root.targetKind === "virtual"
-                        ? 0.01
-                        : 0.05
-                )
+                    ? 0.01
+                    : 0.05
+            )
 
         const sameTarget =
             root.targetKind === String(kind ?? "")
@@ -469,8 +469,8 @@ Item {
             root.setVolume(root.volume)
     }
 
-    // Full-screen transparent backdrop. Tapping anywhere outside the rail
-    // dismisses the OSD and consumes the tap.
+    // Full-screen transparent backdrop. Tapping anywhere outside the
+    // compact Android-style rail dismisses the OSD and consumes the tap.
     MouseArea {
         anchors.fill: parent
         z: 0
@@ -491,16 +491,15 @@ Item {
         }
 
         width:
-            root.targetKind === "physical"
-                ? Math.min(190, parent.width - 20)
-                : 76
+                root.targetKind === "physical"
+            ? Math.min(390, parent.width - 20)
+            : Math.min(330, parent.width - 20)
 
         height:
-            root.targetKind === "physical"
-                ? 250
-                : 218
+                root.targetKind === "physical"
+            ? 84
+            : 62
 
-        // Consume empty-space taps inside the OSD itself.
         MouseArea {
             anchors.fill: parent
         }
@@ -510,34 +509,35 @@ Item {
 
             anchors {
                 top: parent.top
-                horizontalCenter: parent.horizontalCenter
+                left: parent.left
+                right: parent.right
             }
 
-            width: 68
-            height: 214
-            radius: 34
+            height: 58
+            radius: 29
 
             color: Md3Theme.surfaceContainerHigh
 
             border.width: 1
             border.color: Md3Theme.outlineVariant
 
-            Column {
+            RowLayout {
                 anchors {
                     fill: parent
-                    topMargin: 8
-                    bottomMargin: 8
+                    leftMargin: 8
+                    rightMargin: 10
+                    topMargin: 7
+                    bottomMargin: 7
                 }
 
-                spacing: 7
+                spacing: 10
 
                 Rectangle {
                     id: muteButton
 
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.preferredWidth: 42
+                    Layout.preferredHeight: 42
 
-                    width: 42
-                    height: 42
                     radius: 21
 
                     color:
@@ -557,7 +557,7 @@ Item {
                                 ? "volume-off"
                                 : root.iconType
 
-                        size: 23
+                        size: 22
                     }
 
                     TapHandler {
@@ -571,41 +571,39 @@ Item {
                 }
 
                 Item {
-                    id: verticalSlider
+                    id: sliderArea
 
-                    anchors.horizontalCenter: parent.horizontalCenter
-
-                    width: 42
-                    height: 126
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 34
 
                     Rectangle {
                         id: sliderTrack
 
                         anchors.centerIn: parent
 
-                        width: 28
-                        height: 118
-                        radius: 14
+                        width: parent.width
+                        height: 18
+                        radius: 9
 
                         color: Md3Theme.surfaceContainerHighest
 
                         Rectangle {
                             anchors {
-                                left: parent.left
-                                right: parent.right
+                                top: parent.top
                                 bottom: parent.bottom
+                                left: parent.left
                             }
 
-                            height:
+                            width:
                                 root.muted
                                     ? 0
-                                    : parent.height
-                                      * root.volumeFraction
+                                    : parent.width
+                                    * root.volumeFraction
 
-                            radius: 14
+                            radius: 9
                             color: Md3Theme.primary
 
-                            Behavior on height {
+                            Behavior on width {
                                 enabled: !root.interacting
 
                                 NumberAnimation {
@@ -616,21 +614,21 @@ Item {
                         }
 
                         Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.verticalCenter: parent.verticalCenter
 
-                            y:
-                                parent.height
-                                - (root.muted
+                            x:
+                                (root.muted
                                     ? 0
-                                    : parent.height
-                                      * root.volumeFraction)
-                                - height / 2
+                                    : parent.width
+                                    * root.volumeFraction)
+                                - width / 2
 
-                            width: 20
-                            height: 20
-                            radius: 10
+                            width: 22
+                            height: 22
+                            radius: 11
 
                             color: Md3Theme.primaryContent
+
                             border.width: 3
                             border.color: Md3Theme.primary
 
@@ -641,31 +639,26 @@ Item {
                     MouseArea {
                         anchors.fill: parent
 
-                        function updateVolume(mouseY) {
-                            const trackTop =
-                                sliderTrack.y
-
-                            const localY =
+                        function updateVolume(mouseX) {
+                            const localX =
                                 Math.max(
                                     0,
                                     Math.min(
-                                        sliderTrack.height,
-                                        mouseY - trackTop
+                                        sliderTrack.width,
+                                        mouseX - sliderTrack.x
                                     )
                                 )
 
                             const fraction =
-                                1
-                                - localY
-                                  / sliderTrack.height
+                                localX / sliderTrack.width
 
                             const raw =
                                 root.minVolume
                                 + fraction
-                                  * (
-                                      root.maxVolume
-                                      - root.minVolume
-                                  )
+                                * (
+                                    root.maxVolume
+                                    - root.minVolume
+                                )
 
                             const step =
                                 Math.max(
@@ -689,12 +682,12 @@ Item {
                         onPressed: mouse => {
                             root.interacting = true
                             hideTimer.stop()
-                            updateVolume(mouse.y)
+                            updateVolume(mouse.x)
                         }
 
                         onPositionChanged: mouse => {
                             if (pressed)
-                                updateVolume(mouse.y)
+                                updateVolume(mouse.x)
                         }
 
                         onReleased: {
@@ -712,7 +705,10 @@ Item {
                 }
 
                 Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.preferredWidth: 42
+
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
 
                     text:
                         root.muted
@@ -733,20 +729,20 @@ Item {
             anchors {
                 top: rail.bottom
                 horizontalCenter: parent.horizontalCenter
-                topMargin: 6
+                topMargin: 4
             }
 
             width:
                 Math.min(
                     parent.width,
                     Math.max(
-                        88,
+                        92,
                         physicalLabel.implicitWidth + 20
                     )
                 )
 
-            height: 26
-            radius: 13
+            height: 22
+            radius: 11
 
             color: Md3Theme.surfaceContainerHigh
 
