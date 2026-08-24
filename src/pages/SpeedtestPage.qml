@@ -207,10 +207,6 @@ Item {
                                 : "check-circle-outline"
 
                         size: 17
-                        color:
-                            root.running
-                                ? Md3Theme.onPrimaryContainer
-                                : Md3Theme.onSurfaceVariant
                     }
 
                     Text {
@@ -299,7 +295,6 @@ Item {
                 MdiIcon {
                     name: "alert-circle-outline"
                     size: 20
-                    color: Md3Theme.onErrorContainer
                 }
 
                 Text {
@@ -350,12 +345,6 @@ Item {
                             : "play"
 
                     size: 22
-                    color:
-                        root.running
-                        || root.starting
-                        || !root.websocket.connected
-                            ? Md3Theme.onSurfaceVariant
-                            : Md3Theme.onPrimary
                 }
 
                 Text {
@@ -435,10 +424,6 @@ Item {
 
                 name: metric.iconName
                 size: 30
-                color:
-                    metric.active
-                        ? Md3Theme.onPrimaryContainer
-                        : Md3Theme.onSurfaceVariant
             }
 
             Text {
