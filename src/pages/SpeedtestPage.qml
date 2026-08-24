@@ -146,116 +146,33 @@ Item {
             root.starting = false
     }
 
-    Rectangle {
+    ColumnLayout {
         anchors {
             fill: parent
-            margins: 10
+            margins: 12
         }
 
-        radius: Md3Theme.radiusLarge
-        color: Md3Theme.surfaceContainer
-        border.width: 1
-        border.color: Md3Theme.outlineVariant
+        spacing: 8
 
-        ColumnLayout {
-            anchors {
-                fill: parent
-                margins: 12
-            }
-
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
             spacing: 8
 
-            RowLayout {
+            MetricCard {
                 Layout.fillWidth: true
-                spacing: 8
+                Layout.fillHeight: true
 
-                Text {
-                    Layout.fillWidth: true
-
-                    text: root.tr(
-                        "speedtest_title",
-                        "Speedtest"
-                    )
-
-                    color: Md3Theme.surfaceContent
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
-
-                Rectangle {
-                    Layout.preferredHeight: 24
-                    Layout.preferredWidth: Math.max(
-                        74,
-                        stageLabel.implicitWidth + 34
-                    )
-
-                    radius: 12
-
-                    color:
-                        root.running
-                            ? Md3Theme.primaryContainer
-                            : Md3Theme.surfaceContainerHigh
-
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 5
-
-                        MdiIcon {
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            name:
-                                root.running
-                                    ? "progress-clock"
-                                    : "check-circle-outline"
-
-                            size: 15
-                        }
-
-                        Text {
-                            id: stageLabel
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            text: root.stageText()
-
-                            color:
-                                root.running
-                                    ? Md3Theme.onPrimaryContainer
-                                    : Md3Theme.onSurfaceVariant
-
-                            font.pixelSize: 12
-                            font.weight: Font.Medium
-                        }
-                    }
-                }
-            }
-
-            Text {
-                Layout.fillWidth: true
-
-                text: root.tr(
-                    "speedtest_description",
-                    "Test the backend network connection."
-                )
-
-                color: Md3Theme.onSurfaceVariant
-                font.pixelSize: 12
-                wrapMode: Text.WordWrap
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 1
-                color: Md3Theme.outlineVariant
-            }
-
-            MetricRow {
                 iconName: "timer-outline"
                 title: root.tr("speedtest_ping", "Ping")
                 value: root.formatPing(root.pingMs)
                 active: root.stage === "ping"
             }
 
-            MetricRow {
+            MetricCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
                 iconName: "download"
                 title: root.tr(
                     "speedtest_download",
@@ -265,7 +182,10 @@ Item {
                 active: root.stage === "download"
             }
 
-            MetricRow {
+            MetricCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
                 iconName: "upload"
                 title: root.tr(
                     "speedtest_upload",
@@ -274,124 +194,86 @@ Item {
                 value: root.formatMbps(root.uploadMbps)
                 active: root.stage === "upload"
             }
+        }
 
-            Item {
-                Layout.fillHeight: true
-            }
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 32
+            spacing: 8
 
-            Rectangle {
-                visible: root.errorText.length > 0
-
+            Text {
                 Layout.fillWidth: true
-                Layout.preferredHeight: visible ? 38 : 0
 
-                radius: Md3Theme.radiusMedium
-                color: Md3Theme.errorContainer
-
-                RowLayout {
-                    anchors {
-                        fill: parent
-                        leftMargin: 10
-                        rightMargin: 10
-                    }
-
-                    spacing: 6
-
-                    MdiIcon {
-                        name: "alert-circle-outline"
-                        size: 17
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-
-                        text: root.errorText
-                        color: Md3Theme.onErrorContainer
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-
-            Rectangle {
-                id: runButton
-
-                Layout.fillWidth: true
-                Layout.preferredHeight: 40
-
-                radius: Md3Theme.radiusMedium
+                text:
+                        root.errorText.length > 0
+                    ? root.errorText
+                    : root.stageText()
 
                 color:
-                    runTap.pressed
-                        ? Md3Theme.primaryContainer
-                        : (
-                                root.running
-                                || root.starting
-                                || !root.websocket.connected
-                                ? Md3Theme.surfaceContainerHighest
-                                : Md3Theme.primary
-                        )
+                        root.errorText.length > 0
+                    ? Md3Theme.error
+                    : Md3Theme.surfaceVariantContent
+
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
+
+            Rectangle {
+                implicitWidth: Math.max(
+                    112,
+                    runLabel.implicitWidth + 28
+                )
+                implicitHeight: 32
+                radius: 16
+
+                color:
+                        !root.running
+                    && !root.starting
+                    && root.websocket.connected
+                    ? Md3Theme.primary
+                    : Md3Theme.surfaceContainerHighest
 
                 opacity:
-                        root.running
-                    || root.starting
-                    || !root.websocket.connected
-                    ? 0.72
-                    : 1.0
+                        !root.running
+                    && !root.starting
+                    && root.websocket.connected
+                    ? 1
+                    : 0.55
 
-                Row {
+                Text {
+                    id: runLabel
                     anchors.centerIn: parent
-                    spacing: 7
 
-                    MdiIcon {
-                        anchors.verticalCenter: parent.verticalCenter
+                    text:
+                        root.running
+                            ? root.tr(
+                                "speedtest_running",
+                                "Speedtest running"
+                            )
+                            : (
+                                root.starting
+                                    ? root.tr(
+                                        "speedtest_starting",
+                                        "Starting…"
+                                    )
+                                    : root.tr(
+                                        "speedtest_run",
+                                        "Run speedtest"
+                                    )
+                            )
 
-                        // "play-circle-outline" gives the action a clear
-                        // start-button appearance instead of a bare play glyph.
-                        name:
-                                root.running || root.starting
-                            ? "progress-clock"
-                            : "play-circle-outline"
+                    color:
+                            !root.running
+                        && !root.starting
+                        && root.websocket.connected
+                        ? Md3Theme.primaryContent
+                        : Md3Theme.surfaceVariantContent
 
-                        size: 18
-                    }
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        text:
-                            root.running
-                                ? root.tr(
-                                    "speedtest_running",
-                                    "Speedtest running"
-                                )
-                                : (
-                                    root.starting
-                                        ? root.tr(
-                                            "speedtest_starting",
-                                            "Starting…"
-                                        )
-                                        : root.tr(
-                                            "speedtest_run",
-                                            "Run speedtest"
-                                        )
-                                )
-
-                        color:
-                                root.running
-                            || root.starting
-                            || !root.websocket.connected
-                            ? Md3Theme.onSurfaceVariant
-                            : Md3Theme.onPrimary
-
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                    }
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
                 }
 
                 TapHandler {
-                    id: runTap
-
                     enabled:
                         !root.running
                         && !root.starting
@@ -404,7 +286,7 @@ Item {
         }
     }
 
-    component MetricRow: Rectangle {
+    component MetricCard: Rectangle {
         id: metric
 
         required property string iconName
@@ -412,59 +294,44 @@ Item {
         required property string value
         property bool active: false
 
-        Layout.fillWidth: true
-        Layout.preferredHeight: 52
-
-        radius: Md3Theme.radiusMedium
+        radius: Md3Theme.radiusLarge
 
         color:
-            active
-                ? Md3Theme.primaryContainer
-                : Md3Theme.surfaceContainerHigh
+            metric.active
+                ? Md3Theme.surfaceContainerHigh
+                : Md3Theme.surfaceContainer
 
         border.width: 1
         border.color:
-            active
+            metric.active
                 ? Md3Theme.primary
                 : Md3Theme.outlineVariant
 
-        RowLayout {
-            anchors {
-                fill: parent
-                leftMargin: 10
-                rightMargin: 10
-            }
-
+        Column {
+            anchors.centerIn: parent
             spacing: 8
 
             MdiIcon {
+                anchors.horizontalCenter: parent.horizontalCenter
                 name: metric.iconName
-                size: 18
+                size: 26
             }
 
             Text {
-                Layout.fillWidth: true
+                anchors.horizontalCenter: parent.horizontalCenter
 
                 text: metric.title
-
-                color:
-                    metric.active
-                        ? Md3Theme.onPrimaryContainer
-                        : Md3Theme.onSurfaceVariant
-
+                color: Md3Theme.surfaceVariantContent
                 font.pixelSize: 12
             }
 
             Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+
                 text: metric.value
-
-                color:
-                    metric.active
-                        ? Md3Theme.onPrimaryContainer
-                        : Md3Theme.onSurface
-
-                font.pixelSize: 12
-                font.weight: Font.DemiBold
+                color: Md3Theme.surfaceContent
+                font.pixelSize: 24
+                font.weight: Font.Bold
             }
         }
     }
