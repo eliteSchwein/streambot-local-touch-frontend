@@ -143,5 +143,20 @@
   "system_updates_available": "Update available",
   "system_updates_up_to_date": "Up to date",
   "system_updates_package_count": "{count} packages",
-  "system_updates_no_state": "No update state available yet"
+  "system_updates_no_state": "No update state available yet",
+  "page_speedtest": "Speedtest",
+  "speedtest_title": "Speedtest",
+  "speedtest_description": "Test the backend network connection.",
+  "speedtest_ping": "Ping",
+  "speedtest_download": "Download",
+  "speedtest_upload": "Upload",
+  "speedtest_run": "Run speedtest",
+  "speedtest_running": "Speedtest running",
+  "speedtest_starting": "Starting…",
+  "speedtest_stage_idle": "Ready",
+  "speedtest_stage_ping": "Ping",
+  "speedtest_stage_download": "Download",
+  "speedtest_stage_upload": "Upload",
+  "speedtest_stage_finished": "Finished",
+  "speedtest_stage_error": "Error"
 }

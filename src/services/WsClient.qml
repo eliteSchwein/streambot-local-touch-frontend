@@ -21,7 +21,8 @@ QtObject {
         "notify_macro_update",
         "notify_channel_point_update",
         "notify_update_manager",
-        "notify_storage_update"
+        "notify_storage_update",
+        "notify_speedtest_update"
     ]
 
     property int nextRequestId: 1

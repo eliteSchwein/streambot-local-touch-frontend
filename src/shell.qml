@@ -161,6 +161,23 @@ ShellRoot {
                 store: dashboardStore
             }
 
+
+            SpeedtestPage {
+                id: speedtestPage
+
+                visible: appRoot.currentPage === 5
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                i18n: i18n
+                websocket: websocket
+            }
+
             Rectangle {
                 id: navigation
 
@@ -223,6 +240,14 @@ ShellRoot {
 
                         onClicked:
                             appRoot.currentPage = 4
+                    }
+
+                    Md3NavButton {
+                        icon: "speedometer"
+                        selected: appRoot.currentPage === 5
+
+                        onClicked:
+                            appRoot.currentPage = 5
                     }
                 }
 

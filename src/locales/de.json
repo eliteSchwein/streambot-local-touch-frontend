@@ -143,5 +143,20 @@
   "system_updates_available": "Update verfügbar",
   "system_updates_up_to_date": "Aktuell",
   "system_updates_package_count": "{count} Pakete",
-  "system_updates_no_state": "Noch kein Update-Status verfügbar"
+  "system_updates_no_state": "Noch kein Update-Status verfügbar",
+  "page_speedtest": "Speedtest",
+  "speedtest_title": "Speedtest",
+  "speedtest_description": "Netzwerkverbindung des Backends testen.",
+  "speedtest_ping": "Ping",
+  "speedtest_download": "Download",
+  "speedtest_upload": "Upload",
+  "speedtest_run": "Speedtest starten",
+  "speedtest_running": "Speedtest läuft",
+  "speedtest_starting": "Wird gestartet…",
+  "speedtest_stage_idle": "Bereit",
+  "speedtest_stage_ping": "Ping",
+  "speedtest_stage_download": "Download",
+  "speedtest_stage_upload": "Upload",
+  "speedtest_stage_finished": "Fertig",
+  "speedtest_stage_error": "Fehler"
 }
