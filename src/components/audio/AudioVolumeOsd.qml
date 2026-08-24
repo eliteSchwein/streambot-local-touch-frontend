@@ -142,14 +142,14 @@ Item {
                 : 1
 
         root.stepVolume =
-            Number.isFinite(Number(stepValue))
+                Number.isFinite(Number(stepValue))
             && Number(stepValue) > 0
-                ? Number(stepValue)
-                : (
+            ? Number(stepValue)
+            : (
                     root.targetKind === "virtual"
-                        ? 0.01
-                        : 0.05
-                )
+                    ? 0.01
+                    : 0.05
+            )
 
         root.volume = Math.max(
             root.minVolume,
@@ -322,10 +322,10 @@ Item {
                     after.muted,
                     "virtual",
                     name,
-                    Number(device && device.min_range ?? 0),
-                    Number(device && device.max_range ?? 1),
-                    Number(device && device.steps_range ?? 0.01),
-                    Number(device && device.current_volume ?? after.volume)
+                    Number((device && device.min_range) ?? 0),
+                    Number((device && device.max_range) ?? 1),
+                    Number((device && device.steps_range) ?? 0.01),
+                    Number((device && device.current_volume) ?? after.volume)
                 )
             }
         }
