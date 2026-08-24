@@ -260,14 +260,10 @@ ShellRoot {
             NetworkDrawer {
                 id: settingsDrawer
 
-                // The drawer must stop above navigation. Its bottom drag
-                // handle therefore never shares a touch area with nav buttons.
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
+                // Drawer is fullscreen again. Only its close handle is lifted
+                // above the navigation bar.
+                anchors.fill: parent
+                bottomHandleInset: navigation.height
 
                 i18n: i18n
                 config: config
