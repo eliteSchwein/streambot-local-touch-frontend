@@ -19,7 +19,7 @@ Item {
     property string errorText: ""
 
     function tr(key, fallback) {
-        const value = root.i18n.tr(key)
+        const value = root.i18n.text(key)
         return value === key ? fallback : value
     }
 
@@ -196,92 +196,69 @@ Item {
             }
         }
 
-        RowLayout {
+        Text {
             Layout.fillWidth: true
-            Layout.preferredHeight: 32
-            spacing: 8
+            Layout.preferredHeight: 18
 
-            Text {
-                Layout.fillWidth: true
-
-                text:
-                        root.errorText.length > 0
+            text:
+                root.errorText.length > 0
                     ? root.errorText
                     : root.stageText()
 
-                color:
-                        root.errorText.length > 0
+            color:
+                root.errorText.length > 0
                     ? Md3Theme.error
                     : Md3Theme.surfaceVariantContent
 
-                font.pixelSize: 12
-                elide: Text.ElideRight
-            }
+            font.pixelSize: 12
+            elide: Text.ElideRight
+        }
 
-            Rectangle {
-                implicitWidth: Math.max(
-                    112,
-                    runLabel.implicitWidth + 28
-                )
-                implicitHeight: 32
-                radius: 16
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 32
+            radius: 16
 
-                color:
-                        !root.running
-                    && !root.starting
-                    && root.websocket.connected
+            readonly property bool canStart:
+                !root.running
+                && !root.starting
+                && root.websocket.connected
+
+            // Same colors as the Update button.
+            color:
+                canStart
                     ? Md3Theme.primary
                     : Md3Theme.surfaceContainerHighest
 
-                opacity:
-                        !root.running
-                    && !root.starting
-                    && root.websocket.connected
+            opacity:
+                canStart
                     ? 1
                     : 0.55
 
-                Text {
-                    id: runLabel
-                    anchors.centerIn: parent
+            Text {
+                anchors.centerIn: parent
 
-                    text:
-                        root.running
-                            ? root.tr(
-                                "speedtest_running",
-                                "Speedtest running"
-                            )
-                            : (
-                                root.starting
-                                    ? root.tr(
-                                        "speedtest_starting",
-                                        "Starting…"
-                                    )
-                                    : root.tr(
-                                        "speedtest_run",
-                                        "Run speedtest"
-                                    )
-                            )
+                text:
+                    root.running
+                        ? root.i18n.text("speedtest_running")
+                        : (
+                            root.starting
+                                ? root.i18n.text("speedtest_starting")
+                                : root.i18n.text("speedtest_run")
+                        )
 
-                    color:
-                            !root.running
-                        && !root.starting
-                        && root.websocket.connected
+                color:
+                    parent.canStart
                         ? Md3Theme.primaryContent
                         : Md3Theme.surfaceVariantContent
 
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+            }
 
-                TapHandler {
-                    enabled:
-                        !root.running
-                        && !root.starting
-                        && root.websocket.connected
-
-                    onTapped:
-                        root.startSpeedtest()
-                }
+            TapHandler {
+                enabled: parent.canStart
+                onTapped: root.startSpeedtest()
             }
         }
     }

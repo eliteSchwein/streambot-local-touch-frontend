@@ -243,9 +243,9 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        // "download" is already used by SpeedtestPage and is
-                        // therefore a known bundled icon.
-                        icon: "download"
+                        // "swap-vertical" reads as network transfer and avoids
+                        // the unresolved speedometer glyph.
+                        icon: "speedometer"
                         selected: appRoot.currentPage === 5
 
                         onClicked:
