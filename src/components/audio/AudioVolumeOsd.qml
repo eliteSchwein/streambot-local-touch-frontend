@@ -401,7 +401,7 @@ Item {
             ) {
                 root.showOsd(
                     after.label,
-                    "output",
+                    "speaker",
                     after.volume,
                     after.muted,
                     "physical",
