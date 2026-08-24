@@ -39,6 +39,18 @@ Item {
             ) * 100
         )
 
+    readonly property real volumeFraction:
+        root.maxVolume > root.minVolume
+            ? Math.max(
+                0,
+                Math.min(
+                    1,
+                    (root.volume - root.minVolume)
+                    / (root.maxVolume - root.minVolume)
+                )
+            )
+            : 0
+
     anchors.fill: parent
 
     visible: root.shown && !root.suppressed
@@ -68,15 +80,15 @@ Item {
             String(name ?? "").trim().toLowerCase()
 
         if (normalized === "alert")
-            return "alert-circle-outline"
+            return "bell-outline"
 
         if (normalized === "tts")
-            return "message-text-outline"
+            return "account-voice"
 
         if (normalized === "music")
             return "music"
 
-        return "volume-high"
+        return "speaker"
     }
 
     function labelForInterface(name) {
@@ -153,17 +165,23 @@ Item {
                         : 0.05
                 )
 
-        root.volume = Math.max(
-            root.minVolume,
-            Math.min(
-                root.maxVolume,
-                Number(value) || 0
-            )
-        )
+        const sameTarget =
+            root.targetKind === String(kind ?? "")
+            && root.targetId === String(id ?? "")
 
-        root.muted =
-            isMuted === true
-            || root.volume <= root.minVolume
+        if (!root.interacting || !sameTarget) {
+            root.volume = Math.max(
+                root.minVolume,
+                Math.min(
+                    root.maxVolume,
+                    Number(value) || 0
+                )
+            )
+
+            root.muted =
+                isMuted === true
+                || root.volume <= root.minVolume
+        }
 
         const remembered =
             Number(previousValue)
@@ -443,94 +461,93 @@ Item {
 
     Timer {
         id: volumeSendTimer
-        interval: 100
+
+        interval: 90
         repeat: false
 
         onTriggered:
-            root.setVolume(volumeSlider.value)
+            root.setVolume(root.volume)
     }
 
-    // Transparent full-screen dismiss layer. This exists only while the OSD
-    // is visible and prevents clicks from leaking to the UI below.
+    // Full-screen transparent backdrop. Tapping anywhere outside the rail
+    // dismisses the OSD and consumes the tap.
     MouseArea {
         anchors.fill: parent
         z: 0
-
         enabled: root.visible
 
         onClicked:
             root.dismiss()
     }
 
-    Rectangle {
-        id: card
-
+    Item {
+        id: osdContainer
         z: 1
 
         anchors {
             top: parent.top
             horizontalCenter: parent.horizontalCenter
-            topMargin: 14
+            topMargin: 12
         }
 
-        width: Math.min(340, parent.width - 20)
+        width:
+            root.targetKind === "physical"
+                ? Math.min(190, parent.width - 20)
+                : 76
+
         height:
             root.targetKind === "physical"
-                ? 82
-                : 64
+                ? 250
+                : 218
 
-        radius: 24
-        color: Md3Theme.surfaceContainerHigh
-
-        border.width: 1
-        border.color: Md3Theme.outlineVariant
-
+        // Consume empty-space taps inside the OSD itself.
         MouseArea {
             anchors.fill: parent
         }
 
-        ColumnLayout {
+        Rectangle {
+            id: rail
+
             anchors {
-                fill: parent
-                leftMargin: 12
-                rightMargin: 12
-                topMargin: 9
-                bottomMargin: 9
+                top: parent.top
+                horizontalCenter: parent.horizontalCenter
             }
 
-            spacing: 4
+            width: 68
+            height: 214
+            radius: 34
 
-            Text {
-                visible: root.targetKind === "physical"
+            color: Md3Theme.surfaceContainerHigh
 
-                Layout.fillWidth: true
-                Layout.preferredHeight: visible ? 16 : 0
+            border.width: 1
+            border.color: Md3Theme.outlineVariant
 
-                text: root.displayName
-                color: Md3Theme.surfaceVariantContent
+            Column {
+                anchors {
+                    fill: parent
+                    topMargin: 8
+                    bottomMargin: 8
+                }
 
-                font.pixelSize: 11
-                font.weight: Font.Medium
-
-                elide: Text.ElideRight
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                spacing: 8
+                spacing: 7
 
                 Rectangle {
-                    Layout.preferredWidth: 34
-                    Layout.preferredHeight: 34
+                    id: muteButton
 
-                    radius: 17
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    width: 42
+                    height: 42
+                    radius: 21
 
                     color:
                         muteTap.pressed
                             ? Md3Theme.primaryContainer
-                            : Md3Theme.surfaceContainerHighest
+                            : (
+                                root.muted
+                                    ? Md3Theme.primary
+                                    : Md3Theme.surfaceContainerHighest
+                            )
 
                     MdiIcon {
                         anchors.centerIn: parent
@@ -540,7 +557,7 @@ Item {
                                 ? "volume-off"
                                 : root.iconType
 
-                        size: 18
+                        size: 23
                     }
 
                     TapHandler {
@@ -553,53 +570,208 @@ Item {
                     }
                 }
 
-                Md3Slider {
-                    id: volumeSlider
+                Item {
+                    id: verticalSlider
 
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 30
+                    anchors.horizontalCenter: parent.horizontalCenter
 
-                    from: root.minVolume
-                    to: root.maxVolume
-                    stepSize: root.stepVolume
+                    width: 42
+                    height: 126
 
-                    value: root.volume
-                    enabled: true
+                    Rectangle {
+                        id: sliderTrack
 
-                    onMoved: {
-                        root.volume = value
-                        root.muted =
-                            value <= root.minVolume
+                        anchors.centerIn: parent
 
-                        volumeSendTimer.restart()
-                        root.restartHideTimer()
-                    }
+                        width: 28
+                        height: 118
+                        radius: 14
 
-                    onPressedChanged: {
-                        root.interacting = pressed
+                        color: Md3Theme.surfaceContainerHighest
 
-                        if (pressed) {
-                            hideTimer.stop()
-                            return
+                        Rectangle {
+                            anchors {
+                                left: parent.left
+                                right: parent.right
+                                bottom: parent.bottom
+                            }
+
+                            height:
+                                root.muted
+                                    ? 0
+                                    : parent.height
+                                      * root.volumeFraction
+
+                            radius: 14
+                            color: Md3Theme.primary
+
+                            Behavior on height {
+                                enabled: !root.interacting
+
+                                NumberAnimation {
+                                    duration: 80
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
                         }
 
-                        volumeSendTimer.stop()
-                        root.setVolume(value)
-                        root.restartHideTimer()
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+
+                            y:
+                                parent.height
+                                - (root.muted
+                                    ? 0
+                                    : parent.height
+                                      * root.volumeFraction)
+                                - height / 2
+
+                            width: 20
+                            height: 20
+                            radius: 10
+
+                            color: Md3Theme.primaryContent
+                            border.width: 3
+                            border.color: Md3Theme.primary
+
+                            visible: !root.muted
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        function updateVolume(mouseY) {
+                            const trackTop =
+                                sliderTrack.y
+
+                            const localY =
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        sliderTrack.height,
+                                        mouseY - trackTop
+                                    )
+                                )
+
+                            const fraction =
+                                1
+                                - localY
+                                  / sliderTrack.height
+
+                            const raw =
+                                root.minVolume
+                                + fraction
+                                  * (
+                                      root.maxVolume
+                                      - root.minVolume
+                                  )
+
+                            const step =
+                                Math.max(
+                                    0.001,
+                                    root.stepVolume
+                                )
+
+                            root.volume =
+                                root.clampVolume(
+                                    Math.round(raw / step)
+                                    * step
+                                )
+
+                            root.muted =
+                                root.volume
+                                <= root.minVolume
+
+                            volumeSendTimer.restart()
+                        }
+
+                        onPressed: mouse => {
+                            root.interacting = true
+                            hideTimer.stop()
+                            updateVolume(mouse.y)
+                        }
+
+                        onPositionChanged: mouse => {
+                            if (pressed)
+                                updateVolume(mouse.y)
+                        }
+
+                        onReleased: {
+                            volumeSendTimer.stop()
+                            root.setVolume(root.volume)
+                            root.interacting = false
+                            root.restartHideTimer()
+                        }
+
+                        onCanceled: {
+                            root.interacting = false
+                            root.restartHideTimer()
+                        }
                     }
                 }
 
                 Text {
-                    Layout.preferredWidth: 42
+                    anchors.horizontalCenter: parent.horizontalCenter
 
-                    horizontalAlignment: Text.AlignRight
+                    text:
+                        root.muted
+                            ? "0%"
+                            : root.percent + "%"
 
-                    text: root.percent + "%"
                     color: Md3Theme.surfaceContent
 
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                     font.weight: Font.DemiBold
                 }
+            }
+        }
+
+        Rectangle {
+            visible: root.targetKind === "physical"
+
+            anchors {
+                top: rail.bottom
+                horizontalCenter: parent.horizontalCenter
+                topMargin: 6
+            }
+
+            width:
+                Math.min(
+                    parent.width,
+                    Math.max(
+                        88,
+                        physicalLabel.implicitWidth + 20
+                    )
+                )
+
+            height: 26
+            radius: 13
+
+            color: Md3Theme.surfaceContainerHigh
+
+            border.width: 1
+            border.color: Md3Theme.outlineVariant
+
+            Text {
+                id: physicalLabel
+
+                anchors {
+                    fill: parent
+                    leftMargin: 10
+                    rightMargin: 10
+                }
+
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+
+                text: root.displayName
+                color: Md3Theme.surfaceVariantContent
+
+                font.pixelSize: 10
+                font.weight: Font.Medium
+
+                elide: Text.ElideMiddle
             }
         }
     }
