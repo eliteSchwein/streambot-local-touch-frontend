@@ -68,10 +68,10 @@ Item {
             String(name ?? "").trim().toLowerCase()
 
         if (normalized === "alert")
-            return "bell-outline"
+            return "alert-circle-outline"
 
         if (normalized === "tts")
-            return "account-voice"
+            return "message-text-outline"
 
         if (normalized === "music")
             return "music"
@@ -470,20 +470,21 @@ Item {
         anchors {
             top: parent.top
             horizontalCenter: parent.horizontalCenter
-            topMargin: 12
+            topMargin: 14
         }
 
-        width: Math.min(360, parent.width - 20)
-        height: 108
+        width: Math.min(340, parent.width - 20)
+        height:
+            root.targetKind === "physical"
+                ? 82
+                : 64
 
-        radius: Md3Theme.radiusLarge
+        radius: 24
         color: Md3Theme.surfaceContainerHigh
 
         border.width: 1
         border.color: Md3Theme.outlineVariant
 
-        // Consume clicks on otherwise empty card space so the backdrop does
-        // not dismiss while interacting with the OSD itself.
         MouseArea {
             anchors.fill: parent
         }
@@ -491,56 +492,45 @@ Item {
         ColumnLayout {
             anchors {
                 fill: parent
-                margins: 9
+                leftMargin: 12
+                rightMargin: 12
+                topMargin: 9
+                bottomMargin: 9
             }
 
-            spacing: 5
+            spacing: 4
+
+            Text {
+                visible: root.targetKind === "physical"
+
+                Layout.fillWidth: true
+                Layout.preferredHeight: visible ? 16 : 0
+
+                text: root.displayName
+                color: Md3Theme.surfaceVariantContent
+
+                font.pixelSize: 11
+                font.weight: Font.Medium
+
+                elide: Text.ElideRight
+            }
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 27
-                spacing: 7
+                Layout.fillHeight: true
 
-                MdiIcon {
-                    name: root.iconType
-                    size: 21
-                }
-
-                Text {
-                    Layout.fillWidth: true
-
-                    text: root.displayName
-                    color: Md3Theme.surfaceContent
-
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-
-                    elide: Text.ElideRight
-                }
-
-                Text {
-                    text: root.percent + "%"
-                    color: Md3Theme.surfaceContent
-
-                    font.pixelSize: 13
-                    font.weight: Font.Bold
-                }
+                spacing: 8
 
                 Rectangle {
-                    Layout.preferredWidth: 28
-                    Layout.preferredHeight: 28
+                    Layout.preferredWidth: 34
+                    Layout.preferredHeight: 34
 
-                    radius: 14
+                    radius: 17
 
                     color:
-                        root.muted
-                            ? Md3Theme.primary
-                            : muteTap.pressed
-                                ? Md3Theme.surfaceContainerHigh
-                                : Md3Theme.surfaceContainerHighest
-
-                    border.width: root.muted ? 0 : 1
-                    border.color: Md3Theme.outlineVariant
+                        muteTap.pressed
+                            ? Md3Theme.primaryContainer
+                            : Md3Theme.surfaceContainerHighest
 
                     MdiIcon {
                         anchors.centerIn: parent
@@ -548,10 +538,9 @@ Item {
                         name:
                             root.muted
                                 ? "volume-off"
-                                : "volume-high"
+                                : root.iconType
 
-                        size: 17
-                        selected: root.muted
+                        size: 18
                     }
 
                     TapHandler {
@@ -563,127 +552,53 @@ Item {
                         }
                     }
                 }
-            }
 
-            Md3Slider {
-                id: volumeSlider
+                Md3Slider {
+                    id: volumeSlider
 
-                Layout.fillWidth: true
-                Layout.preferredHeight: 26
-
-                from: root.minVolume
-                to: root.maxVolume
-                stepSize: root.stepVolume
-
-                value: root.volume
-                enabled: !root.muted
-
-                onMoved: {
-                    root.volume = value
-                    volumeSendTimer.restart()
-                    root.restartHideTimer()
-                }
-
-                onPressedChanged: {
-                    root.interacting = pressed
-
-                    if (pressed) {
-                        hideTimer.stop()
-                        return
-                    }
-
-                    volumeSendTimer.stop()
-                    root.setVolume(value)
-                    root.restartHideTimer()
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 28
-                spacing: 7
-
-                Rectangle {
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 28
-                    radius: 14
-
-                    color:
-                        minusTap.pressed
-                            ? Md3Theme.surfaceContainerHigh
-                            : Md3Theme.surfaceContainerHighest
-
-                    border.width: 1
-                    border.color: Md3Theme.outlineVariant
-
-                    opacity: root.muted ? 0.45 : 1
-
-                    MdiIcon {
-                        anchors.centerIn: parent
-                        name: "minus"
-                        size: 17
-                    }
-
-                    TapHandler {
-                        id: minusTap
-                        enabled: !root.muted
-
-                        onTapped: {
-                            root.stepVolume(-1)
-                            root.restartHideTimer()
-                        }
-                    }
-                }
-
-                Item {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: 30
+
+                    from: root.minVolume
+                    to: root.maxVolume
+                    stepSize: root.stepVolume
+
+                    value: root.volume
+                    enabled: true
+
+                    onMoved: {
+                        root.volume = value
+                        root.muted =
+                            value <= root.minVolume
+
+                        volumeSendTimer.restart()
+                        root.restartHideTimer()
+                    }
+
+                    onPressedChanged: {
+                        root.interacting = pressed
+
+                        if (pressed) {
+                            hideTimer.stop()
+                            return
+                        }
+
+                        volumeSendTimer.stop()
+                        root.setVolume(value)
+                        root.restartHideTimer()
+                    }
                 }
 
                 Text {
-                    text:
-                        root.muted
-                            ? "0%"
-                            : root.percent + "%"
+                    Layout.preferredWidth: 42
 
-                    color: Md3Theme.surfaceVariantContent
-                    font.pixelSize: 11
-                    font.weight: Font.Medium
-                }
+                    horizontalAlignment: Text.AlignRight
 
-                Item {
-                    Layout.fillWidth: true
-                }
+                    text: root.percent + "%"
+                    color: Md3Theme.surfaceContent
 
-                Rectangle {
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 28
-                    radius: 14
-
-                    color:
-                        plusTap.pressed
-                            ? Md3Theme.surfaceContainerHigh
-                            : Md3Theme.surfaceContainerHighest
-
-                    border.width: 1
-                    border.color: Md3Theme.outlineVariant
-
-                    opacity: root.muted ? 0.45 : 1
-
-                    MdiIcon {
-                        anchors.centerIn: parent
-                        name: "plus"
-                        size: 17
-                    }
-
-                    TapHandler {
-                        id: plusTap
-                        enabled: !root.muted
-
-                        onTapped: {
-                            root.stepVolume(1)
-                            root.restartHideTimer()
-                        }
-                    }
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
                 }
             }
         }
@@ -692,7 +607,7 @@ Item {
     Timer {
         id: hideTimer
 
-        interval: 8000
+        interval: 4500
         repeat: false
 
         onTriggered: {
