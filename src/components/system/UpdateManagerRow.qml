@@ -46,7 +46,7 @@ Rectangle {
 
         MdiIcon {
             name: root.manager.type === "git"
-                ? "source-branch"
+                ? "git"
                 : "package-variant"
             size: 18
         }
