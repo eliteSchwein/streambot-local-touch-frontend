@@ -136,6 +136,7 @@
   "system_rotating_scene_used": "Belegt durch Szenenwechsel",
   "system_auto_macro_used": "Belegt durch Auto-Makros",
   "system_asset_config_used": "Von Asset-Konfigurationen verwendet",
+  "system_tts_used": "Belegt durch TTS",
   "system_ollama_used": "Belegt durch Ollama",
   "system_updates": "Updates",
   "system_updates_refresh": "Updates neu prüfen",

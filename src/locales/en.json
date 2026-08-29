@@ -136,6 +136,7 @@
   "system_rotating_scene_used": "Used by Scene rotation",
   "system_auto_macro_used": "Used by Auto Macros",
   "system_asset_config_used": "Used by asset configs",
+  "system_tts_used": "Used by TTS",
   "system_ollama_used": "Used by Ollama",
   "system_updates": "Updates",
   "system_updates_refresh": "Refresh update check",

@@ -143,6 +143,14 @@ Rectangle {
                 "#CDDC39"
             ],
             [
+                "system_tts_used",
+                firstNumber([
+                    f.tts,
+                    s.ttsUsed
+                ]),
+                "#673AB7"
+            ],
+            [
                 "system_ollama_used",
                 firstNumber([
                     f.ollama,
