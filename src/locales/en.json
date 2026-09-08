@@ -101,6 +101,7 @@
   "connect_stage_loading_cache": "Loading cache…",
   "connect_stage_loading_variables": "Loading variables…",
   "connect_stage_loading_web_components": "Loading web components…",
+  "loading_integrations": "Loading integrations…",
   "connect_stage_starting_ollama": "Starting Ollama…",
   "connect_stage_loading_system_components": "Loading system components…",
   "connect_stage_starting_twitch_bot": "Starting Twitch bot…",
