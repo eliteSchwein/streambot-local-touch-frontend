@@ -160,5 +160,8 @@
   "speedtest_stage_upload": "Upload",
   "speedtest_stage_finished": "Fertig",
   "speedtest_stage_error": "Fehler",
-  "speedtest_start": "Speedtest starten"
+  "speedtest_start": "Speedtest starten",
+  "system_updates_updating": "Wird aktualisiert…",
+  "system_updates_backend_blocked": "Das Backend-Update ist blockiert, bis andere Updates abgeschlossen sind",
+  "system_updates_blocked_by_backend": "Blockiert, solange das Backend-Update läuft"
 }

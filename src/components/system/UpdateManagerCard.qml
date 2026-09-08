@@ -106,6 +106,7 @@ Rectangle {
                 width: listView.width
                 managerName: modelData.name
                 manager: modelData.manager
+                allManagers: root.managers
                 websocket: root.websocket
                 i18n: root.i18n
             }

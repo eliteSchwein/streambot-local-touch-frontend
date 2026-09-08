@@ -6,8 +6,32 @@ Rectangle {
     id: root
     required property string managerName
     required property var manager
+    required property var allManagers
     required property var websocket
     required property var i18n
+
+    readonly property bool backendUpdating:
+        allManagers?.backend?.updating === true
+
+    readonly property bool anotherManagerUpdating: {
+        const src = allManagers ?? ({})
+        for (const name in src) {
+            if (name !== managerName && src[name]?.updating === true)
+                return true
+        }
+        return false
+    }
+
+    readonly property bool blockedByUpdate:
+        managerName === "backend"
+            ? anotherManagerUpdating
+            : backendUpdating
+
+    readonly property bool canUpdate:
+        manager.update_available === true
+        && manager.checking !== true
+        && manager.updating !== true
+        && !blockedByUpdate
 
     implicitHeight:
             managerName === "system"
@@ -69,19 +93,25 @@ Rectangle {
                     implicitWidth: statusText.implicitWidth + 14
                     implicitHeight: 20
                     radius: 10
-                    color: root.manager.update_available === true
-                        ? Md3Theme.error
-                        : Md3Theme.surfaceContainerHighest
+                    color: root.manager.updating === true
+                        ? Md3Theme.primary
+                        : root.manager.update_available === true
+                            ? Md3Theme.error
+                            : Md3Theme.surfaceContainerHighest
 
                     Text {
                         id: statusText
                         anchors.centerIn: parent
-                        text: root.manager.update_available === true
-                            ? root.i18n.text("system_updates_available")
-                            : root.i18n.text("system_updates_up_to_date")
-                        color: root.manager.update_available === true
-                            ? Md3Theme.errorContent
-                            : Md3Theme.surfaceVariantContent
+                        text: root.manager.updating === true
+                            ? root.i18n.text("system_updates_updating")
+                            : root.manager.update_available === true
+                                ? root.i18n.text("system_updates_available")
+                                : root.i18n.text("system_updates_up_to_date")
+                        color: root.manager.updating === true
+                            ? Md3Theme.primaryContent
+                            : root.manager.update_available === true
+                                ? Md3Theme.errorContent
+                                : Md3Theme.surfaceVariantContent
                         font.pixelSize: 12
                         font.weight: Font.DemiBold
                     }
@@ -121,41 +151,44 @@ Rectangle {
 
         Rectangle {
             implicitWidth: 72
+            width: 72
             implicitHeight: 28
+            height: 28
             radius: 14
-            color:
-                    root.manager.update_available === true
-                && !root.manager.checking
-                && !root.manager.updating
+            color: root.canUpdate
                 ? Md3Theme.primary
                 : Md3Theme.surfaceContainerHighest
-            opacity:
-                    root.manager.update_available === true
-                && !root.manager.checking
-                && !root.manager.updating
-                ? 1
-                : 0.55
+            opacity: root.canUpdate ? 1 : 0.55
 
             Text {
                 anchors.centerIn: parent
-                text: root.manager.updating
-                    ? "…"
-                    : root.i18n.text("system_updates_update")
-                color:
-                        root.manager.update_available === true
-                    && !root.manager.checking
-                    && !root.manager.updating
+                visible: root.manager.updating !== true
+                text: root.i18n.text("system_updates_update")
+                color: root.canUpdate
                     ? Md3Theme.primaryContent
                     : Md3Theme.surfaceVariantContent
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
             }
 
+            MdiIcon {
+                anchors.centerIn: parent
+                visible: root.manager.updating === true
+                name: "loading"
+                size: 16
+                color: Md3Theme.primary
+
+                RotationAnimator on rotation {
+                    from: 0
+                    to: 360
+                    duration: 900
+                    loops: Animation.Infinite
+                    running: root.manager.updating === true
+                }
+            }
+
             TapHandler {
-                enabled:
-                    root.manager.update_available === true
-                    && !root.manager.checking
-                    && !root.manager.updating
+                enabled: root.canUpdate
                 onTapped: root.websocket.sendRpc(
                     "update",
                     { name: root.managerName }
