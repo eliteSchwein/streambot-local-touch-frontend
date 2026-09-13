@@ -10,8 +10,6 @@ Md3Card {
     required property var store
     required property var websocket
 
-    title: root.i18n.text("interactions")
-
     function sourceLabel(source) {
         switch (String(source ?? "other")) {
         case "command":
