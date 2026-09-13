@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 
 import "../components/channelpoints"
 import "../components/md3"
@@ -10,12 +11,37 @@ Item {
     required property var websocket
     required property var store
 
+    property string searchQuery: ""
+
     function sortedPoints() {
         const result = Array.from(
             store.channelPoints ?? []
         )
 
-        result.sort(
+        const query =
+            String(searchQuery)
+                .trim()
+                .toLowerCase()
+
+        const filtered = result.filter(point => {
+            if (query === "")
+                return true
+
+            const values = [
+                point?.label,
+                point?.name,
+                point?.twitch_label,
+                point?.twitch_name
+            ]
+
+            return values.some(value =>
+                String(value ?? "")
+                    .toLowerCase()
+                    .includes(query)
+            )
+        })
+
+        filtered.sort(
             (a, b) =>
                 String(
                     a.label
@@ -30,58 +56,97 @@ Item {
                 )
         )
 
-        return result
+        return filtered
     }
 
     readonly property var points:
         sortedPoints()
 
-    Text {
-        anchors.centerIn: parent
-
-        visible:
-            root.points.length === 0
-
-        text:
-            root.i18n.text(
-                "channel_points_empty"
-            )
-
-        color:
-            Md3Theme.surfaceVariantContent
-
-        font.pixelSize: 14
-        font.weight: Font.Medium
-    }
-
-    ListView {
-        id: list
-
+    ColumnLayout {
         anchors.fill: parent
         anchors.margins: 10
 
-        visible:
-            root.points.length > 0
+        spacing: 8
 
-        clip: true
-        spacing: 6
+        Md3TextField {
+            id: searchField
 
-        model:
-            root.points
+            Layout.fillWidth: true
+            Layout.preferredHeight: 44
 
-        delegate: ChannelPointToggleRow {
-            required property var modelData
+            placeholderText:
+                root.i18n.text(
+                    "channel_points_search"
+                )
 
-            width: list.width
+            text: root.searchQuery
 
-            channelPoint:
-                modelData
+            backgroundColor: Qt.rgba(
+                Md3Theme.surfaceContainerHighest.r,
+                Md3Theme.surfaceContainerHighest.g,
+                Md3Theme.surfaceContainerHighest.b,
+                0.88
+            )
 
-            websocket:
-                root.websocket
+            onTextChanged:
+                root.searchQuery = text
+        }
 
-            i18n:
-                root.i18n
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            Text {
+                anchors.centerIn: parent
+
+                visible:
+                    root.points.length === 0
+
+                text:
+                    root.searchQuery.trim() !== ""
+                    ? root.i18n.text(
+                        "channel_points_no_results"
+                    )
+                    : root.i18n.text(
+                        "channel_points_empty"
+                    )
+
+                color:
+                    Md3Theme.surfaceVariantContent
+
+                font.pixelSize: 14
+                font.weight: Font.Medium
+            }
+
+            ListView {
+                id: list
+
+                anchors.fill: parent
+
+                visible:
+                    root.points.length > 0
+
+                clip: true
+                spacing: 6
+
+                model:
+                    root.points
+
+                delegate: ChannelPointToggleRow {
+                    required property var modelData
+
+                    width: list.width
+
+                    channelPoint:
+                        modelData
+
+                    websocket:
+                        root.websocket
+
+                    i18n:
+                        root.i18n
+                }
+            }
         }
     }
 }

@@ -3,7 +3,7 @@ import QtQuick.Layouts
 
 import "../md3"
 
-Rectangle {
+Item {
     id: root
 
     required property var channelPoint
@@ -34,11 +34,14 @@ Rectangle {
 
     implicitHeight: 58
 
-    radius: Md3Theme.radiusMedium
-    color: Md3Theme.surfaceContainer
-
-    border.width: 1
-    border.color: Md3Theme.outlineVariant
+    Md3GlassSurface {
+        anchors.fill: parent
+        tintColor: Md3Theme.surfaceContainer
+        tintOpacity: 0.88
+        radius: Md3Theme.radiusMedium
+        borderColor: Md3Theme.outlineVariant
+        borderWidth: 1
+    }
 
     function toggle() {
         if (

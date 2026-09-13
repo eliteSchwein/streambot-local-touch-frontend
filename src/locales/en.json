@@ -94,6 +94,8 @@
   "macro_no_results": "No macros found",
   "macro_run_failed": "Macro failed",
   "channel_points": "Channel points",
+  "channel_points_search": "Search channel points",
+  "channel_points_no_results": "No channel points found",
   "channel_points_empty": "No channel points available",
   "channel_point_toggle_failed": "Failed to toggle channel point",
   "power_menu": "Power menu",
