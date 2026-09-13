@@ -261,13 +261,13 @@ Item {
                     Md3Theme.surfaceContainerHigh.r,
                     Md3Theme.surfaceContainerHigh.g,
                     Md3Theme.surfaceContainerHigh.b,
-                    0.82
+                    0.92
                 )
                 : Qt.rgba(
                     Md3Theme.surfaceContainer.r,
                     Md3Theme.surfaceContainer.g,
                     Md3Theme.surfaceContainer.b,
-                    0.78
+                    0.88
                 )
 
         border.width: 1

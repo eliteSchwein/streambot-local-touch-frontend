@@ -78,7 +78,7 @@ Md3Card {
                         Md3Theme.surfaceContainerHighest.r,
                         Md3Theme.surfaceContainerHighest.g,
                         Md3Theme.surfaceContainerHighest.b,
-                        0.58
+                        0.88
                     )
                 }
 
@@ -101,7 +101,7 @@ Md3Card {
                         Md3Theme.surfaceContainerHigh.r,
                         Md3Theme.surfaceContainerHigh.g,
                         Md3Theme.surfaceContainerHigh.b,
-                        0.48
+                        0.72
                     )
 
                     opacity:

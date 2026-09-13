@@ -89,7 +89,7 @@ Rectangle {
             Md3Theme.surfaceContainer.r,
             Md3Theme.surfaceContainer.g,
             Md3Theme.surfaceContainer.b,
-            0.68
+            0.82
         )
 
     border.width: 1
