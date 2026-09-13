@@ -37,7 +37,8 @@ Item {
     Md3GlassSurface {
         anchors.fill: parent
         tintColor: Md3Theme.surfaceContainer
-        tintOpacity: 0.88
+        tintOpacity: 0.94
+        blurEnabled: false
         radius: Md3Theme.radiusMedium
         borderColor: Md3Theme.outlineVariant
         borderWidth: 1

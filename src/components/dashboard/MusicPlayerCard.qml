@@ -18,6 +18,7 @@ Rectangle {
         anchors.fill: parent
         tintColor: Md3Theme.surfaceContainer
         tintOpacity: 0.88
+        blurEnabled: true
         radius: root.radius
     }
 

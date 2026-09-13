@@ -15,7 +15,8 @@ Rectangle {
     Md3GlassSurface {
         anchors.fill: parent
         tintColor: Md3Theme.surfaceContainer
-        tintOpacity: 0.88
+        tintOpacity: 0.94
+        blurEnabled: false
         radius: root.radius
     }
 

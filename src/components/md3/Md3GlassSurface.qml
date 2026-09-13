@@ -5,7 +5,8 @@ Item {
     id: root
 
     property color tintColor: Md3Theme.surfaceContainer
-    property real tintOpacity: 0.88
+    property real tintOpacity: 0.94
+    property bool blurEnabled: false
     property real blurAmount: 0.42
     property int blurMaximum: 32
     property real radius: Md3Theme.radiusLarge
@@ -33,7 +34,7 @@ Item {
         id: backdropViewport
         anchors.fill: parent
         clip: true
-        visible: root.hasWallpaper
+        visible: root.blurEnabled && root.hasWallpaper
 
         Image {
             id: localWallpaper
@@ -75,8 +76,8 @@ Item {
     MultiEffect {
         anchors.fill: parent
         source: backdropSource
-        visible: root.hasWallpaper
-        blurEnabled: root.hasWallpaper
+        visible: root.blurEnabled && root.hasWallpaper
+        blurEnabled: root.blurEnabled && root.hasWallpaper
         blur: root.blurAmount
         blurMax: root.blurMaximum
         autoPaddingEnabled: false

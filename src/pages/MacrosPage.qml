@@ -77,7 +77,7 @@ Item {
                 Md3Theme.surfaceContainerHighest.r,
                 Md3Theme.surfaceContainerHighest.g,
                 Md3Theme.surfaceContainerHighest.b,
-                0.68
+                0.94
             )
 
             onTextChanged:
