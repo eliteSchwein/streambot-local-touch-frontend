@@ -74,7 +74,12 @@ Md3Card {
                     anchors.fill: parent
 
                     radius: Md3Theme.radiusMedium
-                    color: Md3Theme.surfaceContainerHighest
+                    color: Qt.rgba(
+                        Md3Theme.surfaceContainerHighest.r,
+                        Md3Theme.surfaceContainerHighest.g,
+                        Md3Theme.surfaceContainerHighest.b,
+                        0.72
+                    )
                 }
 
                 // Whole-row progress background.
@@ -96,7 +101,7 @@ Md3Card {
 
                     opacity:
                         modelData.enabled
-                        ? 0.95
+                        ? 0.72
                         : 0
 
                     Behavior on width {

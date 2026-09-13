@@ -16,7 +16,12 @@ Rectangle {
     implicitHeight: 54
 
     radius: Md3Theme.radiusMedium
-    color: Md3Theme.surfaceContainer
+    color: Qt.rgba(
+            Md3Theme.surfaceContainer.r,
+            Md3Theme.surfaceContainer.g,
+            Md3Theme.surfaceContainer.b,
+            0.78
+        )
 
     border.width: 1
     border.color: Md3Theme.outlineVariant

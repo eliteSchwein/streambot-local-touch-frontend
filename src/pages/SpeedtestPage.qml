@@ -257,8 +257,18 @@ Item {
 
         color:
             metric.active
-                ? Md3Theme.surfaceContainerHigh
-                : Md3Theme.surfaceContainer
+                ? Qt.rgba(
+                    Md3Theme.surfaceContainerHigh.r,
+                    Md3Theme.surfaceContainerHigh.g,
+                    Md3Theme.surfaceContainerHigh.b,
+                    0.82
+                )
+                : Qt.rgba(
+                    Md3Theme.surfaceContainer.r,
+                    Md3Theme.surfaceContainer.g,
+                    Md3Theme.surfaceContainer.b,
+                    0.78
+                )
 
         border.width: 1
         border.color:
