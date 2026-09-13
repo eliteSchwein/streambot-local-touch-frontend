@@ -277,7 +277,7 @@ Rectangle {
 
                 Md3Switch {
                     checked:
-                        root.music.songrequest
+                        !!root.music.songrequest
                         && root.music.songrequest.enabled === true
 
                     onClicked:

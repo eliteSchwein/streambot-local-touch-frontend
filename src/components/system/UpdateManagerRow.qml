@@ -45,6 +45,22 @@ Rectangle {
         ? Md3Theme.surfaceContainerHigh
         : "transparent"
 
+
+    function updatePreview() {
+        if (!Array.isArray(root.manager.updates) || root.manager.updates.length === 0)
+            return ""
+
+        const updates = root.manager.updates
+        const preview = updates.slice(0, 3)
+            .map(p => p && p.package ? p.package : "")
+            .filter(name => name.length > 0)
+            .join(", ")
+
+        return preview + (updates.length > 3
+            ? " +" + (updates.length - 3)
+            : "")
+    }
+
     function versionText() {
         if (managerName === "system") {
             const c = Array.isArray(manager.updates)
@@ -136,13 +152,7 @@ Rectangle {
                     root.managerName === "system"
                     && Array.isArray(root.manager.updates)
                     && root.manager.updates.length > 0
-                text:
-                    root.manager.updates.slice(0, 3)
-                        .map(p => p.package)
-                        .join(", ")
-                    + (root.manager.updates.length > 3
-                        ? " +" + (root.manager.updates.length - 3)
-                        : "")
+                text: root.updatePreview()
                 color: Md3Theme.surfaceVariantContent
                 font.pixelSize: 12
                 elide: Text.ElideRight
@@ -174,7 +184,7 @@ Rectangle {
             MdiIcon {
                 anchors.centerIn: parent
                 visible: root.manager.updating === true
-                name: "loading"
+                name: "refresh"
                 size: 16
                 NumberAnimation on rotation {
                     from: 0
