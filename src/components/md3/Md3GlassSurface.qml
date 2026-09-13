@@ -5,11 +5,9 @@ Rectangle {
 
     property color tintColor: Md3Theme.surfaceContainer
     property real tintOpacity: 0.94
-    property real radius: Md3Theme.radiusLarge
     property color borderColor: Md3Theme.outlineVariant
     property real borderWidth: 1
-
-    radius: root.radius
+    radius: Md3Theme.radiusLarge
     color: Qt.rgba(
         root.tintColor.r,
         root.tintColor.g,
