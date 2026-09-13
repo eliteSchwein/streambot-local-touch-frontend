@@ -5,3 +5,5 @@ WsClient 1.0 WsClient.qml
 singleton KeyboardController 1.0 KeyboardController.qml
 DashboardStore 1.0 DashboardStore.qml
 BackendStatus 1.0 BackendStatus.qml
+
+ThemeManager 1.0 ThemeManager.qml

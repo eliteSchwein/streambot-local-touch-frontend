@@ -27,6 +27,25 @@ QtObject {
     property int websocketPort: 8100
     property int restPort: 8105
     property string language: "en"
+    property string touchWallpaper: ""
+
+    readonly property string assetRootPath:
+        homePath + "/.config/streambot/assets"
+
+    readonly property string touchWallpaperPath: {
+        const value = String(touchWallpaper ?? "").trim().replace(/\\/g, "/")
+        if (value === "")
+            return ""
+
+        const normalized = value.replace(/^\/+/, "")
+        if (normalized === "" || normalized.split("/").includes(".."))
+            return ""
+
+        return assetRootPath + "/" + normalized
+    }
+
+    readonly property string touchWallpaperUrl:
+        touchWallpaperPath === "" ? "" : "file://" + touchWallpaperPath
 
     readonly property string websocketUrl:
         "ws://" + host + ":" + websocketPort
@@ -175,6 +194,7 @@ QtObject {
 
     function loadSharedSettings() {
         language = "en"
+        touchWallpaper = ""
 
         if (!settingsFile.loaded)
             return
@@ -188,6 +208,9 @@ QtObject {
             ) {
                 language = data.language
             }
+
+            if (typeof data.touch_wallpaper === "string")
+                touchWallpaper = data.touch_wallpaper.trim()
         } catch (error) {
             console.warn(
                 "[config] failed to parse streambot-settings.json:",
@@ -195,4 +218,25 @@ QtObject {
             )
         }
     }
+    function handleMessage(data) {
+        if (!data || data.method !== "notify_settings_update")
+            return
+
+        const params = data.params
+        if (!params || typeof params !== "object")
+            return
+
+        const settings =
+            params.system_config
+            && typeof params.system_config === "object"
+            ? params.system_config
+            : params
+
+        if (typeof settings.language === "string" && settings.language.trim() !== "")
+            language = settings.language.trim()
+
+        if (typeof settings.touch_wallpaper === "string")
+            touchWallpaper = settings.touch_wallpaper.trim()
+    }
+
 }

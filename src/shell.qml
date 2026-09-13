@@ -46,6 +46,11 @@ ShellRoot {
         id: dashboardStore
     }
 
+    ThemeManager {
+        id: themeManager
+        wallpaperPath: config.touchWallpaperPath
+    }
+
     IpcHandler {
         target: "streambot-touch"
 
@@ -58,6 +63,7 @@ ShellRoot {
         target: websocket
 
         function onJsonReceived(data) {
+            config.handleMessage(data)
             dashboardStore.handleMessage(data)
         }
     }
@@ -75,13 +81,35 @@ ShellRoot {
         exclusionMode: ExclusionMode.Ignore
         color: Md3Theme.background
 
+        Image {
+            id: touchWallpaper
+            anchors.fill: parent
+            visible: config.touchWallpaperUrl !== ""
+            source: config.touchWallpaperUrl
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            cache: false
+        }
+
+        Rectangle {
+            id: wallpaperTint
+            anchors.fill: parent
+            visible: touchWallpaper.visible
+            color: Qt.rgba(
+                Md3Theme.background.r,
+                Md3Theme.background.g,
+                Md3Theme.background.b,
+                0.40
+            )
+        }
+
         Rectangle {
             id: appRoot
 
             property int currentPage: 0
 
             anchors.fill: parent
-            color: Md3Theme.background
+            color: touchWallpaper.visible ? "transparent" : Md3Theme.background
 
             DashboardPage {
                 id: dashboardPage

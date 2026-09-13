@@ -36,7 +36,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: quickshell, qml6-module-qtwebsockets, network-manager, qrencode, iproute2, python3
+Depends: quickshell, qml6-module-qtwebsockets, network-manager, qrencode, iproute2, python3, matugen
 Maintainer: Thomas Ludwig
 Description: Streambot Touch Quickshell interface
  Touch interface for Streambot using Quickshell.
@@ -49,6 +49,10 @@ install -Dm755 \
 install -Dm755 \
     "$PROJECT_ROOT/helper/power_key_listener.py" \
     "$PACKAGE_ROOT/usr/lib/streambot-touch/power-key-listener"
+
+install -Dm755 \
+    "$PROJECT_ROOT/helper/generate_theme.sh" \
+    "$PACKAGE_ROOT/usr/lib/streambot-touch/generate-theme"
 
 cp -a \
     "$PROJECT_ROOT/src/." \

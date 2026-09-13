@@ -128,7 +128,9 @@ install_packages() {
     libegl-mesa0 \
     libgles2 \
     swayidle \
-    wtype     python3
+    wtype \
+    python3 \
+    matugen
 
   status_msg "Install Quickshell from Trixie Backports"
 
