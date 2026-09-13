@@ -9,8 +9,6 @@ Md3Card {
     required property var i18n
     required property var store
     required property var websocket
-
-    backgroundBlur: true
     backgroundOpacity: 0.88
 
     title: ""

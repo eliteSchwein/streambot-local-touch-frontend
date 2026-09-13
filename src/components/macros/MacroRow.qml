@@ -20,7 +20,6 @@ Item {
         radius: Md3Theme.radiusMedium
         tintColor: Md3Theme.surfaceContainer
         tintOpacity: 0.94
-        blurEnabled: false
     }
 
     function triggerMacro() {

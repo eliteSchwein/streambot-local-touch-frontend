@@ -9,7 +9,6 @@ Item {
     property color backgroundColor: Md3Theme.surfaceContainer
     property real backgroundOpacity: 0.94
     property real radius: Md3Theme.radiusLarge
-    property bool backgroundBlur: false
 
     default property alias content: contentColumn.data
 
@@ -19,7 +18,6 @@ Item {
         anchors.fill: parent
         tintColor: root.backgroundColor
         tintOpacity: root.backgroundOpacity
-        blurEnabled: root.backgroundBlur
         radius: root.radius
     }
 
