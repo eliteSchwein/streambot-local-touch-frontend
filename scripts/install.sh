@@ -103,26 +103,6 @@ EOF
 }
 
 
-setup_matugen_repo() {
-  status_msg "Enable DankLinux Matugen repo"
-
-  sudo install -d -m 0755 /etc/apt/keyrings
-
-  curl -fsSL \
-    https://download.opensuse.org/repositories/home:/AvengeMedia:/danklinux/Debian_13/Release.key \
-    | sudo gpg --dearmor --yes -o /etc/apt/keyrings/danklinux.gpg
-
-  sudo tee /etc/apt/sources.list.d/danklinux.sources >/dev/null <<'EOF'
-Types: deb
-URIs: https://download.opensuse.org/repositories/home:/AvengeMedia:/danklinux/Debian_13/
-Suites: /
-Signed-By: /etc/apt/keyrings/danklinux.gpg
-EOF
-
-  sudo apt update
-
-  ok_msg "DankLinux Matugen repo enabled"
-}
 
 setup_custom_apt_repo() {
   status_msg "Enable tludwig dev repo"
@@ -169,17 +149,16 @@ install_packages() {
   sudo systemctl enable --now seatd
 }
 
+
 install_matugen() {
   status_msg "Install Matugen"
 
-  sudo apt-get -y install --no-install-recommends matugen
-
-  if ! command -v matugen >/dev/null 2>&1; then
-    warn_msg "Matugen package installed but matugen is not in PATH."
-    exit 1
+  if [[ -x "$SCRIPTPATH/install-matugen.sh" ]]; then
+    "$SCRIPTPATH/install-matugen.sh"
+  else
+    warn_msg "install-matugen.sh not found or not executable."
+    warn_msg "Continuing with the built-in fallback colors."
   fi
-
-  ok_msg "Matugen installed: $(matugen --version 2>/dev/null || command -v matugen)"
 }
 
 cleanup_squeekboard() {
@@ -242,7 +221,6 @@ questions
 setup_apt_dependencies
 setup_backports_repo
 setup_custom_apt_repo
-setup_matugen_repo
 install_matugen
 install_packages
 cleanup_squeekboard

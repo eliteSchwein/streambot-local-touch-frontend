@@ -15,6 +15,7 @@ trap cleanup EXIT
 
 files=(
     install.sh
+    install-matugen.sh
     generateService.sh
     StreambotTouch.service
     installLabwcConfig.sh
