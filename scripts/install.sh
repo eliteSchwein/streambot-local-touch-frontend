@@ -129,8 +129,7 @@ install_packages() {
     libgles2 \
     swayidle \
     wtype \
-    python3 \
-    matugen
+    python3
 
   status_msg "Install Quickshell from Trixie Backports"
 
@@ -145,6 +144,33 @@ install_packages() {
   status_msg "Enable seatd service"
 
   sudo systemctl enable --now seatd
+}
+
+install_matugen() {
+  if command -v matugen >/dev/null 2>&1; then
+    ok_msg "Matugen already installed: $(command -v matugen)"
+    return
+  fi
+
+  status_msg "Install Matugen"
+
+  sudo apt-get -y install --no-install-recommends \
+    cargo \
+    rustc \
+    build-essential \
+    pkg-config \
+    libssl-dev
+
+  # Debian does not ship a matugen package. Install the Rust crate system-wide
+  # so the Quickshell session can always find /usr/local/bin/matugen.
+  sudo cargo install --locked --root /usr/local matugen
+
+  if ! command -v matugen >/dev/null 2>&1; then
+    warn_msg "Matugen installation completed but matugen is not in PATH."
+    exit 1
+  fi
+
+  ok_msg "Matugen installed: $(matugen --version 2>/dev/null || command -v matugen)"
 }
 
 cleanup_squeekboard() {
@@ -208,6 +234,7 @@ setup_apt_dependencies
 setup_backports_repo
 setup_custom_apt_repo
 install_packages
+install_matugen
 cleanup_squeekboard
 modify_user
 install_networkmanager_polkit

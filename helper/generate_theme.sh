@@ -11,5 +11,16 @@ if [[ -z "$IMAGE" || ! -f "$IMAGE" ]]; then
 fi
 
 mkdir -p "$CACHE_DIR"
-matugen -c "$CONFIG" image "$IMAGE"
+
+MATUGEN_BIN="$(command -v matugen 2>/dev/null || true)"
+if [[ -z "$MATUGEN_BIN" && -x /usr/local/bin/matugen ]]; then
+    MATUGEN_BIN=/usr/local/bin/matugen
+fi
+
+if [[ -z "$MATUGEN_BIN" ]]; then
+    echo "matugen is not installed" >&2
+    exit 1
+fi
+
+"$MATUGEN_BIN" -c "$CONFIG" image "$IMAGE"
 echo "generated palette from $IMAGE"
