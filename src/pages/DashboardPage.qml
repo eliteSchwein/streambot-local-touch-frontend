@@ -20,7 +20,7 @@ Item {
             Layout.fillHeight: true
             spacing: 8
 
-            AlertsCard {
+            InteractionsCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.preferredHeight: parent.height * 0.66

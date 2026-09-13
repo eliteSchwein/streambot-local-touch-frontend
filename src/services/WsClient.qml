@@ -10,8 +10,8 @@ QtObject {
     property bool enabled: true
 
     property var endpoints: [
-        "notify_alert",
-        "notify_alert_query",
+        "notify_interaction",
+        "notify_interaction_queue",
         "notify_music_update",
         "notify_playlist_update",
         "notify_music_cava",

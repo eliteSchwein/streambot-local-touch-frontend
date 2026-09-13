@@ -11,8 +11,7 @@ QtObject {
     property var macros: ({})
     property var channelPoints: []
     property var activeChannelPoints: []
-    property var alertQueue: []
-    property var activeAlert: null
+    property var interactions: []
     property var updateManager: ({})
     property var systemStorage: null
 
@@ -93,22 +92,12 @@ QtObject {
             )
             break
 
-        case "notify_alert_query":
-            alertQueue = Array.isArray(params) ? params : []
+        case "notify_interaction_queue":
+            interactions = Array.isArray(params) ? params : []
             break
 
-        case "notify_alert":
-            if (params && params.action === "hide") {
-                if (
-                    activeAlert
-                    && activeAlert["event-uuid"]
-                    === params["event-uuid"]
-                ) {
-                    activeAlert = null
-                }
-            } else if (params) {
-                activeAlert = params
-            }
+        case "notify_interaction":
+            handleInteractionNotification(params)
             break
 
         case "notify_music_cava":
@@ -116,6 +105,50 @@ QtObject {
                 parseCava(String(params.raw ?? ""))
             break
         }
+    }
+
+    function handleInteractionNotification(params) {
+        if (!params || typeof params !== "object")
+            return
+
+        const action = String(params.action ?? "")
+        const interaction = params.interaction
+
+        if (!interaction || !interaction.uuid)
+            return
+
+        if (
+            action === "finish"
+            || action === "cancel"
+            || action === "failed"
+        ) {
+            interactions = interactions.filter(
+                item => item && item.uuid !== interaction.uuid
+            )
+            return
+        }
+
+        const next = interactions.slice()
+        const index = next.findIndex(
+            item => item && item.uuid === interaction.uuid
+        )
+
+        if (index >= 0) {
+            const merged = ({})
+            const current = next[index]
+
+            for (const key in current)
+                merged[key] = current[key]
+
+            for (const key in interaction)
+                merged[key] = interaction[key]
+
+            next[index] = merged
+        } else {
+            next.push(interaction)
+        }
+
+        interactions = next
     }
 
     function firstNumber(values) {
