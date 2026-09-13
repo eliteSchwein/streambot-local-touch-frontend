@@ -178,7 +178,7 @@ Rectangle {
                 size: 16
                 color: Md3Theme.primary
 
-                RotationAnimator on rotation {
+                NumberAnimation on rotation {
                     from: 0
                     to: 360
                     duration: 900
