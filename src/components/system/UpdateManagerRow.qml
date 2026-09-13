@@ -176,8 +176,6 @@ Rectangle {
                 visible: root.manager.updating === true
                 name: "loading"
                 size: 16
-                color: Md3Theme.primary
-
                 NumberAnimation on rotation {
                     from: 0
                     to: 360
