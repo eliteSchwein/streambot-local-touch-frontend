@@ -19,7 +19,7 @@ Item {
         anchors.fill: parent
         radius: Md3Theme.radiusMedium
         tintColor: Md3Theme.surfaceContainer
-        tintOpacity: 0.62
+        tintOpacity: 0.88
     }
 
     function triggerMacro() {

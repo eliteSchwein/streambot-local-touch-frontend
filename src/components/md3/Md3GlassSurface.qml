@@ -19,22 +19,47 @@ Item {
         && wallpaper.visible === true
         && wallpaper.source !== ""
 
+    readonly property point wallpaperOffset: {
+        if (!root.hasWallpaper)
+            return Qt.point(0, 0)
+
+        return root.mapToItem(root.wallpaper, 0, 0)
+    }
+
+    // Render the wallpaper again at the exact same window size/position, but
+    // inside a viewport the size of this card. This avoids sourceRect sampling
+    // bugs for delegates nested in ListViews and page layouts.
+    Item {
+        id: backdropViewport
+        anchors.fill: parent
+        clip: true
+        visible: root.hasWallpaper
+
+        Image {
+            id: localWallpaper
+
+            width: root.wallpaper ? root.wallpaper.width : 0
+            height: root.wallpaper ? root.wallpaper.height : 0
+
+            x: -root.wallpaperOffset.x
+            y: -root.wallpaperOffset.y
+
+            source: root.wallpaper ? root.wallpaper.source : ""
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            cache: true
+            smooth: true
+        }
+    }
+
     ShaderEffectSource {
         id: backdropSource
         anchors.fill: parent
-        sourceItem: root.wallpaper
+        sourceItem: backdropViewport
         live: true
-        hideSource: false
+        hideSource: true
         smooth: true
         visible: false
-
-        sourceRect: {
-            if (!root.hasWallpaper)
-                return Qt.rect(0, 0, 0, 0)
-
-            const point = root.mapToItem(root.wallpaper, 0, 0)
-            return Qt.rect(point.x, point.y, root.width, root.height)
-        }
     }
 
     Rectangle {
@@ -68,5 +93,6 @@ Item {
         opacity: root.hasWallpaper ? root.tintOpacity : 1
         border.width: root.borderWidth
         border.color: root.borderColor
+        antialiasing: true
     }
 }
