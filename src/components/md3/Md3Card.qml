@@ -1,26 +1,25 @@
 import QtQuick
 import QtQuick.Layouts
 
-Rectangle {
+Item {
     id: root
 
     property string title: ""
     property string subtitle: ""
+    property color backgroundColor: Md3Theme.surfaceContainer
+    property real backgroundOpacity: 0.88
+    property real radius: Md3Theme.radiusLarge
 
     default property alias content: contentColumn.data
 
-    radius: Md3Theme.radiusLarge
-    color: Qt.rgba(
-        Md3Theme.surfaceContainer.r,
-        Md3Theme.surfaceContainer.g,
-        Md3Theme.surfaceContainer.b,
-        0.88
-    )
-
-    border.width: 1
-    border.color: Md3Theme.outlineVariant
-
     implicitHeight: Math.max(100, contentColumn.implicitHeight + 28)
+
+    Md3GlassSurface {
+        anchors.fill: parent
+        tintColor: root.backgroundColor
+        tintOpacity: root.backgroundOpacity
+        radius: root.radius
+    }
 
     ColumnLayout {
         id: contentColumn

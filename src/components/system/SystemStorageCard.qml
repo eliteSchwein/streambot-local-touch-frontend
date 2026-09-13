@@ -8,14 +8,15 @@ Rectangle {
     required property var storage
 
     radius: Md3Theme.radiusLarge
-    color: Qt.rgba(
-        Md3Theme.surfaceContainer.r,
-        Md3Theme.surfaceContainer.g,
-        Md3Theme.surfaceContainer.b,
-        0.88
-    )
-    border.width: 1
-    border.color: Md3Theme.outlineVariant
+    color: "transparent"
+    border.width: 0
+
+    Md3GlassSurface {
+        anchors.fill: parent
+        tintColor: Md3Theme.surfaceContainer
+        tintOpacity: 0.88
+        radius: root.radius
+    }
 
     function fmt(v) {
         let n = Number(v ?? 0)

@@ -26,6 +26,8 @@ QtObject {
     readonly property color fallbackPrimaryContainer: "#062E6F"
 
     property bool dynamic: false
+    // Live wallpaper item used by frosted card surfaces.
+    property var wallpaperItem: null
 
     property color background: fallbackBackground
     property color surface: fallbackSurface

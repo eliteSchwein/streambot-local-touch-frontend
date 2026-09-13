@@ -15,13 +15,11 @@ Item {
 
     implicitHeight: 54
 
-    Rectangle {
+    Md3GlassSurface {
         anchors.fill: parent
         radius: Md3Theme.radiusMedium
-        color: Md3Theme.surfaceContainer
-        opacity: 0.78
-        border.width: 1
-        border.color: Md3Theme.outlineVariant
+        tintColor: Md3Theme.surfaceContainer
+        tintOpacity: 0.82
     }
 
     function triggerMacro() {

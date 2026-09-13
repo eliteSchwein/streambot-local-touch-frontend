@@ -245,7 +245,7 @@ Item {
         }
     }
 
-    component MetricCard: Rectangle {
+    component MetricCard: Item {
         id: metric
 
         required property string iconName
@@ -253,28 +253,19 @@ Item {
         required property string value
         property bool active: false
 
-        radius: Md3Theme.radiusLarge
-
-        color:
-            metric.active
-                ? Qt.rgba(
-                    Md3Theme.surfaceContainerHigh.r,
-                    Md3Theme.surfaceContainerHigh.g,
-                    Md3Theme.surfaceContainerHigh.b,
-                    0.92
-                )
-                : Qt.rgba(
-                    Md3Theme.surfaceContainer.r,
-                    Md3Theme.surfaceContainer.g,
-                    Md3Theme.surfaceContainer.b,
-                    0.88
-                )
-
-        border.width: 1
-        border.color:
-            metric.active
-                ? Md3Theme.primary
-                : Md3Theme.outlineVariant
+        Md3GlassSurface {
+            anchors.fill: parent
+            radius: Md3Theme.radiusLarge
+            tintColor:
+                metric.active
+                    ? Md3Theme.surfaceContainerHigh
+                    : Md3Theme.surfaceContainer
+            tintOpacity: metric.active ? 0.92 : 0.88
+            borderColor:
+                metric.active
+                    ? Md3Theme.primary
+                    : Md3Theme.outlineVariant
+        }
 
         Column {
             anchors.centerIn: parent

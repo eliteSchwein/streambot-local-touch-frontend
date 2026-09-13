@@ -11,15 +11,15 @@ Rectangle {
     required property var store
 
     radius: Md3Theme.radiusLarge
-    color: Qt.rgba(
-            Md3Theme.surfaceContainer.r,
-            Md3Theme.surfaceContainer.g,
-            Md3Theme.surfaceContainer.b,
-            0.88
-        )
+    color: "transparent"
+    border.width: 0
 
-    border.width: 1
-    border.color: Md3Theme.outlineVariant
+    Md3GlassSurface {
+        anchors.fill: parent
+        tintColor: Md3Theme.surfaceContainer
+        tintOpacity: 0.88
+        radius: root.radius
+    }
 
     readonly property var music:
         store.music ?? ({})

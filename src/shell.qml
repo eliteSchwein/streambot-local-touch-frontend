@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 
@@ -90,16 +89,9 @@ ShellRoot {
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             cache: false
-        }
 
-        MultiEffect {
-            anchors.fill: touchWallpaper
-            visible: touchWallpaper.visible
-            source: touchWallpaper
-            blurEnabled: true
-            blur: 0.42
-            blurMax: 32
-            autoPaddingEnabled: false
+            Component.onCompleted:
+                Md3Theme.wallpaperItem = touchWallpaper
         }
 
         Rectangle {
