@@ -108,6 +108,13 @@ QtObject {
         // Material You has no semantic success role; keep the existing green.
         success = fallbackSuccess
         dynamic = true
+
+        console.log(
+            "[theme] applied Matugen palette:",
+            "background=" + background,
+            "primary=" + primary,
+            "surface=" + surfaceContainer
+        )
     }
 
     function reloadGeneratedTheme() {

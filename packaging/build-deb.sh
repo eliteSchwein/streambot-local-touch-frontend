@@ -36,12 +36,24 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: quickshell, qml6-module-qtwebsockets, network-manager, qrencode, iproute2, python3
-Suggests: matugen
+Depends: quickshell, qml6-module-qtwebsockets, network-manager, qrencode, iproute2, python3, cargo, rustc, build-essential, pkg-config, libssl-dev
 Maintainer: Thomas Ludwig
 Description: Streambot Touch Quickshell interface
  Touch interface for Streambot using Quickshell.
 EOF
+
+cat > "$PACKAGE_ROOT/DEBIAN/postinst" <<'EOF'
+#!/bin/bash
+set -e
+
+if ! command -v matugen >/dev/null 2>&1 && [[ ! -x /usr/local/bin/matugen ]]; then
+    echo "streambot-touch: installing Matugen via Cargo..."
+    HOME=/root cargo install --locked --root /usr/local matugen
+fi
+
+exit 0
+EOF
+chmod 0755 "$PACKAGE_ROOT/DEBIAN/postinst"
 
 install -Dm755 \
     "$PROJECT_ROOT/packaging/streambot-touch" \

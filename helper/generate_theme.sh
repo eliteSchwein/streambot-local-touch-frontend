@@ -17,10 +17,23 @@ if [[ -z "$MATUGEN_BIN" && -x /usr/local/bin/matugen ]]; then
     MATUGEN_BIN=/usr/local/bin/matugen
 fi
 
+if [[ -z "$MATUGEN_BIN" && -x "$HOME/.cargo/bin/matugen" ]]; then
+    MATUGEN_BIN="$HOME/.cargo/bin/matugen"
+fi
+
 if [[ -z "$MATUGEN_BIN" ]]; then
     echo "matugen is not installed" >&2
     exit 1
 fi
 
-"$MATUGEN_BIN" -c "$CONFIG" image "$IMAGE"
+echo "using $($MATUGEN_BIN --version 2>/dev/null || echo "$MATUGEN_BIN")"
+"$MATUGEN_BIN" -c "$CONFIG" image --source-color-index 0 "$IMAGE"
+
+THEME_FILE="$CACHE_DIR/theme.json"
+if [[ ! -s "$THEME_FILE" ]]; then
+    echo "matugen did not create $THEME_FILE" >&2
+    exit 1
+fi
+
+echo "generated palette: $THEME_FILE"
 echo "generated palette from $IMAGE"

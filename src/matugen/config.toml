@@ -1,8 +1,6 @@
 [config]
 reload_apps = false
 
-[config.wallpaper]
-set = false
 
 [templates.streambot_touch]
 input_path = "/usr/share/streambot-touch/matugen/theme.json"

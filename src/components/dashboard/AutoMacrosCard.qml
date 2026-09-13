@@ -78,7 +78,7 @@ Md3Card {
                         Md3Theme.surfaceContainerHighest.r,
                         Md3Theme.surfaceContainerHighest.g,
                         Md3Theme.surfaceContainerHighest.b,
-                        0.72
+                        0.58
                     )
                 }
 
@@ -97,11 +97,16 @@ Md3Card {
                     radius: Md3Theme.radiusMedium
 
                     // Keep it subtle so text/switch remain readable.
-                    color: Md3Theme.surfaceContainerHigh
+                    color: Qt.rgba(
+                        Md3Theme.surfaceContainerHigh.r,
+                        Md3Theme.surfaceContainerHigh.g,
+                        Md3Theme.surfaceContainerHigh.b,
+                        0.48
+                    )
 
                     opacity:
                         modelData.enabled
-                        ? 0.72
+                        ? 1
                         : 0
 
                     Behavior on width {
