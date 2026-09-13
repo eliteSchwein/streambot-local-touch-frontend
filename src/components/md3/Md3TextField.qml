@@ -8,6 +8,8 @@ TextField {
 
     implicitHeight: 52
 
+    property color backgroundColor: Md3Theme.surfaceContainerHighest
+
     color: Md3Theme.surfaceContent
     placeholderTextColor: Md3Theme.surfaceVariantContent
     selectionColor: Md3Theme.primary
@@ -18,7 +20,7 @@ TextField {
 
     background: Rectangle {
         radius: Md3Theme.radiusMedium
-        color: Md3Theme.surfaceContainerHighest
+        color: root.backgroundColor
 
         border.width: root.activeFocus ? 2 : 1
         border.color:

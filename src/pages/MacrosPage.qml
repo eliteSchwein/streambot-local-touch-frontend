@@ -73,6 +73,13 @@ Item {
 
             text: root.searchQuery
 
+            backgroundColor: Qt.rgba(
+                Md3Theme.surfaceContainerHighest.r,
+                Md3Theme.surfaceContainerHighest.g,
+                Md3Theme.surfaceContainerHighest.b,
+                0.82
+            )
+
             onTextChanged:
                 root.searchQuery = text
         }
