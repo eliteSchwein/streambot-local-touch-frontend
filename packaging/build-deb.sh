@@ -36,7 +36,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: quickshell, qml6-module-qtwebsockets, network-manager, qrencode, iproute2, python3
+Depends: quickshell, qml6-module-qtwebsockets, qml6-module-qtquick-effects, network-manager, qrencode, iproute2, python3
 Suggests: matugen
 Maintainer: Thomas Ludwig
 Description: Streambot Touch Quickshell interface
