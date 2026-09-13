@@ -12,8 +12,6 @@ Item {
     property color borderColor: Md3Theme.outlineVariant
     property real borderWidth: 1
 
-    clip: true
-
     readonly property var wallpaper: Md3Theme.wallpaperItem
     readonly property bool hasWallpaper:
         wallpaper !== null
@@ -39,6 +37,16 @@ Item {
         }
     }
 
+    Rectangle {
+        id: roundedMask
+        anchors.fill: parent
+        radius: root.radius
+        color: "white"
+        visible: false
+        layer.enabled: true
+        antialiasing: true
+    }
+
     MultiEffect {
         anchors.fill: parent
         source: backdropSource
@@ -47,6 +55,10 @@ Item {
         blur: root.blurAmount
         blurMax: root.blurMaximum
         autoPaddingEnabled: false
+        maskEnabled: true
+        maskSource: roundedMask
+        maskThresholdMin: 0.5
+        maskThresholdMax: 1.0
     }
 
     Rectangle {
