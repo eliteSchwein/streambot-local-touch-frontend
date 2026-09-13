@@ -81,7 +81,8 @@ setup_apt_dependencies() {
   sudo apt-get -y install --no-install-recommends \
     ca-certificates \
     curl \
-    debian-archive-keyring
+    debian-archive-keyring \
+    gpg
 }
 
 setup_backports_repo() {
@@ -99,6 +100,28 @@ EOF
   sudo apt update
 
   ok_msg "Trixie Backports enabled"
+}
+
+
+setup_matugen_repo() {
+  status_msg "Enable DankLinux Matugen repo"
+
+  sudo install -d -m 0755 /etc/apt/keyrings
+
+  curl -fsSL \
+    https://download.opensuse.org/repositories/home:/AvengeMedia:/danklinux/Debian_13/Release.key \
+    | sudo gpg --dearmor --yes -o /etc/apt/keyrings/danklinux.gpg
+
+  sudo tee /etc/apt/sources.list.d/danklinux.sources >/dev/null <<'EOF'
+Types: deb
+URIs: https://download.opensuse.org/repositories/home:/AvengeMedia:/danklinux/Debian_13/
+Suites: /
+Signed-By: /etc/apt/keyrings/danklinux.gpg
+EOF
+
+  sudo apt update
+
+  ok_msg "DankLinux Matugen repo enabled"
 }
 
 setup_custom_apt_repo() {
@@ -147,26 +170,12 @@ install_packages() {
 }
 
 install_matugen() {
-  if command -v matugen >/dev/null 2>&1; then
-    ok_msg "Matugen already installed: $(command -v matugen)"
-    return
-  fi
-
   status_msg "Install Matugen"
 
-  sudo apt-get -y install --no-install-recommends \
-    cargo \
-    rustc \
-    build-essential \
-    pkg-config \
-    libssl-dev
-
-  # Debian does not ship a matugen package. Install the Rust crate system-wide
-  # so the Quickshell session can always find /usr/local/bin/matugen.
-  sudo cargo install --locked --root /usr/local matugen
+  sudo apt-get -y install --no-install-recommends matugen
 
   if ! command -v matugen >/dev/null 2>&1; then
-    warn_msg "Matugen installation completed but matugen is not in PATH."
+    warn_msg "Matugen package installed but matugen is not in PATH."
     exit 1
   fi
 
@@ -233,8 +242,9 @@ questions
 setup_apt_dependencies
 setup_backports_repo
 setup_custom_apt_repo
-install_packages
+setup_matugen_repo
 install_matugen
+install_packages
 cleanup_squeekboard
 modify_user
 install_networkmanager_polkit
