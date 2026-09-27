@@ -21,7 +21,7 @@ Item {
 
     readonly property var row2:
         symbols
-        ? ["@","#","€","_","&","-","+","(",")"]
+        ? ["@","#","$","%","&","-","+","(",")","/"]
         : (
             language === "de"
             ? ["a","s","d","f","g","h","j","k","l","ö"]
@@ -30,7 +30,7 @@ Item {
 
     readonly property var row3:
         symbols
-        ? ["*","\"","'",";",":","!","?","="]
+        ? ["*","\"","'",";",":","!","?","=","_","\\"]
         : (
             language === "de"
             ? ["y","x","c","v","b","n","m","ä","ü"]
@@ -40,7 +40,10 @@ Item {
     visible: KeyboardController.visible
     z: 1000000
     height: visible
-        ? Math.min(250, parent.height * 0.42)
+        ? Math.min(
+            root.symbols ? 300 : 250,
+            parent.height * (root.symbols ? 0.50 : 0.42)
+        )
         : 0
 
     Rectangle {
@@ -253,6 +256,46 @@ Item {
             }
         }
 
+        // Extra Wi-Fi/password symbols. Keep them on their own row so
+        // common punctuation is reachable without long-press gestures.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: root.symbols
+            spacing: 4
+
+            Repeater {
+                model: ["{", "}", "<", ">", "^", "~", "`", "|"]
+
+                Rectangle {
+                    required property string modelData
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 8
+
+                    color: extraSymbolTap.pressed
+                        ? Md3Theme.primary
+                        : Md3Theme.surfaceContainerHighest
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData
+                        color: extraSymbolTap.pressed
+                            ? Md3Theme.primaryContent
+                            : Md3Theme.surfaceContent
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+
+                    TapHandler {
+                        id: extraSymbolTap
+                        onTapped: KeyboardController.insert(modelData)
+                    }
+                }
+            }
+        }
+
         // Bottom row: Android/Gboard-ish.
         RowLayout {
             Layout.fillWidth: true
@@ -292,14 +335,14 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: root.language === "de" ? "," : ","
+                    text: root.symbols ? "[" : ","
                     color: Md3Theme.surfaceContent
                     font.pixelSize: 18
                 }
 
                 TapHandler {
                     id: commaTap
-                    onTapped: KeyboardController.insert(",")
+                    onTapped: KeyboardController.insert(root.symbols ? "[" : ",")
                 }
             }
 
@@ -314,7 +357,9 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: root.language === "de" ? "Deutsch" : "English"
+                    text: root.symbols
+                        ? "{ }  < >  ^ ~ ` |"
+                        : (root.language === "de" ? "Deutsch" : "English")
                     color: Md3Theme.surfaceVariantContent
                     font.pixelSize: 11
                 }
@@ -335,14 +380,14 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "."
+                    text: root.symbols ? "]" : "."
                     color: Md3Theme.surfaceContent
                     font.pixelSize: 18
                 }
 
                 TapHandler {
                     id: periodTap
-                    onTapped: KeyboardController.insert(".")
+                    onTapped: KeyboardController.insert(root.symbols ? "]" : ".")
                 }
             }
 

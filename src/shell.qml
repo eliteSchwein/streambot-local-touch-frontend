@@ -110,6 +110,8 @@ ShellRoot {
             id: appRoot
 
             property int currentPage: 0
+            readonly property bool backendStatusActive:
+                !backendStatus.ready || !websocket.connected
 
             anchors.fill: parent
             color: touchWallpaper.visible ? "transparent" : Md3Theme.background
@@ -117,7 +119,7 @@ ShellRoot {
             DashboardPage {
                 id: dashboardPage
 
-                visible: appRoot.currentPage === 0
+                visible: !appRoot.backendStatusActive && appRoot.currentPage === 0
 
                 anchors {
                     top: parent.top
@@ -134,7 +136,7 @@ ShellRoot {
             AudioPage {
                 id: audioPage
 
-                visible: appRoot.currentPage === 1
+                visible: !appRoot.backendStatusActive && appRoot.currentPage === 1
 
                 anchors {
                     top: parent.top
@@ -152,7 +154,8 @@ ShellRoot {
                 id: macrosPage
 
                 visible:
-                    appRoot.currentPage === 2
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 2
 
                 anchors {
                     top: parent.top
@@ -170,7 +173,8 @@ ShellRoot {
                 id: channelPointsPage
 
                 visible:
-                    appRoot.currentPage === 3
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 3
 
                 anchors {
                     top: parent.top
@@ -186,7 +190,7 @@ ShellRoot {
 
             SystemPage {
                 id: systemPage
-                visible: appRoot.currentPage === 4
+                visible: !appRoot.backendStatusActive && appRoot.currentPage === 4
                 anchors { top: parent.top; left: parent.left; right: parent.right; bottom: navigation.top }
                 i18n: i18n
                 websocket: websocket
@@ -197,7 +201,7 @@ ShellRoot {
             SpeedtestPage {
                 id: speedtestPage
 
-                visible: appRoot.currentPage === 5
+                visible: !appRoot.backendStatusActive && appRoot.currentPage === 5
 
                 anchors {
                     top: parent.top
@@ -208,6 +212,23 @@ ShellRoot {
 
                 i18n: i18n
                 websocket: websocket
+            }
+
+            BackendStatusView {
+                id: backendStatusView
+
+                visible: appRoot.backendStatusActive
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                i18n: i18n
+                websocket: websocket
+                backendStatus: backendStatus
             }
 
             Rectangle {
@@ -342,19 +363,8 @@ ShellRoot {
                 suppressed: appRoot.currentPage === 1
             }
 
-            ConnectDialog {
-                id: connectDialog
-
-                anchors.fill: parent
-                z: 8000000
-
-                i18n: i18n
-                websocket: websocket
-                backendStatus: backendStatus
-            }
-
             // Global top-most dialog. Keep this outside NetworkDrawer so its z
-            // is compared directly with ConnectDialog and Md3Keyboard.
+            // is compared directly with Md3Keyboard.
             PowerMenuDialog {
                 id: powerMenu
 
