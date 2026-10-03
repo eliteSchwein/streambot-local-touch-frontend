@@ -675,7 +675,7 @@ Item {
 
                                             width:
                                                 pairedBluetoothList.width
-                                            height: 52
+                                            height: 60
 
                                             radius:
                                                 Md3Theme.radiusLarge
@@ -691,8 +691,8 @@ Item {
                                                 spacing: 10
 
                                                 Rectangle {
-                                                    width: 32
-                                                    height: 32
+                                                    width: 36
+                                                    height: 36
                                                     radius: 16
 
                                                     color:
@@ -702,15 +702,15 @@ Item {
 
                                                     Item {
                                                         anchors.centerIn: parent
-                                                        width: 18
-                                                        height: 18
+                                                        width: 20
+                                                        height: 20
 
                                                         MdiIcon {
                                                             anchors.centerIn: parent
                                                             visible:
                                                                 modelData.kind === "audio"
                                                             name: "speaker"
-                                                            size: 18
+                                                            size: 20
                                                         }
 
                                                         Text {
@@ -739,7 +739,7 @@ Item {
                                                             modelData.name
                                                         color:
                                                             Md3Theme.surfaceContent
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         font.weight: Font.DemiBold
                                                         elide:
                                                             Text.ElideRight
@@ -853,7 +853,7 @@ Item {
 
                                             width:
                                                 discoveredBluetoothList.width
-                                            height: 48
+                                            height: 54
 
                                             radius:
                                                 Md3Theme.radiusLarge
@@ -866,23 +866,23 @@ Item {
                                                 spacing: 10
 
                                                 Rectangle {
-                                                    width: 30
-                                                    height: 30
+                                                    width: 34
+                                                    height: 34
                                                     radius: 15
                                                     color:
                                                         Md3Theme.surfaceContainer
 
                                                     Item {
                                                         anchors.centerIn: parent
-                                                        width: 18
-                                                        height: 18
+                                                        width: 20
+                                                        height: 20
 
                                                         MdiIcon {
                                                             anchors.centerIn: parent
                                                             visible:
                                                                 modelData.kind === "audio"
                                                             name: "speaker"
-                                                            size: 18
+                                                            size: 20
                                                         }
 
                                                         Text {
@@ -904,7 +904,7 @@ Item {
                                                     text: modelData.name
                                                     color:
                                                         Md3Theme.surfaceContent
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     elide:
                                                         Text.ElideRight
                                                 }
@@ -985,7 +985,7 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            spacing: 8
+                            spacing: 4
 
                             Item {
                                 Layout.fillWidth: true
@@ -999,9 +999,9 @@ Item {
                                     anchors.centerIn: parent
 
                                     width: Math.min(
-                                        220,
+                                        260,
                                         parent.width - 8,
-                                        parent.height - 8
+                                        parent.height - 4
                                     )
 
                                     height: width
@@ -1028,7 +1028,7 @@ Item {
                                 color:
                                     Md3Theme.surfaceVariantContent
 
-                                font.pixelSize: 14
+                                font.pixelSize: 13
 
                                 horizontalAlignment:
                                     Text.AlignHCenter
