@@ -753,7 +753,7 @@ Item {
                                                             : root.i18n.text("disconnected")
                                                         color:
                                                             modelData.connected
-                                                            ? Md3Theme.primaryContent
+                                                            ? Md3Theme.surfaceContent
                                                             : Md3Theme.surfaceVariantContent
                                                         font.pixelSize: 10
                                                         elide:

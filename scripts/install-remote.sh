@@ -21,6 +21,7 @@ files=(
     installLabwcConfig.sh
     installNetworkManagerPolkit.sh
     installPowerPolkit.sh
+    installWireplumberBluetoothConfig.sh
 )
 
 echo "Downloading Streambot Touch installer..."
