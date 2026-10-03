@@ -319,7 +319,7 @@ Item {
 
                                     color:
                                         modelData.connected
-                                            ? Md3Theme.surfaceContainerHigh
+                                            ? Md3Theme.primaryContainer
                                             : Md3Theme.surfaceContainerHighest
 
                                     RowLayout {
@@ -350,16 +350,24 @@ Item {
                                                 Layout.fillWidth: true
 
                                                 text:
-                                                    modelData.known
-                                                        ? root.i18n.text("saved")
-                                                        : ""
+                                                    modelData.connected
+                                                        ? root.i18n.text("connected")
+                                                        : modelData.known
+                                                            ? root.i18n.text("saved")
+                                                            : ""
 
                                                 visible: text !== ""
 
                                                 color:
-                                                    Md3Theme.surfaceVariantContent
+                                                    modelData.connected
+                                                        ? Md3Theme.primary
+                                                        : Md3Theme.surfaceVariantContent
 
                                                 font.pixelSize: 9
+                                                font.weight:
+                                                    modelData.connected
+                                                        ? Font.DemiBold
+                                                        : Font.Normal
                                             }
                                         }
 
