@@ -42,6 +42,10 @@ ShellRoot {
         id: network
     }
 
+    BluetoothManager {
+        id: bluetooth
+    }
+
     DashboardStore {
         id: dashboardStore
     }
@@ -350,6 +354,7 @@ ShellRoot {
                 i18n: i18n
                 config: config
                 network: network
+                bluetooth: bluetooth
             }
 
             AudioVolumeOsd {

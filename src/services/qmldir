@@ -7,3 +7,5 @@ DashboardStore 1.0 DashboardStore.qml
 BackendStatus 1.0 BackendStatus.qml
 
 ThemeManager 1.0 ThemeManager.qml
+
+BluetoothManager 1.0 BluetoothManager.qml

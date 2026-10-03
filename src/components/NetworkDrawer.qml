@@ -14,6 +14,7 @@ Item {
     required property var i18n
     required property var config
     required property var network
+    required property var bluetooth
 
     property bool open: false
 
@@ -55,6 +56,7 @@ Item {
 
     onOpenChanged: {
         network.setWifiScanning(open)
+        bluetooth.setAutoRefresh(open)
 
         if (open) {
             network.refreshPrimaryIp()
@@ -423,27 +425,176 @@ Item {
 
                     Md3Card {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 118
+                        Layout.preferredHeight: 176
 
-                        title: root.i18n.text("language")
+                        title: root.i18n.text("bluetooth")
 
-                        Md3Select {
+                        ColumnLayout {
                             Layout.fillWidth: true
+                            spacing: 7
 
-                            model: [
-                                root.i18n.text("english"),
-                                root.i18n.text("german")
-                            ]
+                            RowLayout {
+                                Layout.fillWidth: true
 
-                            currentIndex:
-                                    root.config.language === "de"
-                                ? 1
-                                : 0
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
 
-                            onActivated: index => {
-                                root.config.setLanguage(
-                                        index === 1 ? "de" : "en"
-                                )
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text:
+                                            root.bluetooth.available
+                                            ? (
+                                                root.bluetooth.powered
+                                                ? root.i18n.text("bluetooth_on")
+                                                : root.i18n.text("bluetooth_off")
+                                            )
+                                            : root.i18n.text("bluetooth_unavailable")
+
+                                        color:
+                                            root.bluetooth.powered
+                                            ? Md3Theme.primary
+                                            : Md3Theme.surfaceVariantContent
+
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible:
+                                            root.bluetooth.available
+                                            && root.bluetooth.powered
+
+                                        text:
+                                            root.i18n
+                                                .text("bluetooth_paired_count")
+                                                .replace(
+                                                    "{count}",
+                                                    root.bluetooth.devices.length
+                                                )
+
+                                        color:
+                                            Md3Theme.surfaceVariantContent
+                                        font.pixelSize: 9
+                                    }
+                                }
+
+                                Md3Switch {
+                                    checked:
+                                        root.bluetooth.powered
+
+                                    enabled:
+                                        root.bluetooth.available
+                                        && !root.bluetooth.busy
+
+                                    onClicked:
+                                        root.bluetooth.setPowered(
+                                            !root.bluetooth.powered
+                                        )
+                                }
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+
+                                Text {
+                                    anchors.centerIn: parent
+
+                                    visible:
+                                        !root.bluetooth.available
+                                        || !root.bluetooth.powered
+                                        || root.bluetooth.devices.length === 0
+
+                                    text:
+                                        !root.bluetooth.available
+                                        ? root.i18n.text("bluetooth_unavailable")
+                                        : !root.bluetooth.powered
+                                            ? root.i18n.text("bluetooth_disabled")
+                                            : root.i18n.text("bluetooth_no_paired")
+
+                                    color:
+                                        Md3Theme.surfaceVariantContent
+                                    font.pixelSize: 11
+                                }
+
+                                ListView {
+                                    id: bluetoothList
+
+                                    anchors.fill: parent
+                                    visible:
+                                        root.bluetooth.available
+                                        && root.bluetooth.powered
+                                        && root.bluetooth.devices.length > 0
+
+                                    clip: true
+                                    spacing: 4
+                                    model: root.bluetooth.devices
+
+                                    delegate: Rectangle {
+                                        required property var modelData
+
+                                        width: bluetoothList.width
+                                        height: 38
+                                        radius: Md3Theme.radiusMedium
+
+                                        color:
+                                            modelData.connected
+                                            ? Md3Theme.primaryContainer
+                                            : Md3Theme.surfaceContainerHighest
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            spacing: 6
+
+                                            Text {
+                                                Layout.fillWidth: true
+
+                                                text: modelData.name
+                                                color:
+                                                    Md3Theme.surfaceContent
+
+                                                font.pixelSize: 11
+                                                font.weight:
+                                                    modelData.connected
+                                                    ? Font.DemiBold
+                                                    : Font.Normal
+
+                                                elide: Text.ElideRight
+                                            }
+
+                                            Text {
+                                                text:
+                                                    modelData.connected
+                                                    ? root.i18n.text("connected")
+                                                    : root.i18n.text("disconnected")
+
+                                                color:
+                                                    modelData.connected
+                                                    ? Md3Theme.primary
+                                                    : Md3Theme.surfaceVariantContent
+
+                                                font.pixelSize: 9
+                                                font.weight:
+                                                    modelData.connected
+                                                    ? Font.DemiBold
+                                                    : Font.Normal
+                                            }
+                                        }
+
+                                        TapHandler {
+                                            enabled:
+                                                !root.bluetooth.busy
+
+                                            onTapped:
+                                                root.bluetooth.toggleDevice(
+                                                    modelData
+                                                )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -482,9 +633,9 @@ Item {
                                     cache: false
 
                                     source:
-                                            root.commanderUrl !== ""
+                                        root.commanderUrl !== ""
                                         ? "file://" + root.qrPath
-                                        + "?v=" + revision
+                                            + "?v=" + revision
                                         : ""
                                 }
                             }
@@ -493,7 +644,7 @@ Item {
                                 Layout.fillWidth: true
 
                                 text:
-                                        root.commanderUrl !== ""
+                                    root.commanderUrl !== ""
                                     ? root.commanderUrl
                                     : root.i18n.text("no_ip")
 
@@ -509,6 +660,33 @@ Item {
 
                                 maximumLineCount: 2
                                 elide: Text.ElideMiddle
+                            }
+                        }
+                    }
+
+                    Md3Card {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 118
+
+                        title: root.i18n.text("language")
+
+                        Md3Select {
+                            Layout.fillWidth: true
+
+                            model: [
+                                root.i18n.text("english"),
+                                root.i18n.text("german")
+                            ]
+
+                            currentIndex:
+                                root.config.language === "de"
+                                ? 1
+                                : 0
+
+                            onActivated: index => {
+                                root.config.setLanguage(
+                                    index === 1 ? "de" : "en"
+                                )
                             }
                         }
                     }

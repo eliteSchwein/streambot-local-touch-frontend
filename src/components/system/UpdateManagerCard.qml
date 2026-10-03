@@ -38,6 +38,152 @@ Rectangle {
     readonly property var list: items()
     readonly property bool checking: list.some(e => e.manager?.checking === true)
     readonly property bool updating: list.some(e => e.manager?.updating === true)
+    readonly property bool hasUpdates:
+        list.some(e => e.manager?.update_available === true)
+
+    property var updateAllQueue: []
+    property string updateAllCurrent: ""
+    property bool updateAllSeenRunning: false
+    property int updateAllRequestId: -1
+    property bool updateAllActive: false
+    property int updateAllIdleTicks: 0
+
+    function startUpdateAll() {
+        if (updateAllActive || updating || !hasUpdates)
+            return
+
+        const names = list
+            .filter(e =>
+                e.manager?.update_available === true
+                && e.manager?.checking !== true
+                && e.manager?.updating !== true
+            )
+            .map(e => e.name)
+
+        // Updating the backend can restart the service, so always do it last.
+        names.sort((a, b) => {
+            if (a === "backend")
+                return 1
+            if (b === "backend")
+                return -1
+            return 0
+        })
+
+        if (names.length === 0)
+            return
+
+        updateAllQueue = names
+        updateAllActive = true
+        updateAllCurrent = ""
+        updateAllSeenRunning = false
+        updateAllIdleTicks = 0
+        Qt.callLater(runNextUpdate)
+    }
+
+    function runNextUpdate() {
+        if (!updateAllActive || updateAllCurrent !== "" || updating)
+            return
+
+        if (updateAllQueue.length === 0) {
+            updateAllActive = false
+            return
+        }
+
+        const queue = Array.from(updateAllQueue)
+        updateAllCurrent = queue.shift()
+        updateAllQueue = queue
+        updateAllSeenRunning = false
+        updateAllIdleTicks = 0
+
+        updateAllRequestId = websocket.sendRpc(
+            "update",
+            { name: updateAllCurrent }
+        )
+
+        if (updateAllRequestId < 0) {
+            updateAllCurrent = ""
+            updateAllActive = false
+            return
+        }
+
+        updateAllTimer.restart()
+    }
+
+    function finishCurrentUpdate() {
+        updateAllCurrent = ""
+        updateAllSeenRunning = false
+        updateAllRequestId = -1
+        updateAllIdleTicks = 0
+
+        if (updateAllQueue.length === 0) {
+            updateAllActive = false
+            return
+        }
+
+        Qt.callLater(runNextUpdate)
+    }
+
+    Connections {
+        target: root.websocket
+
+        function onRpcResponse(id, data) {
+            if (
+                !root.updateAllActive
+                || id !== root.updateAllRequestId
+            ) {
+                return
+            }
+
+            if (data?.error !== undefined) {
+                root.finishCurrentUpdate()
+            }
+        }
+    }
+
+    Timer {
+        id: updateAllTimer
+        interval: 300
+        repeat: true
+
+        onTriggered: {
+            if (
+                !root.updateAllActive
+                || root.updateAllCurrent === ""
+            ) {
+                stop()
+                return
+            }
+
+            const manager =
+                root.managers?.[root.updateAllCurrent]
+
+            if (manager?.updating === true) {
+                root.updateAllSeenRunning = true
+                root.updateAllIdleTicks = 0
+                return
+            }
+
+            // Normal path: wait until the manager has entered and then left
+            // its updating state before starting the next manager.
+            if (root.updateAllSeenRunning) {
+                stop()
+                root.finishCurrentUpdate()
+                return
+            }
+
+            // Fallback for very fast/no-op updaters where the updating
+            // notification can be missed between two UI frames.
+            root.updateAllIdleTicks++
+
+            if (
+                root.updateAllIdleTicks >= 10
+                && manager?.update_available !== true
+            ) {
+                stop()
+                root.finishCurrentUpdate()
+            }
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -54,6 +200,57 @@ Rectangle {
                 color: Md3Theme.surfaceContent
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
+            }
+
+            Rectangle {
+                implicitWidth: updateAllText.implicitWidth + 24
+                width: implicitWidth
+                height: 32
+                radius: 16
+
+                color:
+                    root.hasUpdates
+                    && !root.updating
+                    && !root.updateAllActive
+                    ? Md3Theme.primary
+                    : Md3Theme.surfaceContainerHighest
+
+                opacity:
+                    root.hasUpdates
+                    && !root.updating
+                    && !root.updateAllActive
+                    ? 1
+                    : 0.55
+
+                Text {
+                    id: updateAllText
+                    anchors.centerIn: parent
+
+                    text:
+                        root.updateAllActive
+                        ? root.i18n.text("system_updates_updating")
+                        : root.i18n.text("system_updates_update_all")
+
+                    color:
+                        root.hasUpdates
+                        && !root.updating
+                        && !root.updateAllActive
+                        ? Md3Theme.primaryContent
+                        : Md3Theme.surfaceVariantContent
+
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
+                }
+
+                TapHandler {
+                    enabled:
+                        root.hasUpdates
+                        && !root.updating
+                        && !root.updateAllActive
+
+                    onTapped:
+                        root.startUpdateAll()
+                }
             }
 
             Rectangle {

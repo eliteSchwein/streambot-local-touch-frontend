@@ -179,5 +179,13 @@
   "speedtest_start": "Speedtest starten",
   "system_updates_updating": "Wird aktualisiert…",
   "system_updates_backend_blocked": "Das Backend-Update ist blockiert, bis andere Updates abgeschlossen sind",
-  "system_updates_blocked_by_backend": "Blockiert, solange das Backend-Update läuft"
+  "system_updates_blocked_by_backend": "Blockiert, solange das Backend-Update läuft",
+  "system_updates_update_all": "Alle aktualisieren",
+  "bluetooth": "Bluetooth",
+  "bluetooth_on": "Bluetooth an",
+  "bluetooth_off": "Bluetooth aus",
+  "bluetooth_unavailable": "Bluetooth nicht verfügbar",
+  "bluetooth_disabled": "Bluetooth ist deaktiviert",
+  "bluetooth_no_paired": "Keine gekoppelten Geräte",
+  "bluetooth_paired_count": "{count} gekoppelte Geräte"
 }
