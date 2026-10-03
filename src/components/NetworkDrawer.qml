@@ -700,8 +700,6 @@ Item {
                                                             modelData.kind === "audio"
                                                         name: "speaker"
                                                         size: 22
-                                                        selected:
-                                                            modelData.connected
                                                     }
 
                                                     Text {
