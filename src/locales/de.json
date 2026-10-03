@@ -187,5 +187,13 @@
   "bluetooth_unavailable": "Bluetooth nicht verfügbar",
   "bluetooth_disabled": "Bluetooth ist deaktiviert",
   "bluetooth_no_paired": "Keine gekoppelten Geräte",
-  "bluetooth_paired_count": "{count} gekoppelte Geräte"
+  "bluetooth_paired_count": "{count} gekoppelte Geräte",
+  "bluetooth_scan": "Suchen",
+  "bluetooth_stop_scan": "Stoppen",
+  "bluetooth_scanning": "Suche nach Geräten…",
+  "bluetooth_paired": "Gekoppelt",
+  "bluetooth_discovered": "Verfügbare Geräte",
+  "bluetooth_pair": "Koppeln",
+  "bluetooth_pairing": "Koppeln…",
+  "bluetooth_forget": "Entfernen"
 }

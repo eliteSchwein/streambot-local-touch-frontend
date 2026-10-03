@@ -187,5 +187,13 @@
   "bluetooth_unavailable": "Bluetooth unavailable",
   "bluetooth_disabled": "Bluetooth is disabled",
   "bluetooth_no_paired": "No paired devices",
-  "bluetooth_paired_count": "{count} paired devices"
+  "bluetooth_paired_count": "{count} paired devices",
+  "bluetooth_scan": "Scan",
+  "bluetooth_stop_scan": "Stop",
+  "bluetooth_scanning": "Scanning for devices…",
+  "bluetooth_paired": "Paired",
+  "bluetooth_discovered": "Available devices",
+  "bluetooth_pair": "Pair",
+  "bluetooth_pairing": "Pairing…",
+  "bluetooth_forget": "Forget"
 }

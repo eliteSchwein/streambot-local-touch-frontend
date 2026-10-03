@@ -425,9 +425,9 @@ Item {
 
                     Md3Card {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 176
+                        Layout.preferredHeight: 244
 
-                        title: root.i18n.text("bluetooth")
+                        title: ""
 
                         ColumnLayout {
                             Layout.fillWidth: true
@@ -435,49 +435,38 @@ Item {
 
                             RowLayout {
                                 Layout.fillWidth: true
+                                spacing: 8
 
-                                ColumnLayout {
+                                Text {
                                     Layout.fillWidth: true
-                                    spacing: 1
 
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text:
-                                            root.bluetooth.available
-                                            ? (
-                                                root.bluetooth.powered
-                                                ? root.i18n.text("bluetooth_on")
-                                                : root.i18n.text("bluetooth_off")
-                                            )
-                                            : root.i18n.text("bluetooth_unavailable")
+                                    text: root.i18n.text("bluetooth")
+                                    color: Md3Theme.surfaceContent
 
-                                        color:
-                                            root.bluetooth.powered
-                                            ? Md3Theme.primary
-                                            : Md3Theme.surfaceVariantContent
+                                    font.pixelSize: 16
+                                    font.weight: Font.DemiBold
+                                }
 
-                                        font.pixelSize: 12
-                                        font.weight: Font.DemiBold
-                                    }
+                                Md3Button {
+                                    text:
+                                        root.bluetooth.scanning
+                                        ? root.i18n.text("bluetooth_stop_scan")
+                                        : root.i18n.text("bluetooth_scan")
 
-                                    Text {
-                                        Layout.fillWidth: true
-                                        visible:
-                                            root.bluetooth.available
-                                            && root.bluetooth.powered
+                                    implicitHeight: 34
+                                    leftPadding: 10
+                                    rightPadding: 10
+                                    outlined: true
 
-                                        text:
-                                            root.i18n
-                                                .text("bluetooth_paired_count")
-                                                .replace(
-                                                    "{count}",
-                                                    root.bluetooth.devices.length
-                                                )
+                                    enabled:
+                                        root.bluetooth.available
+                                        && root.bluetooth.powered
+                                        && !root.bluetooth.busy
 
-                                        color:
-                                            Md3Theme.surfaceVariantContent
-                                        font.pixelSize: 9
-                                    }
+                                    onClicked:
+                                        root.bluetooth.setScanning(
+                                            !root.bluetooth.scanning
+                                        )
                                 }
 
                                 Md3Switch {
@@ -495,104 +484,314 @@ Item {
                                 }
                             }
 
+                            Text {
+                                Layout.fillWidth: true
+
+                                text:
+                                    !root.bluetooth.available
+                                    ? root.i18n.text("bluetooth_unavailable")
+                                    : !root.bluetooth.powered
+                                        ? root.i18n.text("bluetooth_disabled")
+                                        : root.bluetooth.scanning
+                                            ? root.i18n.text("bluetooth_scanning")
+                                            : root.i18n
+                                                .text("bluetooth_paired_count")
+                                                .replace(
+                                                    "{count}",
+                                                    root.bluetooth.pairedDevices.length
+                                                )
+
+                                color:
+                                    root.bluetooth.scanning
+                                    ? Md3Theme.primary
+                                    : Md3Theme.surfaceVariantContent
+
+                                font.pixelSize: 10
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                visible:
+                                    root.bluetooth.lastError !== ""
+
+                                text: root.bluetooth.lastError
+                                color: Md3Theme.error
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
+                            }
+
                             Item {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
 
-                                Text {
-                                    anchors.centerIn: parent
-
-                                    visible:
-                                        !root.bluetooth.available
-                                        || !root.bluetooth.powered
-                                        || root.bluetooth.devices.length === 0
-
-                                    text:
-                                        !root.bluetooth.available
-                                        ? root.i18n.text("bluetooth_unavailable")
-                                        : !root.bluetooth.powered
-                                            ? root.i18n.text("bluetooth_disabled")
-                                            : root.i18n.text("bluetooth_no_paired")
-
-                                    color:
-                                        Md3Theme.surfaceVariantContent
-                                    font.pixelSize: 11
-                                }
-
-                                ListView {
-                                    id: bluetoothList
-
+                                ColumnLayout {
                                     anchors.fill: parent
-                                    visible:
-                                        root.bluetooth.available
-                                        && root.bluetooth.powered
-                                        && root.bluetooth.devices.length > 0
+                                    spacing: 5
 
-                                    clip: true
-                                    spacing: 4
-                                    model: root.bluetooth.devices
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length > 0
 
-                                    delegate: Rectangle {
-                                        required property var modelData
-
-                                        width: bluetoothList.width
-                                        height: 38
-                                        radius: Md3Theme.radiusMedium
+                                        text:
+                                            root.i18n.text("bluetooth_paired")
 
                                         color:
-                                            modelData.connected
-                                            ? Md3Theme.primaryContainer
-                                            : Md3Theme.surfaceContainerHighest
+                                            Md3Theme.surfaceVariantContent
 
-                                        RowLayout {
-                                            anchors.fill: parent
-                                            anchors.margins: 8
-                                            spacing: 6
+                                        font.pixelSize: 9
+                                        font.weight: Font.DemiBold
+                                    }
 
-                                            Text {
-                                                Layout.fillWidth: true
+                                    ListView {
+                                        id: pairedBluetoothList
 
-                                                text: modelData.name
-                                                color:
-                                                    Md3Theme.surfaceContent
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight:
+                                            Math.min(
+                                                82,
+                                                contentHeight
+                                            )
 
-                                                font.pixelSize: 11
-                                                font.weight:
-                                                    modelData.connected
-                                                    ? Font.DemiBold
-                                                    : Font.Normal
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length > 0
 
-                                                elide: Text.ElideRight
+                                        clip: true
+                                        spacing: 4
+                                        model:
+                                            root.bluetooth.pairedDevices
+
+                                        delegate: Rectangle {
+                                            required property var modelData
+
+                                            width:
+                                                pairedBluetoothList.width
+                                            height: 38
+
+                                            radius:
+                                                Md3Theme.radiusMedium
+
+                                            color:
+                                                modelData.connected
+                                                ? Md3Theme.primaryContainer
+                                                : Md3Theme.surfaceContainerHighest
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 8
+                                                spacing: 6
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 0
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+
+                                                        text:
+                                                            modelData.name
+
+                                                        color:
+                                                            Md3Theme.surfaceContent
+
+                                                        font.pixelSize: 11
+                                                        font.weight:
+                                                            modelData.connected
+                                                            ? Font.DemiBold
+                                                            : Font.Normal
+
+                                                        elide:
+                                                            Text.ElideRight
+                                                    }
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+
+                                                        text:
+                                                            modelData.connected
+                                                            ? root.i18n.text("connected")
+                                                            : root.i18n.text("disconnected")
+
+                                                        color:
+                                                            modelData.connected
+                                                            ? Md3Theme.primary
+                                                            : Md3Theme.surfaceVariantContent
+
+                                                        font.pixelSize: 8
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 28
+                                                    height: 28
+                                                    radius: 14
+
+                                                    color:
+                                                        forgetBtTap.pressed
+                                                        ? Md3Theme.errorContainer
+                                                        : "transparent"
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+
+                                                        text: "×"
+                                                        color: Md3Theme.error
+                                                        font.pixelSize: 20
+                                                    }
+
+                                                    TapHandler {
+                                                        id: forgetBtTap
+
+                                                        enabled:
+                                                            !root.bluetooth.busy
+
+                                                        onTapped:
+                                                            root.bluetooth.forgetDevice(
+                                                                modelData
+                                                            )
+                                                    }
+                                                }
                                             }
 
-                                            Text {
-                                                text:
-                                                    modelData.connected
-                                                    ? root.i18n.text("connected")
-                                                    : root.i18n.text("disconnected")
+                                            TapHandler {
+                                                enabled:
+                                                    !root.bluetooth.busy
 
-                                                color:
-                                                    modelData.connected
-                                                    ? Md3Theme.primary
-                                                    : Md3Theme.surfaceVariantContent
-
-                                                font.pixelSize: 9
-                                                font.weight:
-                                                    modelData.connected
-                                                    ? Font.DemiBold
-                                                    : Font.Normal
+                                                onTapped: {
+                                                    if (modelData.connected) {
+                                                        root.bluetooth.disconnectDevice(
+                                                            modelData
+                                                        )
+                                                    } else {
+                                                        root.bluetooth.connectDevice(
+                                                            modelData
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
+                                    }
 
-                                        TapHandler {
-                                            enabled:
-                                                !root.bluetooth.busy
+                                    Text {
+                                        Layout.fillWidth: true
 
-                                            onTapped:
-                                                root.bluetooth.toggleDevice(
-                                                    modelData
-                                                )
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.scanning
+
+                                        text:
+                                            root.i18n.text("bluetooth_discovered")
+
+                                        color:
+                                            Md3Theme.surfaceVariantContent
+
+                                        font.pixelSize: 9
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    ListView {
+                                        id: discoveredBluetoothList
+
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+
+                                        visible:
+                                            root.bluetooth.powered
+                                            && (
+                                                root.bluetooth.scanning
+                                                || root.bluetooth.discoveredDevices.length > 0
+                                            )
+
+                                        clip: true
+                                        spacing: 4
+
+                                        model:
+                                            root.bluetooth.discoveredDevices
+
+                                        delegate: Rectangle {
+                                            required property var modelData
+
+                                            width:
+                                                discoveredBluetoothList.width
+                                            height: 38
+
+                                            radius:
+                                                Md3Theme.radiusMedium
+
+                                            color:
+                                                Md3Theme.surfaceContainerHighest
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 8
+                                                spacing: 6
+
+                                                Text {
+                                                    Layout.fillWidth: true
+
+                                                    text: modelData.name
+                                                    color:
+                                                        Md3Theme.surfaceContent
+
+                                                    font.pixelSize: 11
+                                                    elide:
+                                                        Text.ElideRight
+                                                }
+
+                                                Text {
+                                                    text:
+                                                        root.bluetooth.busy
+                                                        && root.bluetooth.busyAddress
+                                                            === modelData.address
+                                                        ? root.i18n.text("bluetooth_pairing")
+                                                        : root.i18n.text("bluetooth_pair")
+
+                                                    color:
+                                                        Md3Theme.primary
+
+                                                    font.pixelSize: 9
+                                                    font.weight:
+                                                        Font.DemiBold
+                                                }
+                                            }
+
+                                            TapHandler {
+                                                enabled:
+                                                    !root.bluetooth.busy
+
+                                                onTapped:
+                                                    root.bluetooth.pairDevice(
+                                                        modelData
+                                                    )
+                                            }
                                         }
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length === 0
+                                            && root.bluetooth.discoveredDevices.length === 0
+
+                                        text:
+                                            root.bluetooth.scanning
+                                            ? root.i18n.text("bluetooth_scanning")
+                                            : root.i18n.text("bluetooth_no_paired")
+
+                                        color:
+                                            Md3Theme.surfaceVariantContent
+
+                                        font.pixelSize: 11
+
+                                        horizontalAlignment:
+                                            Text.AlignHCenter
+                                        verticalAlignment:
+                                            Text.AlignVCenter
                                     }
                                 }
                             }
