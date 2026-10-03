@@ -690,42 +690,32 @@ Item {
                                                 anchors.margins: 10
                                                 spacing: 10
 
-                                                Rectangle {
-                                                    width: 36
-                                                    height: 36
-                                                    radius: 16
+                                                Item {
+                                                    width: 28
+                                                    height: 28
 
-                                                    color:
-                                                        modelData.connected
-                                                        ? Md3Theme.primary
-                                                        : Md3Theme.surfaceContainer
-
-                                                    Item {
+                                                    MdiIcon {
                                                         anchors.centerIn: parent
-                                                        width: 20
-                                                        height: 20
+                                                        visible:
+                                                            modelData.kind === "audio"
+                                                        name: "speaker"
+                                                        size: 22
+                                                        selected:
+                                                            modelData.connected
+                                                    }
 
-                                                        MdiIcon {
-                                                            anchors.centerIn: parent
-                                                            visible:
-                                                                modelData.kind === "audio"
-                                                            name: "speaker"
-                                                            size: 20
-                                                        }
-
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            visible:
-                                                                modelData.kind !== "audio"
-                                                            text:
-                                                                modelData.kindLabel
-                                                            color:
-                                                                modelData.connected
-                                                                ? Md3Theme.primaryContent
-                                                                : Md3Theme.surfaceContent
-                                                            font.pixelSize: 8
-                                                            font.weight: Font.Bold
-                                                        }
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        visible:
+                                                            modelData.kind !== "audio"
+                                                        text:
+                                                            modelData.kindLabel
+                                                        color:
+                                                            modelData.connected
+                                                            ? Md3Theme.primaryContent
+                                                            : Md3Theme.surfaceContent
+                                                        font.pixelSize: 9
+                                                        font.weight: Font.Bold
                                                     }
                                                 }
 
@@ -865,37 +855,28 @@ Item {
                                                 anchors.margins: 10
                                                 spacing: 10
 
-                                                Rectangle {
-                                                    width: 34
-                                                    height: 34
-                                                    radius: 15
-                                                    color:
-                                                        Md3Theme.surfaceContainer
+                                                Item {
+                                                    width: 28
+                                                    height: 28
 
-                                                    Item {
+                                                    MdiIcon {
                                                         anchors.centerIn: parent
-                                                        width: 20
-                                                        height: 20
+                                                        visible:
+                                                            modelData.kind === "audio"
+                                                        name: "speaker"
+                                                        size: 22
+                                                    }
 
-                                                        MdiIcon {
-                                                            anchors.centerIn: parent
-                                                            visible:
-                                                                modelData.kind === "audio"
-                                                            name: "speaker"
-                                                            size: 20
-                                                        }
-
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            visible:
-                                                                modelData.kind !== "audio"
-                                                            text:
-                                                                modelData.kindLabel
-                                                            color:
-                                                                Md3Theme.surfaceContent
-                                                            font.pixelSize: 8
-                                                            font.weight: Font.Bold
-                                                        }
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        visible:
+                                                            modelData.kind !== "audio"
+                                                        text:
+                                                            modelData.kindLabel
+                                                        color:
+                                                            Md3Theme.surfaceContent
+                                                        font.pixelSize: 9
+                                                        font.weight: Font.Bold
                                                     }
                                                 }
 
