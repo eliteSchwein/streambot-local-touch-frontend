@@ -513,15 +513,109 @@ Item {
                                 font.pixelSize: 10
                             }
 
-                            Text {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                visible:
-                                    root.bluetooth.lastError !== ""
+                                implicitHeight:
+                                    bluetoothErrorColumn.implicitHeight + 14
 
-                                text: root.bluetooth.lastError
-                                color: Md3Theme.error
-                                font.pixelSize: 9
-                                elide: Text.ElideRight
+                                visible:
+                                    root.bluetooth.lastErrorCode !== ""
+
+                                radius: Md3Theme.radiusMedium
+                                color: Md3Theme.errorContainer
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    spacing: 8
+
+                                    ColumnLayout {
+                                        id: bluetoothErrorColumn
+
+                                        Layout.fillWidth: true
+                                        spacing: 2
+
+                                        Text {
+                                            Layout.fillWidth: true
+
+                                            text:
+                                                root.i18n.text(
+                                                    "bluetooth_error_title"
+                                                )
+
+                                            color: Md3Theme.errorContent
+                                            font.pixelSize: 10
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+
+                                            text: {
+                                                switch (
+                                                    root.bluetooth.lastErrorCode
+                                                ) {
+                                                    case "authentication_failed":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_authentication_failed"
+                                                        )
+                                                    case "authentication_rejected":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_authentication_rejected"
+                                                        )
+                                                    case "authentication_canceled":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_authentication_canceled"
+                                                        )
+                                                    case "connection_failed":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_connection_failed"
+                                                        )
+                                                    case "not_available":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_not_available"
+                                                        )
+                                                    case "timeout":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_timeout"
+                                                        )
+                                                    default:
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_generic"
+                                                        )
+                                                }
+                                            }
+
+                                            color: Md3Theme.errorContent
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 28
+                                        height: 28
+                                        radius: 14
+                                        color:
+                                            bluetoothErrorDismiss.pressed
+                                            ? Md3Theme.surfaceContainerHighest
+                                            : "transparent"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "×"
+                                            color: Md3Theme.errorContent
+                                            font.pixelSize: 19
+                                        }
+
+                                        TapHandler {
+                                            id: bluetoothErrorDismiss
+
+                                            onTapped:
+                                                root.bluetooth.clearError()
+                                        }
+                                    }
+                                }
                             }
 
                             Item {

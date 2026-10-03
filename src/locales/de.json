@@ -197,5 +197,13 @@
   "bluetooth_pairing": "Koppeln…",
   "bluetooth_forget": "Entfernen",
   "bluetooth_scanning_classic": "Suche nach klassischen Bluetooth-Geräten…",
-  "bluetooth_scanning_le": "Suche nach Bluetooth-LE-Geräten…"
+  "bluetooth_scanning_le": "Suche nach Bluetooth-LE-Geräten…",
+  "bluetooth_error_title": "Bluetooth-Aktion fehlgeschlagen",
+  "bluetooth_error_authentication_failed": "Das Gerät hat die Kopplung abgelehnt. Versetze es erneut in den Kopplungsmodus und versuche es noch einmal.",
+  "bluetooth_error_authentication_rejected": "Das Gerät hat die Kopplungsanfrage abgelehnt. Prüfe den Kopplungsmodus und versuche es erneut.",
+  "bluetooth_error_authentication_canceled": "Die Kopplung wurde abgebrochen. Versetze das Gerät erneut in den Kopplungsmodus.",
+  "bluetooth_error_connection_failed": "Gekoppelt, aber die Verbindung ist fehlgeschlagen. Versuche erneut zu verbinden.",
+  "bluetooth_error_not_available": "Das Gerät ist nicht mehr verfügbar. Bringe es näher heran und suche erneut.",
+  "bluetooth_error_timeout": "Das Gerät hat nicht rechtzeitig geantwortet. Aktiviere den Kopplungsmodus erneut.",
+  "bluetooth_error_generic": "Die Bluetooth-Aktion konnte nicht abgeschlossen werden. Versuche es erneut."
 }

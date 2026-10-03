@@ -10,10 +10,55 @@ QtObject {
     property bool scanning: false
     property string scanTransport: "bredr"
     property string busyAddress: ""
-    property string lastError: ""
+    property string lastErrorCode: ""
+    property string lastErrorDetail: ""
 
     property var pairedDevices: []
     property var discoveredDevices: []
+
+    function clearError() {
+        lastErrorCode = ""
+        lastErrorDetail = ""
+    }
+
+    function cleanBluetoothOutput(value) {
+        // bluetoothctl may emit ANSI/terminal control sequences even when
+        // launched without an interactive terminal.
+        return String(value ?? "")
+            .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
+            .replace(/\r/g, "")
+            .trim()
+    }
+
+    function classifyError(value) {
+        const text = cleanBluetoothOutput(value)
+
+        if (text === "")
+            return ""
+
+        if (/AuthenticationFailed|Authentication Failed/i.test(text))
+            return "authentication_failed"
+
+        if (/AuthenticationRejected|Rejected/i.test(text))
+            return "authentication_rejected"
+
+        if (/AuthenticationCanceled|AuthenticationCancelled|Canceled/i.test(text))
+            return "authentication_canceled"
+
+        if (/ConnectionAttemptFailed|Failed to connect/i.test(text))
+            return "connection_failed"
+
+        if (/not available|NotAvailable/i.test(text))
+            return "not_available"
+
+        if (/timeout|Timed out/i.test(text))
+            return "timeout"
+
+        if (/Failed|Error/i.test(text))
+            return "generic"
+
+        return ""
+    }
 
     function refresh() {
         if (refreshProcess.running)
@@ -41,7 +86,7 @@ QtObject {
 
         busy = true
         busyAddress = ""
-        lastError = ""
+        clearError()
 
         actionProcess.exec([
             "bluetoothctl",
@@ -55,7 +100,7 @@ QtObject {
             return
 
         scanning = enabled
-        lastError = ""
+        clearError()
 
         if (enabled) {
             scanTransport = "bredr"
@@ -100,20 +145,28 @@ QtObject {
 
         busy = true
         busyAddress = device.address
-        lastError = ""
+        clearError()
 
-        // NoInputNoOutput handles the common "Just Works" pairing flow
-        // entirely inside the touch UI. After pairing succeeds, trust and
-        // connect are performed automatically.
+        // Pairing while discovery is active is unreliable with a number of
+        // Classic Bluetooth devices. Stop our scan loop immediately and tell
+        // BlueZ to stop discovery before starting the pairing agent.
+        scanning = false
+        scanCycleDelay.stop()
+
+        // NoInputNoOutput handles the common "Just Works" pairing flow.
+        // After a successful pair, trust and connect automatically.
         actionProcess.exec([
             "sh",
             "-c",
-            "bluetoothctl --agent NoInputNoOutput pair "
+            "(bluetoothctl scan off >/dev/null 2>&1 || true); "
+            + "sleep 0.6; "
+            + "bluetoothctl --agent NoInputNoOutput pair "
             + shellQuote(device.address)
             + " && bluetoothctl trust "
             + shellQuote(device.address)
             + " && bluetoothctl connect "
             + shellQuote(device.address)
+            + " 2>&1"
         ])
     }
 
@@ -130,7 +183,7 @@ QtObject {
 
         busy = true
         busyAddress = device.address
-        lastError = ""
+        clearError()
 
         actionProcess.exec([
             "bluetoothctl",
@@ -151,7 +204,7 @@ QtObject {
 
         busy = true
         busyAddress = device.address
-        lastError = ""
+        clearError()
 
         actionProcess.exec([
             "bluetoothctl",
@@ -172,7 +225,7 @@ QtObject {
 
         busy = true
         busyAddress = device.address
-        lastError = ""
+        clearError()
 
         actionProcess.exec([
             "bluetoothctl",
@@ -333,23 +386,39 @@ QtObject {
     }
 
     property Process actionProcess: Process {
+        property string output: ""
+
         stdout: StdioCollector {
             onStreamFinished: {
-                const output = String(text ?? "").trim()
-
-                if (
-                    output !== ""
-                    && /Failed|not available|AuthenticationFailed|ConnectionAttemptFailed/i.test(output)
-                ) {
-                    root.lastError = output
-                }
+                actionProcess.output =
+                    root.cleanBluetoothOutput(text)
             }
         }
 
         onExited: code => {
-            if (code !== 0 && root.lastError === "")
-                root.lastError = "Bluetooth action failed"
+            const errorCode =
+                root.classifyError(actionProcess.output)
 
+            if (errorCode !== "") {
+                root.lastErrorCode = errorCode
+
+                // Keep only a short, sanitized final line for diagnostics.
+                const lines =
+                    actionProcess.output
+                        .split(/\n/)
+                        .map(line => line.trim())
+                        .filter(line => line !== "")
+
+                root.lastErrorDetail =
+                    lines.length > 0
+                    ? lines[lines.length - 1]
+                    : ""
+            } else if (code !== 0) {
+                root.lastErrorCode = "generic"
+                root.lastErrorDetail = ""
+            }
+
+            actionProcess.output = ""
             root.busy = false
             root.busyAddress = ""
 

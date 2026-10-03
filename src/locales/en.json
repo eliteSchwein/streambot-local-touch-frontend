@@ -197,5 +197,13 @@
   "bluetooth_pairing": "Pairing…",
   "bluetooth_forget": "Forget",
   "bluetooth_scanning_classic": "Scanning Classic Bluetooth devices…",
-  "bluetooth_scanning_le": "Scanning Bluetooth LE devices…"
+  "bluetooth_scanning_le": "Scanning Bluetooth LE devices…",
+  "bluetooth_error_title": "Bluetooth action failed",
+  "bluetooth_error_authentication_failed": "Pairing was rejected by the device. Put it back into pairing mode and try again.",
+  "bluetooth_error_authentication_rejected": "The device rejected the pairing request. Confirm pairing mode and try again.",
+  "bluetooth_error_authentication_canceled": "Pairing was cancelled. Put the device back into pairing mode and retry.",
+  "bluetooth_error_connection_failed": "Paired, but the connection failed. Try connecting again.",
+  "bluetooth_error_not_available": "The device is no longer available. Move it closer and scan again.",
+  "bluetooth_error_timeout": "The device did not respond in time. Put it into pairing mode and retry.",
+  "bluetooth_error_generic": "Bluetooth could not complete the action. Try again."
 }
