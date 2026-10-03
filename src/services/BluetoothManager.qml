@@ -50,20 +50,39 @@ QtObject {
     }
 
     function setScanning(enabled) {
-        if (busy || !powered || !available)
+        if (!powered || !available)
             return
 
         scanning = enabled
         lastError = ""
 
+        if (enabled) {
+            startScanCycle()
+        } else {
+            Qt.callLater(refresh)
+        }
+    }
+
+    function startScanCycle() {
+        if (
+            !scanning
+            || !powered
+            || !available
+            || scanProcess.running
+        ) {
+            return
+        }
+
+        // Keep bluetoothctl alive long enough for BlueZ discovery to actually
+        // find nearby devices. Once the timed scan exits, refresh() reads
+        // BlueZ's device cache and another cycle starts while scanning stays on.
         scanProcess.exec([
             "bluetoothctl",
+            "--timeout",
+            "3",
             "scan",
-            enabled ? "on" : "off"
+            "on"
         ])
-
-        if (enabled)
-            scanRefreshTimer.restart()
     }
 
     function pairDevice(device) {
@@ -288,7 +307,18 @@ QtObject {
     property Process scanProcess: Process {
         onExited: {
             Qt.callLater(root.refresh)
+
+            if (root.scanning)
+                scanCycleDelay.restart()
         }
+    }
+
+    property Timer scanCycleDelay: Timer {
+        interval: 250
+        repeat: false
+
+        onTriggered:
+            root.startScanCycle()
     }
 
     property Process actionProcess: Process {
@@ -320,15 +350,6 @@ QtObject {
         interval: 3000
         repeat: true
         running: false
-
-        onTriggered:
-            root.refresh()
-    }
-
-    property Timer scanRefreshTimer: Timer {
-        interval: 1500
-        repeat: true
-        running: root.scanning
 
         onTriggered:
             root.refresh()

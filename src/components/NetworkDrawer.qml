@@ -863,32 +863,7 @@ Item {
                         }
                     }
 
-                    Md3Card {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 118
 
-                        title: root.i18n.text("language")
-
-                        Md3Select {
-                            Layout.fillWidth: true
-
-                            model: [
-                                root.i18n.text("english"),
-                                root.i18n.text("german")
-                            ]
-
-                            currentIndex:
-                                root.config.language === "de"
-                                ? 1
-                                : 0
-
-                            onActivated: index => {
-                                root.config.setLanguage(
-                                    index === 1 ? "de" : "en"
-                                )
-                            }
-                        }
-                    }
                 }
             }
 
