@@ -8,6 +8,7 @@ QtObject {
     property bool powered: false
     property bool busy: false
     property bool scanning: false
+    property string scanTransport: "bredr"
     property string busyAddress: ""
     property string lastError: ""
 
@@ -57,6 +58,7 @@ QtObject {
         lastError = ""
 
         if (enabled) {
+            scanTransport = "bredr"
             startScanCycle()
         } else {
             Qt.callLater(refresh)
@@ -79,9 +81,9 @@ QtObject {
         scanProcess.exec([
             "bluetoothctl",
             "--timeout",
-            "3",
+            scanTransport === "bredr" ? "5" : "4",
             "scan",
-            "on"
+            scanTransport
         ])
     }
 
@@ -308,8 +310,17 @@ QtObject {
         onExited: {
             Qt.callLater(root.refresh)
 
-            if (root.scanning)
+            if (root.scanning) {
+                // Classic Bluetooth first catches speakers/headsets that may
+                // not advertise over BLE. Then alternate with LE so both
+                // transports stay covered while the Scan button is active.
+                root.scanTransport =
+                    root.scanTransport === "bredr"
+                    ? "le"
+                    : "bredr"
+
                 scanCycleDelay.restart()
+            }
         }
     }
 

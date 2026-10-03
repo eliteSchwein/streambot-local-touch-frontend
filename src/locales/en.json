@@ -195,5 +195,7 @@
   "bluetooth_discovered": "Available devices",
   "bluetooth_pair": "Pair",
   "bluetooth_pairing": "Pairing…",
-  "bluetooth_forget": "Forget"
+  "bluetooth_forget": "Forget",
+  "bluetooth_scanning_classic": "Scanning Classic Bluetooth devices…",
+  "bluetooth_scanning_le": "Scanning Bluetooth LE devices…"
 }

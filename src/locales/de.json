@@ -195,5 +195,7 @@
   "bluetooth_discovered": "Verfügbare Geräte",
   "bluetooth_pair": "Koppeln",
   "bluetooth_pairing": "Koppeln…",
-  "bluetooth_forget": "Entfernen"
+  "bluetooth_forget": "Entfernen",
+  "bluetooth_scanning_classic": "Suche nach klassischen Bluetooth-Geräten…",
+  "bluetooth_scanning_le": "Suche nach Bluetooth-LE-Geräten…"
 }

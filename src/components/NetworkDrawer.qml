@@ -493,7 +493,11 @@ Item {
                                     : !root.bluetooth.powered
                                         ? root.i18n.text("bluetooth_disabled")
                                         : root.bluetooth.scanning
-                                            ? root.i18n.text("bluetooth_scanning")
+                                            ? (
+                                                root.bluetooth.scanTransport === "bredr"
+                                                ? root.i18n.text("bluetooth_scanning_classic")
+                                                : root.i18n.text("bluetooth_scanning_le")
+                                            )
                                             : root.i18n
                                                 .text("bluetooth_paired_count")
                                                 .replace(
@@ -780,7 +784,11 @@ Item {
 
                                         text:
                                             root.bluetooth.scanning
-                                            ? root.i18n.text("bluetooth_scanning")
+                                            ? (
+                                                root.bluetooth.scanTransport === "bredr"
+                                                ? root.i18n.text("bluetooth_scanning_classic")
+                                                : root.i18n.text("bluetooth_scanning_le")
+                                            )
                                             : root.i18n.text("bluetooth_no_paired")
 
                                         color:
