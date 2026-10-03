@@ -125,6 +125,11 @@ install_packages() {
     qml6-module-qtquick-layouts \
     qml6-module-qtwebsockets \
     network-manager \
+    bluez \
+    pipewire \
+    pipewire-pulse \
+    wireplumber \
+    libspa-0.2-bluetooth \
     qrencode \
     iproute2 \
     libgl1-mesa-dri \
@@ -132,8 +137,7 @@ install_packages() {
     libgles2 \
     swayidle \
     wtype \
-    python3 \
-    libspa-0.2-bluetooth
+    python3
 
   status_msg "Install Quickshell from Trixie Backports"
 
@@ -148,6 +152,17 @@ install_packages() {
   status_msg "Enable seatd service"
 
   sudo systemctl enable --now seatd
+
+  status_msg "Enable PipeWire Bluetooth audio"
+
+  # PipeWire/WirePlumber run as user services. Linger is enabled later by the
+  # installer, but the current user session can already be started/restarted
+  # here so newly installed Bluetooth SPA plugins are picked up immediately.
+  systemctl --user daemon-reload || true
+  systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service || true
+  systemctl --user restart pipewire.service pipewire-pulse.service wireplumber.service || true
+
+  ok_msg "PipeWire Bluetooth audio support installed"
 }
 
 
@@ -217,6 +232,15 @@ install_networkmanager_polkit() {
   fi
 }
 
+install_wireplumber_bluetooth_config() {
+  if [[ -x "$SCRIPTPATH/installWireplumberBluetoothConfig.sh" ]]; then
+    "$SCRIPTPATH/installWireplumberBluetoothConfig.sh"
+  else
+    warn_msg "installWireplumberBluetoothConfig.sh not found or not executable."
+    exit 1
+  fi
+}
+
 check_distribution
 questions
 setup_apt_dependencies
@@ -226,6 +250,7 @@ install_matugen
 install_packages
 cleanup_squeekboard
 modify_user
+install_wireplumber_bluetooth_config
 install_networkmanager_polkit
 install_power_polkit
 install_labwc_config
