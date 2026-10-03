@@ -132,7 +132,8 @@ install_packages() {
     libgles2 \
     swayidle \
     wtype \
-    python3
+    python3 \
+    libspa-0.2-bluetooth
 
   status_msg "Install Quickshell from Trixie Backports"
 
