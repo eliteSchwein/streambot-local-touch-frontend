@@ -81,7 +81,7 @@ QtObject {
         scanProcess.exec([
             "bluetoothctl",
             "--timeout",
-            scanTransport === "bredr" ? "5" : "4",
+            scanTransport === "bredr" ? "15" : "5",
             "scan",
             scanTransport
         ])
