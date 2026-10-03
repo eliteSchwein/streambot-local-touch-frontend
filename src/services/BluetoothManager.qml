@@ -67,16 +67,20 @@ QtObject {
         refreshProcess.exec([
             "sh",
             "-c",
-            "printf '__SHOW__\\n'; "
+            "paired=\"$(bluetoothctl devices Paired 2>/dev/null || bluetoothctl paired-devices 2>/dev/null || true)\"; "
+            + "all=\"$(bluetoothctl devices 2>/dev/null || true)\"; "
+            + "connected=\"$(bluetoothctl devices Connected 2>/dev/null || true)\"; "
+            + "printf '__SHOW__\\n'; "
             + "bluetoothctl show 2>/dev/null || true; "
-            + "printf '__PAIRED__\\n'; "
-            + "(bluetoothctl devices Paired 2>/dev/null "
-            + "|| bluetoothctl paired-devices 2>/dev/null "
-            + "|| true); "
-            + "printf '__ALL__\\n'; "
-            + "bluetoothctl devices 2>/dev/null || true; "
-            + "printf '__CONNECTED__\\n'; "
-            + "(bluetoothctl devices Connected 2>/dev/null || true)"
+            + "printf '__PAIRED__\\n%s\\n' \"$paired\"; "
+            + "printf '__ALL__\\n%s\\n' \"$all\"; "
+            + "printf '__CONNECTED__\\n%s\\n' \"$connected\"; "
+            + "printf '__INFO__\\n'; "
+            + "printf '%s\\n%s\\n' \"$paired\" \"$all\" | awk '/^Device / {print $2}' | sort -u | while read -r addr; do "
+            + "  [ -n \"$addr\" ] || continue; "
+            + "  printf '__DEVICE__ %s\\n' \"$addr\"; "
+            + "  bluetoothctl info \"$addr\" 2>/dev/null || true; "
+            + "done"
         ])
     }
 
@@ -238,7 +242,68 @@ QtObject {
         return "'" + String(value).replace(/'/g, "'\\''") + "'"
     }
 
-    function parseDeviceLines(text, connectedSet, pairedSet) {
+    function parseInfoMap(text) {
+        const result = ({})
+        const value = String(text ?? "")
+        const lines = value.split(/\r?\n/)
+        let currentAddress = ""
+        let currentLines = []
+
+        function commitCurrent() {
+            if (currentAddress === "")
+                return
+
+            const block = currentLines.join("\n")
+            const iconMatch = block.match(/^\s*Icon:\s+(.+)$/m)
+            const icon = iconMatch ? iconMatch[1].trim() : ""
+
+            let kind = "generic"
+            if (/(audio|headset|headphones|speaker)/i.test(icon) || /0000110b|0000110d|00001108|0000111e|00001131/i.test(block))
+                kind = "audio"
+            else if (/(phone|modem)/i.test(icon))
+                kind = "phone"
+            else if (/(input-keyboard|input-mouse)/i.test(icon) || /00001124/i.test(block))
+                kind = "input"
+            else if (/(computer|laptop)/i.test(icon))
+                kind = "computer"
+
+            result[currentAddress] = {
+                icon: icon,
+                kind: kind
+            }
+        }
+
+        for (const rawLine of lines) {
+            const deviceMatch = rawLine.match(/^__DEVICE__\s+([0-9A-Fa-f:]{17})$/)
+            if (deviceMatch) {
+                commitCurrent()
+                currentAddress = deviceMatch[1].toUpperCase()
+                currentLines = []
+                continue
+            }
+            currentLines.push(rawLine)
+        }
+
+        commitCurrent()
+        return result
+    }
+
+    function deviceTypeLabel(kind) {
+        switch (kind) {
+            case "audio":
+                return "SPK"
+            case "phone":
+                return "PH"
+            case "computer":
+                return "PC"
+            case "input":
+                return "KB"
+            default:
+                return "BT"
+        }
+    }
+
+    function parseDeviceLines(text, connectedSet, pairedSet, infoMap) {
         const result = []
 
         for (const rawLine of String(text ?? "").split(/\r?\n/)) {
@@ -253,11 +318,15 @@ QtObject {
             const address = match[1].toUpperCase()
             const name = match[2].trim()
 
+            const info = infoMap?.[address] ?? ({})
+
             result.push({
                 address: address,
                 name: name,
                 connected: connectedSet[address] === true,
-                paired: pairedSet[address] === true
+                paired: pairedSet[address] === true,
+                kind: info.kind ?? "generic",
+                kindLabel: root.deviceTypeLabel(info.kind ?? "generic")
             })
         }
 
@@ -292,6 +361,7 @@ QtObject {
         const pairedMarker = value.indexOf("__PAIRED__")
         const allMarker = value.indexOf("__ALL__")
         const connectedMarker = value.indexOf("__CONNECTED__")
+        const infoMarker = value.indexOf("__INFO__")
 
         const showText =
             pairedMarker >= 0
@@ -319,8 +389,16 @@ QtObject {
         const connectedText =
             connectedMarker >= 0
             ? value.slice(
-                connectedMarker + "__CONNECTED__".length
+                connectedMarker + "__CONNECTED__".length,
+                infoMarker >= 0
+                    ? infoMarker
+                    : value.length
             )
+            : ""
+
+        const infoText =
+            infoMarker >= 0
+            ? value.slice(infoMarker + "__INFO__".length)
             : ""
 
         root.available =
@@ -331,19 +409,22 @@ QtObject {
 
         const pairedSet = parseAddressSet(pairedText)
         const connectedSet = parseAddressSet(connectedText)
+        const infoMap = parseInfoMap(infoText)
 
         root.pairedDevices =
             parseDeviceLines(
                 pairedText,
                 connectedSet,
-                pairedSet
+                pairedSet,
+                infoMap
             )
 
         const allDevices =
             parseDeviceLines(
                 allText,
                 connectedSet,
-                pairedSet
+                pairedSet,
+                infoMap
             )
 
         root.discoveredDevices =

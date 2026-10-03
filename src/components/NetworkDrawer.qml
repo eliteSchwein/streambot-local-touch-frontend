@@ -647,17 +647,26 @@ Item {
 
                                         Layout.fillWidth: true
                                         Layout.preferredHeight:
-                                            Math.min(
-                                                82,
+                                            visible
+                                            ? Math.min(
+                                                150,
                                                 contentHeight
                                             )
+                                            : 0
+                                        Layout.maximumHeight:
+                                            visible
+                                            ? Math.min(
+                                                150,
+                                                contentHeight
+                                            )
+                                            : 0
 
                                         visible:
                                             root.bluetooth.powered
                                             && root.bluetooth.pairedDevices.length > 0
 
                                         clip: true
-                                        spacing: 4
+                                        spacing: 6
                                         model:
                                             root.bluetooth.pairedDevices
 
@@ -666,10 +675,10 @@ Item {
 
                                             width:
                                                 pairedBluetoothList.width
-                                            height: 38
+                                            height: 52
 
                                             radius:
-                                                Md3Theme.radiusMedium
+                                                Md3Theme.radiusLarge
 
                                             color:
                                                 modelData.connected
@@ -678,8 +687,47 @@ Item {
 
                                             RowLayout {
                                                 anchors.fill: parent
-                                                anchors.margins: 8
-                                                spacing: 6
+                                                anchors.margins: 10
+                                                spacing: 10
+
+                                                Rectangle {
+                                                    width: 32
+                                                    height: 32
+                                                    radius: 16
+
+                                                    color:
+                                                        modelData.connected
+                                                        ? Md3Theme.primary
+                                                        : Md3Theme.surfaceContainer
+
+                                                    Item {
+                                                        anchors.centerIn: parent
+                                                        width: 18
+                                                        height: 18
+
+                                                        MdiIcon {
+                                                            anchors.centerIn: parent
+                                                            visible:
+                                                                modelData.kind === "audio"
+                                                            name: "speaker"
+                                                            size: 18
+                                                        }
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            visible:
+                                                                modelData.kind !== "audio"
+                                                            text:
+                                                                modelData.kindLabel
+                                                            color:
+                                                                modelData.connected
+                                                                ? Md3Theme.primaryContent
+                                                                : Md3Theme.surfaceContent
+                                                            font.pixelSize: 8
+                                                            font.weight: Font.Bold
+                                                        }
+                                                    }
+                                                }
 
                                                 ColumnLayout {
                                                     Layout.fillWidth: true
@@ -687,37 +735,29 @@ Item {
 
                                                     Text {
                                                         Layout.fillWidth: true
-
                                                         text:
                                                             modelData.name
-
                                                         color:
                                                             Md3Theme.surfaceContent
-
-                                                        font.pixelSize: 11
-                                                        font.weight:
-                                                            modelData.connected
-                                                            ? Font.DemiBold
-                                                            : Font.Normal
-
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.DemiBold
                                                         elide:
                                                             Text.ElideRight
                                                     }
 
                                                     Text {
                                                         Layout.fillWidth: true
-
                                                         text:
                                                             modelData.connected
                                                             ? root.i18n.text("connected")
                                                             : root.i18n.text("disconnected")
-
                                                         color:
                                                             modelData.connected
-                                                            ? Md3Theme.primary
+                                                            ? Md3Theme.primaryContent
                                                             : Md3Theme.surfaceVariantContent
-
-                                                        font.pixelSize: 8
+                                                        font.pixelSize: 10
+                                                        elide:
+                                                            Text.ElideRight
                                                     }
                                                 }
 
@@ -725,7 +765,6 @@ Item {
                                                     width: 28
                                                     height: 28
                                                     radius: 14
-
                                                     color:
                                                         forgetBtTap.pressed
                                                         ? Md3Theme.errorContainer
@@ -733,7 +772,6 @@ Item {
 
                                                     Text {
                                                         anchors.centerIn: parent
-
                                                         text: "×"
                                                         color: Md3Theme.error
                                                         font.pixelSize: 20
@@ -741,10 +779,8 @@ Item {
 
                                                     TapHandler {
                                                         id: forgetBtTap
-
                                                         enabled:
                                                             !root.bluetooth.busy
-
                                                         onTapped:
                                                             root.bluetooth.forgetDevice(
                                                                 modelData
@@ -756,7 +792,6 @@ Item {
                                             TapHandler {
                                                 enabled:
                                                     !root.bluetooth.busy
-
                                                 onTapped: {
                                                     if (modelData.connected) {
                                                         root.bluetooth.disconnectDevice(
@@ -774,7 +809,6 @@ Item {
 
                                     Text {
                                         Layout.fillWidth: true
-
                                         visible:
                                             root.bluetooth.powered
                                             && root.bluetooth.scanning
@@ -793,7 +827,14 @@ Item {
                                         id: discoveredBluetoothList
 
                                         Layout.fillWidth: true
-                                        Layout.fillHeight: true
+                                        Layout.fillHeight: visible
+                                        Layout.preferredHeight:
+                                            visible
+                                            ? Math.min(
+                                                120,
+                                                contentHeight
+                                            )
+                                            : 0
 
                                         visible:
                                             root.bluetooth.powered
@@ -803,8 +844,7 @@ Item {
                                             )
 
                                         clip: true
-                                        spacing: 4
-
+                                        spacing: 6
                                         model:
                                             root.bluetooth.discoveredDevices
 
@@ -813,26 +853,57 @@ Item {
 
                                             width:
                                                 discoveredBluetoothList.width
-                                            height: 38
+                                            height: 48
 
                                             radius:
-                                                Md3Theme.radiusMedium
-
+                                                Md3Theme.radiusLarge
                                             color:
                                                 Md3Theme.surfaceContainerHighest
 
                                             RowLayout {
                                                 anchors.fill: parent
-                                                anchors.margins: 8
-                                                spacing: 6
+                                                anchors.margins: 10
+                                                spacing: 10
+
+                                                Rectangle {
+                                                    width: 30
+                                                    height: 30
+                                                    radius: 15
+                                                    color:
+                                                        Md3Theme.surfaceContainer
+
+                                                    Item {
+                                                        anchors.centerIn: parent
+                                                        width: 18
+                                                        height: 18
+
+                                                        MdiIcon {
+                                                            anchors.centerIn: parent
+                                                            visible:
+                                                                modelData.kind === "audio"
+                                                            name: "speaker"
+                                                            size: 18
+                                                        }
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            visible:
+                                                                modelData.kind !== "audio"
+                                                            text:
+                                                                modelData.kindLabel
+                                                            color:
+                                                                Md3Theme.surfaceContent
+                                                            font.pixelSize: 8
+                                                            font.weight: Font.Bold
+                                                        }
+                                                    }
+                                                }
 
                                                 Text {
                                                     Layout.fillWidth: true
-
                                                     text: modelData.name
                                                     color:
                                                         Md3Theme.surfaceContent
-
                                                     font.pixelSize: 11
                                                     elide:
                                                         Text.ElideRight
@@ -841,14 +912,11 @@ Item {
                                                 Text {
                                                     text:
                                                         root.bluetooth.busy
-                                                        && root.bluetooth.busyAddress
-                                                            === modelData.address
+                                                        && root.bluetooth.busyAddress === modelData.address
                                                         ? root.i18n.text("bluetooth_pairing")
                                                         : root.i18n.text("bluetooth_pair")
-
                                                     color:
                                                         Md3Theme.primary
-
                                                     font.pixelSize: 9
                                                     font.weight:
                                                         Font.DemiBold
@@ -858,13 +926,21 @@ Item {
                                             TapHandler {
                                                 enabled:
                                                     !root.bluetooth.busy
-
                                                 onTapped:
                                                     root.bluetooth.pairDevice(
                                                         modelData
                                                     )
                                             }
                                         }
+                                    }
+
+                                    Item {
+                                        Layout.fillHeight: true
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length > 0
+                                            && !root.bluetooth.scanning
+                                            && root.bluetooth.discoveredDevices.length === 0
                                     }
 
                                     Text {
@@ -923,9 +999,9 @@ Item {
                                     anchors.centerIn: parent
 
                                     width: Math.min(
-                                        165,
-                                        parent.width - 20,
-                                        parent.height - 20
+                                        220,
+                                        parent.width - 8,
+                                        parent.height - 8
                                     )
 
                                     height: width
