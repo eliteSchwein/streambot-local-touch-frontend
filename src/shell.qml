@@ -38,6 +38,17 @@ ShellRoot {
         enabled: backendStatus.ready
     }
 
+    CavaClient {
+        id: cavaMusicPreview
+
+        baseUrl: config.websocketUrl
+        target: "music_preview"
+
+        // CAVA has a dedicated, registration-free websocket in Backend 2.0.
+        // Keep it separate from the normal dashboard/state traffic.
+        enabled: backendStatus.ready
+    }
+
     NetworkManager {
         id: network
     }
@@ -68,6 +79,14 @@ ShellRoot {
 
         function onJsonReceived(data) {
             config.handleMessage(data)
+            dashboardStore.handleMessage(data)
+        }
+    }
+
+    Connections {
+        target: cavaMusicPreview
+
+        function onJsonReceived(data) {
             dashboardStore.handleMessage(data)
         }
     }

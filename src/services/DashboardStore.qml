@@ -24,7 +24,7 @@ QtObject {
         return false
     }
 
-    // CAVA preview from notify_music_cava target=music_preview.
+    // CAVA preview from dedicated /cava/music_preview websocket.
     property var cava: [0, 0, 0, 0, 0]
 
     function handleMessage(data) {

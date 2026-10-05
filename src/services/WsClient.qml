@@ -14,7 +14,6 @@ QtObject {
         "notify_interaction_queue",
         "notify_music_update",
         "notify_playlist_update",
-        "notify_music_cava",
         "notify_audio_update",
         "notify_audio_outputs_update",
         "notify_auto_macros_update",
