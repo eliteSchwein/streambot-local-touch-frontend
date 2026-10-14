@@ -1,3 +1,4 @@
 SystemStorageCard 1.0 SystemStorageCard.qml
 UpdateManagerCard 1.0 UpdateManagerCard.qml
 UpdateManagerRow 1.0 UpdateManagerRow.qml
+SystemStatsCard 1.0 SystemStatsCard.qml
