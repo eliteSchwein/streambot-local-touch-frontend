@@ -96,12 +96,27 @@ Rectangle {
         anchors.margins: 12
         spacing: 6
 
-        Text {
+        RowLayout {
             Layout.fillWidth: true
-            text: root.i18n.text("system_stats")
-            color: Md3Theme.surfaceContent
-            font.pixelSize: 12
-            font.weight: Font.DemiBold
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                text: root.i18n.text("system_stats")
+                color: Md3Theme.surfaceContent
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+            }
+
+            Text {
+                text:
+                    root.i18n.text("system_cpu_temp")
+                    + "  "
+                    + root.tempText(root.cpuTemperature)
+                color: Md3Theme.surfaceContent
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+            }
         }
 
         RowLayout {
@@ -173,26 +188,6 @@ Rectangle {
                         drawRing(ctx, cx, cy, 58, 9, cpuValue, "#EF5350")
                         drawRing(ctx, cx, cy, 44, 9, ramValue, "#FFB300")
                         drawRing(ctx, cx, cy, 30, 9, storageValue, "#26C6DA")
-                    }
-                }
-
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 0
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.tempText(root.cpuTemperature)
-                        color: Md3Theme.surfaceContent
-                        font.pixelSize: 17
-                        font.weight: Font.DemiBold
-                    }
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.i18n.text("system_cpu_temp")
-                        color: Md3Theme.surfaceVariantContent
-                        font.pixelSize: 9
                     }
                 }
             }

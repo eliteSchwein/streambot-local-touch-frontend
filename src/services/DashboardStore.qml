@@ -181,6 +181,116 @@ QtObject {
         return null
     }
 
+    function findMetricByMethod(value, method, entryNames) {
+        if (value === undefined || value === null)
+            return null
+
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                const found = findMetricByMethod(item, method, entryNames)
+                if (found !== null)
+                    return found
+            }
+            return null
+        }
+
+        if (typeof value !== "object")
+            return null
+
+        if (String(value.method ?? "") === method) {
+            const candidates = []
+
+            for (const entry of entryNames)
+                candidates.push(value[entry])
+
+            candidates.push(
+                value.value,
+                value.result,
+                value.data,
+                value.current,
+                value.raw
+            )
+
+            const direct = firstNumber(candidates)
+            if (direct !== null)
+                return direct
+
+            for (const candidate of candidates) {
+                if (!candidate || typeof candidate !== "object")
+                    continue
+
+                const nested = firstNumber([
+                    candidate.value,
+                    candidate.result,
+                    candidate.currentLoad,
+                    candidate.current_load,
+                    candidate.main,
+                    candidate.temperature,
+                    candidate.temp,
+                    candidate.percent,
+                    candidate.usage_percent,
+                    candidate.usagePercent
+                ])
+
+                if (nested !== null)
+                    return nested
+            }
+        }
+
+        for (const key in value) {
+            const found = findMetricByMethod(value[key], method, entryNames)
+            if (found !== null)
+                return found
+        }
+
+        return null
+    }
+
+    function findNumberByKeys(value, keys, nestedKeys) {
+        if (value === undefined || value === null)
+            return null
+
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                const found = findNumberByKeys(item, keys, nestedKeys)
+                if (found !== null)
+                    return found
+            }
+            return null
+        }
+
+        if (typeof value !== "object")
+            return null
+
+        for (const key of keys) {
+            if (!(key in value))
+                continue
+
+            const candidate = value[key]
+            const direct = firstNumber([candidate])
+            if (direct !== null)
+                return direct
+
+            if (candidate && typeof candidate === "object") {
+                const nestedCandidates = []
+                for (const nestedKey of nestedKeys)
+                    nestedCandidates.push(candidate[nestedKey])
+
+                const nested = firstNumber(nestedCandidates)
+                if (nested !== null)
+                    return nested
+            }
+        }
+
+        for (const key in value) {
+            const found = findNumberByKeys(value[key], keys, nestedKeys)
+            if (found !== null)
+                return found
+        }
+
+        return null
+    }
+
     function normalizeSystemInfo(value) {
         if (!value || typeof value !== "object")
             return ({})
@@ -282,7 +392,26 @@ QtObject {
             raw.system_cpu_usage?.cpu,
             raw.systemCpuUsage?.cpu,
             raw.cpu_usage,
-            raw.cpuUsage
+            raw.cpuUsage,
+            findMetricByMethod(
+                raw,
+                "currentLoad",
+                ["currentLoad", "current_load"]
+            ),
+            findNumberByKeys(
+                raw,
+                ["currentLoad", "current_load", "cpu_usage", "cpuUsage"],
+                [
+                    "currentLoad",
+                    "current_load",
+                    "value",
+                    "result",
+                    "usage_percent",
+                    "usagePercent",
+                    "usage",
+                    "percent"
+                ]
+            )
         ])
 
         const cpuTemp = firstNumber([
@@ -300,7 +429,17 @@ QtObject {
             raw.cpu_temperature,
             raw.cpuTemperature,
             raw.cpu_temp,
-            raw.cpuTemp
+            raw.cpuTemp,
+            findMetricByMethod(
+                raw,
+                "cpuTemperature",
+                ["main", "temperature", "temp"]
+            ),
+            findNumberByKeys(
+                raw,
+                ["cpuTemperature", "cpu_temperature", "cpuTemp", "cpu_temp"],
+                ["main", "value", "result", "temperature", "temp", "max"]
+            )
         ])
 
         const ramUsage = firstNumber([
