@@ -66,6 +66,8 @@ Rectangle {
     // CPU usage comes from /proc/stat and temperature from /sys/class/thermal.
     property real nativeCpuUsage: -1
     property real nativeCpuTemperature: -1
+    property real previousCpuTotal: -1
+    property real previousCpuIdle: -1
 
     readonly property real cpuUsage:
         clampPercent(nativeCpuUsage)
@@ -100,37 +102,21 @@ Rectangle {
             return
 
         nativeCpuProcess.exec([
-            "sh",
+            "/bin/sh",
             "-c",
-            "read_cpu() { "
-            + "read _ user nice system idle iowait irq softirq steal _ "
-            + "< /proc/stat; "
-            + "idle_all=$((idle + iowait)); "
-            + "non_idle=$((user + nice + system + irq + softirq + steal)); "
-            + "echo $((idle_all + non_idle)) $idle_all; "
-            + "}; "
-            + "set -- $(read_cpu); total1=$1; idle1=$2; "
-            + "sleep 0.20; "
-            + "set -- $(read_cpu); total2=$1; idle2=$2; "
-            + "dt=$((total2-total1)); di=$((idle2-idle1)); "
-            + "if [ \"$dt\" -gt 0 ]; then "
-            + "cpu=$(awk -v dt=\"$dt\" -v di=\"$di\" "
-            + "'BEGIN { printf \"%.1f\", (dt-di)*100/dt }'); "
-            + "else cpu=''; fi; "
+            "head -n 1 /proc/stat; "
             + "temp=''; "
-            + "for z in /sys/class/thermal/thermal_zone*; do "
-            + "[ -r \"$z/temp\" ] || continue; "
-            + "t=$(cat \"$z/temp\" 2>/dev/null) || continue; "
-            + "case \"$t\" in ''|*[!0-9-]*) continue ;; esac; "
-            + "if [ \"$t\" -gt 1000 ] 2>/dev/null; then "
-            + "v=$(awk -v t=\"$t\" 'BEGIN { printf \"%.1f\", t/1000 }'); "
-            + "else v=\"$t\"; fi; "
-            + "case \"$(cat \"$z/type\" 2>/dev/null)\" in "
-            + "*cpu*|*CPU*|*soc*|*SoC*) temp=\"$v\"; break ;; "
-            + "esac; "
-            + "[ -z \"$temp\" ] && temp=\"$v\"; "
+            + "if [ -r /sys/class/thermal/thermal_zone0/temp ]; then "
+            + "temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null); "
+            + "fi; "
+            + "if [ -z \"$temp\" ]; then "
+            + "for f in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp*_input; do "
+            + "[ -r \"$f\" ] || continue; "
+            + "temp=$(cat \"$f\" 2>/dev/null); "
+            + "[ -n \"$temp\" ] && break; "
             + "done; "
-            + "printf '%s %s\\n' \"$cpu\" \"$temp\""
+            + "fi; "
+            + "printf 'TEMP %s\\n' \"$temp\""
         ])
     }
 
@@ -139,18 +125,93 @@ Rectangle {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const parts = String(text).trim().split(/\\s+/)
+                const lines = String(text)
+                    .trim()
+                    .split(/\\r?\\n/)
 
-                if (parts.length > 0) {
-                    const usage = Number(parts[0])
-                    if (Number.isFinite(usage))
-                        root.nativeCpuUsage = usage
-                }
+                for (const line of lines) {
+                    const value = String(line).trim()
 
-                if (parts.length > 1) {
-                    const temperature = Number(parts[1])
-                    if (Number.isFinite(temperature))
-                        root.nativeCpuTemperature = temperature
+                    if (value.startsWith("cpu ")) {
+                        const fields = value
+                            .split(/\\s+/)
+                            .slice(1)
+                            .map(Number)
+
+                        if (fields.length < 4)
+                            continue
+
+                        let valid = true
+                        for (const field of fields) {
+                            if (!Number.isFinite(field)) {
+                                valid = false
+                                break
+                            }
+                        }
+
+                        if (!valid)
+                            continue
+
+                        const user = fields[0] ?? 0
+                        const nice = fields[1] ?? 0
+                        const system = fields[2] ?? 0
+                        const idle = fields[3] ?? 0
+                        const iowait = fields[4] ?? 0
+                        const irq = fields[5] ?? 0
+                        const softirq = fields[6] ?? 0
+                        const steal = fields[7] ?? 0
+
+                        const idleAll = idle + iowait
+                        const total =
+                            user
+                            + nice
+                            + system
+                            + idle
+                            + iowait
+                            + irq
+                            + softirq
+                            + steal
+
+                        if (
+                            root.previousCpuTotal >= 0
+                            && root.previousCpuIdle >= 0
+                        ) {
+                            const totalDelta =
+                                total - root.previousCpuTotal
+                            const idleDelta =
+                                idleAll - root.previousCpuIdle
+
+                            if (totalDelta > 0) {
+                                root.nativeCpuUsage =
+                                    Math.max(
+                                        0,
+                                        Math.min(
+                                            100,
+                                            (totalDelta - idleDelta)
+                                            / totalDelta
+                                            * 100
+                                        )
+                                    )
+                            }
+                        }
+
+                        root.previousCpuTotal = total
+                        root.previousCpuIdle = idleAll
+                        continue
+                    }
+
+                    if (value.startsWith("TEMP ")) {
+                        const raw = Number(
+                            value.substring(5).trim()
+                        )
+
+                        if (Number.isFinite(raw)) {
+                            root.nativeCpuTemperature =
+                                Math.abs(raw) >= 1000
+                                ? raw / 1000
+                                : raw
+                        }
+                    }
                 }
             }
         }
@@ -159,7 +220,10 @@ Rectangle {
             onRead: line => {
                 const message = String(line).trim()
                 if (message !== "")
-                    console.warn("[system-native-cpu]", message)
+                    console.warn(
+                        "[system-native-cpu]",
+                        message
+                    )
             }
         }
     }
