@@ -682,7 +682,7 @@ Rectangle {
         id: selectorDialogLayer
 
         anchors.fill: parent
-        z: 5000000
+        z: 6000000
 
         visible: root.selectorOpen
 

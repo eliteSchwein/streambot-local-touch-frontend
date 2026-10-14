@@ -148,6 +148,14 @@ ShellRoot {
 
                 visible: !appRoot.backendStatusActive && appRoot.currentPage === 0
 
+                // While editing, the dashboard and its modal selector must sit
+                // above the bottom navigation bar. Keyboard still has the
+                // global higher z value.
+                z:
+                    dashboardPage.editing
+                    ? 100000
+                    : 0
+
                 anchors {
                     top: parent.top
                     left: parent.left
