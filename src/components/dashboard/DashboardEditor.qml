@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 import "../md3"
@@ -283,7 +282,6 @@ Rectangle {
             : autoMacroNames.slice(0, 4)
 
         selectorOpen = true
-        selectorDialog.open()
     }
 
     function selectorContains(name) {
@@ -313,7 +311,6 @@ Rectangle {
             autoMacroNames = selectorSelection.slice(0, 4)
 
         selectorOpen = false
-        selectorDialog.close()
     }
 
     function selectionSummary(values, emptyText) {
@@ -647,217 +644,220 @@ Rectangle {
         }
     }
 
-    Popup {
-        id: selectorDialog
 
-        parent: Overlay.overlay
+    Item {
+        id: selectorDialogLayer
 
-        modal: true
-        focus: true
+        anchors.fill: parent
+        z: 5000000
 
-        closePolicy:
-            Popup.CloseOnEscape
-            | Popup.CloseOnPressOutside
+        visible: root.selectorOpen
 
-        width:
-            Math.min(
-                Overlay.overlay.width - 80,
-                640
-            )
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(0, 0, 0, 0.62)
 
-        height:
-            Math.min(
-                Overlay.overlay.height - 70,
-                430
-            )
-
-        x:
-            Math.round(
-                (Overlay.overlay.width - width) / 2
-            )
-
-        y:
-            Math.round(
-                (Overlay.overlay.height - height) / 2
-            )
-
-        padding: 0
-
-        onClosed: {
-            root.selectorOpen = false
-            root.selectorSearch = ""
+            TapHandler {
+                onTapped: {
+                    root.selectorOpen = false
+                    root.selectorSearch = ""
+                }
+            }
         }
 
-        background: Rectangle {
+        Rectangle {
+            id: selectorDialog
+
+            anchors.centerIn: parent
+
+            width:
+                Math.min(
+                    selectorDialogLayer.width - 80,
+                    640
+                )
+
+            height:
+                Math.min(
+                    selectorDialogLayer.height - 70,
+                    430
+                )
+
             radius: Md3Theme.radiusExtraLarge
             color: Md3Theme.surfaceContainer
 
             border.width: 1
             border.color: Md3Theme.outlineVariant
-        }
 
-        contentItem: ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 9
+            // Eat taps inside the dialog so the backdrop doesn't close it.
+            TapHandler {
+                onTapped: {}
+            }
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 36
-                spacing: 8
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 14
+                spacing: 9
 
-                Text {
+                RowLayout {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    spacing: 8
 
-                    text:
-                        root.selectorType === "macros"
-                        ? root.i18n.text(
-                            "dashboard_choose_macros"
-                        )
-                        : root.i18n.text(
-                            "dashboard_choose_auto_macros"
-                        )
+                    Text {
+                        Layout.fillWidth: true
 
-                    color: Md3Theme.surfaceContent
-                    font.pixelSize: 16
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    text:
-                        root.selectorSelection.length
-                        + "/4"
-
-                    color:
-                        root.selectorSelection.length >= 4
-                        ? Md3Theme.primary
-                        : Md3Theme.surfaceVariantContent
-
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
-            }
-
-            Md3TextField {
-                id: selectorSearchField
-
-                Layout.fillWidth: true
-                implicitHeight: 44
-
-                placeholderText:
-                    root.i18n.text(
-                        "dashboard_search"
-                    )
-
-                text:
-                    root.selectorSearch
-
-                onTextChanged:
-                    root.selectorSearch = text
-            }
-
-            ListView {
-                id: selectorList
-
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                clip: true
-                spacing: 5
-
-                model:
-                    root.selectorCandidates()
-
-                delegate: Rectangle {
-                    required property string modelData
-
-                    width: selectorList.width
-                    height: 44
-                    radius: Md3Theme.radiusMedium
-
-                    color:
-                        selectorTap.pressed
-                        ? Md3Theme.surfaceContainerHigh
-                        : (
-                            root.selectorContains(modelData)
-                            ? Md3Theme.primaryContainer
-                            : Md3Theme.surfaceContainerHighest
-                        )
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        spacing: 8
-
-                        Text {
-                            Layout.fillWidth: true
-
-                            text: modelData
-                            color: Md3Theme.surfaceContent
-
-                            font.pixelSize: 11
-                            font.weight:
-                                root.selectorContains(modelData)
-                                ? Font.DemiBold
-                                : Font.Medium
-
-                            elide: Text.ElideRight
-                        }
-
-                        Text {
-                            visible:
-                                root.selectorContains(modelData)
-
-                            text: "✓"
-                            color: Md3Theme.primary
-
-                            font.pixelSize: 18
-                            font.weight: Font.Bold
-                        }
-                    }
-
-                    TapHandler {
-                        id: selectorTap
-
-                        enabled:
-                            root.selectorContains(modelData)
-                            || root.selectorSelection.length < 4
-
-                        onTapped:
-                            root.toggleSelectorName(
-                                modelData
+                        text:
+                            root.selectorType === "macros"
+                            ? root.i18n.text(
+                                "dashboard_choose_macros"
                             )
+                            : root.i18n.text(
+                                "dashboard_choose_auto_macros"
+                            )
+
+                        color: Md3Theme.surfaceContent
+                        font.pixelSize: 16
+                        font.weight: Font.DemiBold
+                    }
+
+                    Text {
+                        text:
+                            root.selectorSelection.length
+                            + "/4"
+
+                        color:
+                            root.selectorSelection.length >= 4
+                            ? Md3Theme.primary
+                            : Md3Theme.surfaceVariantContent
+
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
                     }
                 }
-            }
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 38
-                spacing: 8
+                Md3TextField {
+                    id: selectorSearchField
 
-                Item {
                     Layout.fillWidth: true
+                    implicitHeight: 44
+
+                    placeholderText:
+                        root.i18n.text(
+                            "dashboard_search"
+                        )
+
+                    text:
+                        root.selectorSearch
+
+                    onTextChanged:
+                        root.selectorSearch = text
                 }
 
-                Md3Button {
-                    text:
-                        root.i18n.text("cancel")
-                    outlined: true
-                    implicitHeight: 36
+                ListView {
+                    id: selectorList
 
-                    onClicked:
-                        selectorDialog.close()
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    clip: true
+                    spacing: 5
+
+                    model:
+                        root.selectorCandidates()
+
+                    delegate: Rectangle {
+                        required property string modelData
+
+                        width: selectorList.width
+                        height: 44
+                        radius: Md3Theme.radiusMedium
+
+                        color:
+                            selectorTap.pressed
+                            ? Md3Theme.surfaceContainerHigh
+                            : (
+                                root.selectorContains(modelData)
+                                ? Md3Theme.primaryContainer
+                                : Md3Theme.surfaceContainerHighest
+                            )
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 8
+
+                            Text {
+                                Layout.fillWidth: true
+
+                                text: modelData
+                                color: Md3Theme.surfaceContent
+
+                                font.pixelSize: 11
+                                font.weight:
+                                    root.selectorContains(modelData)
+                                    ? Font.DemiBold
+                                    : Font.Medium
+
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                visible:
+                                    root.selectorContains(modelData)
+
+                                text: "✓"
+                                color: Md3Theme.primary
+
+                                font.pixelSize: 18
+                                font.weight: Font.Bold
+                            }
+                        }
+
+                        TapHandler {
+                            id: selectorTap
+
+                            enabled:
+                                root.selectorContains(modelData)
+                                || root.selectorSelection.length < 4
+
+                            onTapped:
+                                root.toggleSelectorName(
+                                    modelData
+                                )
+                        }
+                    }
                 }
 
-                Md3Button {
-                    text:
-                        root.i18n.text("apply")
-                    implicitHeight: 36
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 38
+                    spacing: 8
 
-                    onClicked:
-                        root.applySelector()
+                    Item {
+                        Layout.fillWidth: true
+                    }
+
+                    Md3Button {
+                        text:
+                            root.i18n.text("cancel")
+                        outlined: true
+                        implicitHeight: 36
+
+                        onClicked: {
+                            root.selectorOpen = false
+                            root.selectorSearch = ""
+                        }
+                    }
+
+                    Md3Button {
+                        text:
+                            root.i18n.text("apply")
+                        implicitHeight: 36
+
+                        onClicked:
+                            root.applySelector()
+                    }
                 }
             }
         }

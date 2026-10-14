@@ -457,18 +457,13 @@ ShellRoot {
             Md3Keyboard {
                 id: keyboard
 
-                // Popups are rendered through Qt Quick Controls' Overlay.
-                // Put the on-screen keyboard into the same overlay so its z
-                // order can stay above dashboard selector dialogs.
-                parent: Overlay.overlay
-
                 anchors {
                     left: parent.left
                     right: parent.right
                     bottom: parent.bottom
                 }
 
-                z: 30000000
+                z: 10000000
                 language: config.language
             }
 
