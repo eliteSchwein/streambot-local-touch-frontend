@@ -21,6 +21,7 @@ QtObject {
         "notify_channel_point_update",
         "notify_update_manager",
         "notify_storage_update",
+        "notify_system_info",
         "notify_settings_update",
         "notify_speedtest_update"
     ]

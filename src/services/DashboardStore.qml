@@ -14,6 +14,7 @@ QtObject {
     property var interactions: []
     property var updateManager: ({})
     property var systemStorage: null
+    property var systemInfo: ({})
 
     readonly property bool updatesAvailable: {
         const managers = updateManager ?? ({})
@@ -92,6 +93,10 @@ QtObject {
             )
             break
 
+        case "notify_system_info":
+            systemInfo = normalizeSystemInfo(params)
+            break
+
         case "notify_interaction_queue":
             interactions = Array.isArray(params) ? params : []
             break
@@ -168,6 +173,108 @@ QtObject {
         }
 
         return null
+    }
+
+    function normalizeSystemInfo(value) {
+        if (!value || typeof value !== "object")
+            return ({})
+
+        const components =
+            value.components && typeof value.components === "object"
+            ? value.components
+            : ({})
+
+        const memory =
+            components.memory && typeof components.memory === "object"
+            ? components.memory
+            : (
+                value.memory && typeof value.memory === "object"
+                ? value.memory
+                : ({})
+            )
+
+        const storage =
+            components.storage && typeof components.storage === "object"
+            ? components.storage
+            : (
+                value.storage && typeof value.storage === "object"
+                ? value.storage
+                : ({})
+            )
+
+        const internal =
+            storage.internal && typeof storage.internal === "object"
+            ? storage.internal
+            : ({})
+
+        const currentLoad =
+            components.currentLoad
+            ?? components.current_load
+            ?? value.currentLoad
+            ?? value.current_load
+            ?? ({})
+
+        const cpuTemperature =
+            components.cpuTemperature
+            ?? components.cpu_temperature
+            ?? value.cpuTemperature
+            ?? value.cpu_temperature
+            ?? ({})
+
+        const cpuUsage = firstNumber([
+            currentLoad?.currentLoad,
+            currentLoad?.current_load,
+            currentLoad?.usage_percent,
+            currentLoad?.usage,
+            components.cpu?.usage_percent,
+            components.cpu?.usage,
+            components.cpu_usage,
+            components.cpuUsage,
+            value.cpu_usage,
+            value.cpuUsage
+        ])
+
+        const cpuTemp = firstNumber([
+            cpuTemperature?.main,
+            cpuTemperature?.temperature,
+            cpuTemperature?.temp,
+            components.cpu?.temperature,
+            components.cpu?.temp,
+            components.cpu_temperature,
+            components.cpuTemperature,
+            value.cpu_temperature,
+            value.cpuTemperature
+        ])
+
+        const ramUsage = firstNumber([
+            memory?.usage_percent,
+            memory?.usagePercent,
+            memory?.percent,
+            components.ram?.usage_percent,
+            components.ram?.usagePercent,
+            components.ram_usage,
+            components.ramUsage,
+            value.ram_usage,
+            value.ramUsage
+        ])
+
+        const internalStorageUsage = firstNumber([
+            internal?.usage_percent,
+            internal?.usagePercent,
+            internal?.percent,
+            components.internal_storage_usage,
+            components.internalStorageUsage,
+            value.internal_storage_usage,
+            value.internalStorageUsage
+        ])
+
+        return {
+            cpu_usage: cpuUsage,
+            cpu_temperature: cpuTemp,
+            ram_usage: ramUsage,
+            internal_storage_usage: internalStorageUsage,
+            raw: value
+        }
     }
 
     function normalizeUpdateManager(value) {

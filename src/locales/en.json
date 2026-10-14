@@ -206,5 +206,10 @@
   "bluetooth_error_not_available": "The device is no longer available. Move it closer and scan again.",
   "bluetooth_error_timeout": "The device did not respond in time. Put it into pairing mode and retry.",
   "bluetooth_error_generic": "Bluetooth could not complete the action. Try again.",
-  "bluetooth_device_counts": "{paired} paired • {connected} connected"
+  "bluetooth_device_counts": "{paired} paired • {connected} connected",
+  "system_stats": "System",
+  "system_cpu_usage": "CPU usage",
+  "system_cpu_temp": "CPU temperature",
+  "system_ram_usage": "RAM usage",
+  "system_internal_storage_usage": "Internal storage"
 }

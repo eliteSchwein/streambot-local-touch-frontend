@@ -23,12 +23,27 @@ Item {
         anchors.margins: 10
         spacing: 8
 
-        SystemStorageCard {
+        ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            spacing: 8
 
-            i18n: root.i18n
-            storage: root.store.systemStorage ?? ({})
+            SystemStatsCard {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 176
+
+                i18n: root.i18n
+                info: root.store.systemInfo ?? ({})
+                storage: root.store.systemStorage ?? ({})
+            }
+
+            SystemStorageCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                i18n: root.i18n
+                storage: root.store.systemStorage ?? ({})
+            }
         }
 
         ColumnLayout {
