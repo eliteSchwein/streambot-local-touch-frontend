@@ -711,7 +711,7 @@ Rectangle {
                 ? KeyboardController.keyboardHeight
                 : 0
 
-            readonly property real keyboardGap: 8
+            readonly property real keyboardGap: -12
 
             readonly property real availableHeight:
                 Math.max(
