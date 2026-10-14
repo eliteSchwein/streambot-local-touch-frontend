@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Io
 import "../md3"
 
 Rectangle {
@@ -62,18 +61,13 @@ Rectangle {
         return clampPercent(used / total * 100)
     }
 
-    // CPU metrics are read directly from the local Debian/Linux system.
-    // CPU usage comes from /proc/stat and temperature from /sys/class/thermal.
-    property real nativeCpuUsage: -1
-    property real nativeCpuTemperature: -1
-    property real previousCpuTotal: -1
-    property real previousCpuIdle: -1
-
     readonly property real cpuUsage:
-        clampPercent(nativeCpuUsage)
+        clampPercent(info?.cpu_usage)
 
-    readonly property real cpuTemperature:
-        nativeCpuTemperature
+    readonly property real cpuTemperature: {
+        const value = numberOrNull(info?.cpu_temperature)
+        return value === null ? -1 : value
+    }
 
     readonly property real ramUsage:
         clampPercent(info?.ram_usage)
@@ -95,147 +89,6 @@ Rectangle {
         return value >= 0
             ? Math.round(value) + " °C"
             : "—"
-    }
-
-    function refreshNativeCpu() {
-        if (nativeCpuProcess.running)
-            return
-
-        nativeCpuProcess.exec([
-            "/bin/sh",
-            "-c",
-            "head -n 1 /proc/stat; "
-            + "temp=''; "
-            + "if [ -r /sys/class/thermal/thermal_zone0/temp ]; then "
-            + "temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null); "
-            + "fi; "
-            + "if [ -z \"$temp\" ]; then "
-            + "for f in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp*_input; do "
-            + "[ -r \"$f\" ] || continue; "
-            + "temp=$(cat \"$f\" 2>/dev/null); "
-            + "[ -n \"$temp\" ] && break; "
-            + "done; "
-            + "fi; "
-            + "printf 'TEMP %s\\n' \"$temp\""
-        ])
-    }
-
-    Process {
-        id: nativeCpuProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = String(text)
-                    .trim()
-                    .split(/\\r?\\n/)
-
-                for (const line of lines) {
-                    const value = String(line).trim()
-
-                    if (value.startsWith("cpu ")) {
-                        const fields = value
-                            .split(/\\s+/)
-                            .slice(1)
-                            .map(Number)
-
-                        if (fields.length < 4)
-                            continue
-
-                        let valid = true
-                        for (const field of fields) {
-                            if (!Number.isFinite(field)) {
-                                valid = false
-                                break
-                            }
-                        }
-
-                        if (!valid)
-                            continue
-
-                        const user = fields[0] ?? 0
-                        const nice = fields[1] ?? 0
-                        const system = fields[2] ?? 0
-                        const idle = fields[3] ?? 0
-                        const iowait = fields[4] ?? 0
-                        const irq = fields[5] ?? 0
-                        const softirq = fields[6] ?? 0
-                        const steal = fields[7] ?? 0
-
-                        const idleAll = idle + iowait
-                        const total =
-                            user
-                            + nice
-                            + system
-                            + idle
-                            + iowait
-                            + irq
-                            + softirq
-                            + steal
-
-                        if (
-                            root.previousCpuTotal >= 0
-                            && root.previousCpuIdle >= 0
-                        ) {
-                            const totalDelta =
-                                total - root.previousCpuTotal
-                            const idleDelta =
-                                idleAll - root.previousCpuIdle
-
-                            if (totalDelta > 0) {
-                                root.nativeCpuUsage =
-                                    Math.max(
-                                        0,
-                                        Math.min(
-                                            100,
-                                            (totalDelta - idleDelta)
-                                            / totalDelta
-                                            * 100
-                                        )
-                                    )
-                            }
-                        }
-
-                        root.previousCpuTotal = total
-                        root.previousCpuIdle = idleAll
-                        continue
-                    }
-
-                    if (value.startsWith("TEMP ")) {
-                        const raw = Number(
-                            value.substring(5).trim()
-                        )
-
-                        if (Number.isFinite(raw)) {
-                            root.nativeCpuTemperature =
-                                Math.abs(raw) >= 1000
-                                ? raw / 1000
-                                : raw
-                        }
-                    }
-                }
-            }
-        }
-
-        stderr: SplitParser {
-            onRead: line => {
-                const message = String(line).trim()
-                if (message !== "")
-                    console.warn(
-                        "[system-native-cpu]",
-                        message
-                    )
-            }
-        }
-    }
-
-    Timer {
-        interval: 2000
-        repeat: true
-        running: true
-        triggeredOnStart: true
-
-        onTriggered:
-            root.refreshNativeCpu()
     }
 
     ColumnLayout {
