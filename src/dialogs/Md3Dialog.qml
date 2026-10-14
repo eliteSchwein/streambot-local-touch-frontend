@@ -102,9 +102,18 @@ Item {
                 )
             }
 
-            return Math.round(
-                (root.height - height) / 2
-            ) + 30
+            const desired =
+                Math.round(
+                    (root.height - height) / 2
+                ) + 30
+
+            return Math.max(
+                8,
+                Math.min(
+                    desired,
+                    root.height - height - 8
+                )
+            )
         }
 
         radius: Md3Theme.radiusExtraLarge

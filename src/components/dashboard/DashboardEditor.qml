@@ -311,6 +311,7 @@ Rectangle {
         else
             autoMacroNames = selectorSelection.slice(0, 4)
 
+        KeyboardController.hide()
         selectorOpen = false
     }
 
@@ -691,6 +692,7 @@ Rectangle {
 
             TapHandler {
                 onTapped: {
+                    KeyboardController.hide()
                     root.selectorOpen = false
                     root.selectorSearch = ""
                 }
@@ -749,9 +751,20 @@ Rectangle {
                     )
                 }
 
-                return Math.round(
-                    (selectorDialogLayer.height - height) / 2
-                ) + 30
+                const desired =
+                    Math.round(
+                        (selectorDialogLayer.height - height) / 2
+                    ) + 30
+
+                return Math.max(
+                    8,
+                    Math.min(
+                        desired,
+                        selectorDialogLayer.height
+                        - height
+                        - 8
+                    )
+                )
             }
 
             Behavior on y {
@@ -931,6 +944,7 @@ Rectangle {
                         implicitHeight: 36
 
                         onClicked: {
+                            KeyboardController.hide()
                             root.selectorOpen = false
                             root.selectorSearch = ""
                         }
