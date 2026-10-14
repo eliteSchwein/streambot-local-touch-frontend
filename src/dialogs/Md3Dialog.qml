@@ -90,23 +90,11 @@ Item {
         )
 
         y: {
-            const usableHeight =
-                root.height
-                - keyboardHeight
+            if (KeyboardController.visible)
+                return 10
 
-            const centered =
-                Math.round(
-                    (usableHeight - height) / 2
-                )
-
-            return Math.max(
-                12,
-                centered
-                - (
-                    KeyboardController.visible
-                    ? 18
-                    : 0
-                )
+            return Math.round(
+                (root.height - height) / 2
             )
         }
 

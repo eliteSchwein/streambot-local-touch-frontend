@@ -712,17 +712,21 @@ Rectangle {
 
             readonly property real availableHeight:
                 Math.max(
-                    180,
+                    170,
                     selectorDialogLayer.height
                     - keyboardHeight
-                    - 32
+                    - 20
                 )
 
             height:
                 Math.min(
-                    availableHeight,
-                    430
+                    430,
+                    availableHeight
                 )
+
+            // Critical for small 7-inch layouts: when the keyboard is open,
+            // child layouts must not paint outside the reduced dialog height.
+            clip: true
 
             x:
                 Math.round(
@@ -730,25 +734,11 @@ Rectangle {
                 )
 
             y: {
-                const usableHeight =
-                    selectorDialogLayer.height
-                    - keyboardHeight
+                if (KeyboardController.visible)
+                    return 10
 
-                const centered =
-                    Math.round(
-                        (usableHeight - height) / 2
-                    )
-
-                // While typing, bias the dialog upward a little so the list
-                // remains comfortably clear of the keyboard.
-                return Math.max(
-                    12,
-                    centered
-                    - (
-                        KeyboardController.visible
-                        ? 18
-                        : 0
-                    )
+                return Math.round(
+                    (selectorDialogLayer.height - height) / 2
                 )
             }
 
