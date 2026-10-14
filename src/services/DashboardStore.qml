@@ -170,6 +170,12 @@ QtObject {
 
             if (Number.isFinite(numberValue))
                 return numberValue
+
+            if (typeof value === "string") {
+                const parsed = parseFloat(value)
+                if (Number.isFinite(parsed))
+                    return parsed
+            }
         }
 
         return null
@@ -179,17 +185,30 @@ QtObject {
         if (!value || typeof value !== "object")
             return ({})
 
+        // Backend 2.0 notifications may arrive either as the system-info
+        // object itself or wrapped in the common content/data/info envelope.
+        const raw =
+            value.content
+            ?? value.data
+            ?? value.info
+            ?? value.system_info
+            ?? value.systemInfo
+            ?? value
+
+        if (!raw || typeof raw !== "object")
+            return ({})
+
         const components =
-            value.components && typeof value.components === "object"
-            ? value.components
+            raw.components && typeof raw.components === "object"
+            ? raw.components
             : ({})
 
         const memory =
             components.memory && typeof components.memory === "object"
             ? components.memory
             : (
-                value.memory && typeof value.memory === "object"
-                ? value.memory
+                raw.memory && typeof raw.memory === "object"
+                ? raw.memory
                 : ({})
             )
 
@@ -197,8 +216,8 @@ QtObject {
             components.storage && typeof components.storage === "object"
             ? components.storage
             : (
-                value.storage && typeof value.storage === "object"
-                ? value.storage
+                raw.storage && typeof raw.storage === "object"
+                ? raw.storage
                 : ({})
             )
 
@@ -207,65 +226,106 @@ QtObject {
             ? storage.internal
             : ({})
 
+        const cpu =
+            components.cpu && typeof components.cpu === "object"
+            ? components.cpu
+            : (
+                raw.cpu && typeof raw.cpu === "object"
+                ? raw.cpu
+                : ({})
+            )
+
         const currentLoad =
             components.currentLoad
             ?? components.current_load
-            ?? value.currentLoad
-            ?? value.current_load
+            ?? components.cpuLoad
+            ?? components.cpu_load
+            ?? cpu.currentLoad
+            ?? cpu.current_load
+            ?? cpu.load
+            ?? raw.currentLoad
+            ?? raw.current_load
+            ?? raw.cpuLoad
+            ?? raw.cpu_load
             ?? ({})
 
         const cpuTemperature =
             components.cpuTemperature
             ?? components.cpu_temperature
-            ?? value.cpuTemperature
-            ?? value.cpu_temperature
+            ?? components.cpuTemp
+            ?? components.cpu_temp
+            ?? cpu.temperature
+            ?? cpu.temp
+            ?? raw.cpuTemperature
+            ?? raw.cpu_temperature
+            ?? raw.cpuTemp
+            ?? raw.cpu_temp
             ?? ({})
 
         const cpuUsage = firstNumber([
+            currentLoad,
             currentLoad?.currentLoad,
             currentLoad?.current_load,
             currentLoad?.usage_percent,
+            currentLoad?.usagePercent,
             currentLoad?.usage,
-            components.cpu?.usage_percent,
-            components.cpu?.usage,
+            currentLoad?.percent,
+            cpu?.usage_percent,
+            cpu?.usagePercent,
+            cpu?.usage,
+            cpu?.load,
+            cpu?.percent,
+            components.system_cpu_usage?.cpu,
+            components.systemCpuUsage?.cpu,
             components.cpu_usage,
             components.cpuUsage,
-            value.cpu_usage,
-            value.cpuUsage
+            raw.system_cpu_usage?.cpu,
+            raw.systemCpuUsage?.cpu,
+            raw.cpu_usage,
+            raw.cpuUsage
         ])
 
         const cpuTemp = firstNumber([
+            cpuTemperature,
             cpuTemperature?.main,
             cpuTemperature?.temperature,
             cpuTemperature?.temp,
-            components.cpu?.temperature,
-            components.cpu?.temp,
+            cpuTemperature?.max,
+            cpu?.temperature,
+            cpu?.temp,
             components.cpu_temperature,
             components.cpuTemperature,
-            value.cpu_temperature,
-            value.cpuTemperature
+            components.cpu_temp,
+            components.cpuTemp,
+            raw.cpu_temperature,
+            raw.cpuTemperature,
+            raw.cpu_temp,
+            raw.cpuTemp
         ])
 
         const ramUsage = firstNumber([
             memory?.usage_percent,
             memory?.usagePercent,
             memory?.percent,
+            memory?.usage,
             components.ram?.usage_percent,
             components.ram?.usagePercent,
+            components.ram?.percent,
             components.ram_usage,
             components.ramUsage,
-            value.ram_usage,
-            value.ramUsage
+            raw.ram_usage,
+            raw.ramUsage
         ])
 
         const internalStorageUsage = firstNumber([
             internal?.usage_percent,
             internal?.usagePercent,
             internal?.percent,
+            internal?.usage,
             components.internal_storage_usage,
             components.internalStorageUsage,
-            value.internal_storage_usage,
-            value.internalStorageUsage
+            raw.internal_storage_usage,
+            raw.internalStorageUsage
         ])
 
         return {
@@ -273,7 +333,7 @@ QtObject {
             cpu_temperature: cpuTemp,
             ram_usage: ramUsage,
             internal_storage_usage: internalStorageUsage,
-            raw: value
+            raw: raw
         }
     }
 

@@ -9,7 +9,7 @@ Rectangle {
     required property var info
     required property var storage
 
-    implicitHeight: 176
+    implicitHeight: 190
 
     radius: Md3Theme.radiusLarge
     color: "transparent"
@@ -32,48 +32,51 @@ Rectangle {
         }
 
         const n = Number(value)
-        return Number.isFinite(n) ? n : null
+        if (Number.isFinite(n))
+            return n
+
+        if (typeof value === "string") {
+            const parsed = parseFloat(value)
+            if (Number.isFinite(parsed))
+                return parsed
+        }
+
+        return null
+    }
+
+    function clampPercent(value) {
+        const n = numberOrNull(value)
+        if (n === null)
+            return -1
+        return Math.max(0, Math.min(100, n))
     }
 
     function fallbackStoragePercent() {
         const total = numberOrNull(storage?.total)
         const used = numberOrNull(storage?.used)
 
-        if (
-            total === null
-            || used === null
-            || total <= 0
-        ) {
-            return null
-        }
+        if (total === null || used === null || total <= 0)
+            return -1
 
-        return Math.max(
-            0,
-            Math.min(
-                100,
-                used / total * 100
-            )
-        )
+        return clampPercent(used / total * 100)
     }
 
     readonly property real cpuUsage:
-        numberOrNull(info?.cpu_usage) ?? -1
+        clampPercent(info?.cpu_usage)
 
-    readonly property real cpuTemperature:
-        numberOrNull(info?.cpu_temperature) ?? -1
+    readonly property real cpuTemperature: {
+        const value = numberOrNull(info?.cpu_temperature)
+        return value === null ? -1 : value
+    }
 
     readonly property real ramUsage:
-        numberOrNull(info?.ram_usage) ?? -1
+        clampPercent(info?.ram_usage)
 
     readonly property real internalStorageUsage: {
-        const backendValue =
-            numberOrNull(info?.internal_storage_usage)
-
-        if (backendValue !== null)
-            return backendValue
-
-        const fallback = fallbackStoragePercent()
-        return fallback === null ? -1 : fallback
+        const backendValue = clampPercent(info?.internal_storage_usage)
+        return backendValue >= 0
+            ? backendValue
+            : fallbackStoragePercent()
     }
 
     function percentText(value) {
@@ -88,132 +91,193 @@ Rectangle {
             : "—"
     }
 
-    function barValue(value) {
-        if (value < 0)
-            return 0
-
-        return Math.max(
-            0,
-            Math.min(
-                1,
-                value / 100
-            )
-        )
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
-        spacing: 9
+        spacing: 6
 
         Text {
             Layout.fillWidth: true
-
             text: root.i18n.text("system_stats")
             color: Md3Theme.surfaceContent
-
             font.pixelSize: 12
             font.weight: Font.DemiBold
         }
 
-        GridLayout {
+        RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            spacing: 14
 
-            columns: 2
-            rowSpacing: 8
-            columnSpacing: 8
+            Item {
+                Layout.preferredWidth: 142
+                Layout.preferredHeight: 142
+                Layout.alignment: Qt.AlignVCenter
 
-            Repeater {
-                model: [
-                    {
-                        label: root.i18n.text("system_cpu_usage"),
-                        value: root.cpuUsage,
-                        text: root.percentText(root.cpuUsage)
-                    },
-                    {
-                        label: root.i18n.text("system_cpu_temp"),
-                        value: -1,
-                        text: root.tempText(root.cpuTemperature)
-                    },
-                    {
-                        label: root.i18n.text("system_ram_usage"),
-                        value: root.ramUsage,
-                        text: root.percentText(root.ramUsage)
-                    },
-                    {
-                        label: root.i18n.text("system_internal_storage_usage"),
-                        value: root.internalStorageUsage,
-                        text: root.percentText(root.internalStorageUsage)
+                Canvas {
+                    id: rings
+                    anchors.fill: parent
+
+                    property real cpuValue: root.cpuUsage
+                    property real ramValue: root.ramUsage
+                    property real storageValue: root.internalStorageUsage
+
+                    onCpuValueChanged: requestPaint()
+                    onRamValueChanged: requestPaint()
+                    onStorageValueChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+
+                    function drawRing(ctx, cx, cy, radius, width, value, color) {
+                        const start = -Math.PI / 2
+                        const full = Math.PI * 2
+
+                        ctx.beginPath()
+                        ctx.strokeStyle = Md3Theme.surfaceContainerHighest
+                        ctx.lineWidth = width
+                        ctx.lineCap = "round"
+                        ctx.arc(cx, cy, radius, start, start + full, false)
+                        ctx.stroke()
+
+                        if (value < 0)
+                            return
+
+                        const progress = Math.max(0, Math.min(100, value)) / 100
+                        if (progress <= 0)
+                            return
+
+                        ctx.beginPath()
+                        ctx.strokeStyle = color
+                        ctx.lineWidth = width
+                        ctx.lineCap = "round"
+                        ctx.arc(
+                            cx,
+                            cy,
+                            radius,
+                            start,
+                            start + full * progress,
+                            false
+                        )
+                        ctx.stroke()
                     }
-                ]
 
-                delegate: Rectangle {
-                    required property var modelData
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.reset()
 
+                        const cx = width / 2
+                        const cy = height / 2
+
+                        // Same three-ring hierarchy as Commander 2.0:
+                        // CPU outer, RAM middle, internal storage inner.
+                        drawRing(ctx, cx, cy, 58, 9, cpuValue, "#EF5350")
+                        drawRing(ctx, cx, cy, 44, 9, ramValue, "#FFB300")
+                        drawRing(ctx, cx, cy, 30, 9, storageValue, "#26C6DA")
+                    }
+                }
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 0
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.tempText(root.cpuTemperature)
+                        color: Md3Theme.surfaceContent
+                        font.pixelSize: 17
+                        font.weight: Font.DemiBold
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.i18n.text("system_cpu_temp")
+                        color: Md3Theme.surfaceVariantContent
+                        font.pixelSize: 9
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.alignment: Qt.AlignVCenter
+                spacing: 8
+
+                RowLayout {
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.minimumHeight: 54
+                    spacing: 8
 
-                    radius: Md3Theme.radiusMedium
-                    color: Md3Theme.surfaceContainerHighest
+                    Rectangle {
+                        Layout.preferredWidth: 9
+                        Layout.preferredHeight: 9
+                        radius: 5
+                        color: "#EF5350"
+                    }
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 4
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.i18n.text("system_cpu_usage")
+                        color: Md3Theme.surfaceVariantContent
+                        font.pixelSize: 11
+                    }
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 6
+                    Text {
+                        text: root.percentText(root.cpuUsage)
+                        color: Md3Theme.surfaceContent
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                    }
+                }
 
-                            Text {
-                                Layout.fillWidth: true
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
 
-                                text: modelData.label
-                                color: Md3Theme.surfaceVariantContent
+                    Rectangle {
+                        Layout.preferredWidth: 9
+                        Layout.preferredHeight: 9
+                        radius: 5
+                        color: "#FFB300"
+                    }
 
-                                font.pixelSize: 10
-                                elide: Text.ElideRight
-                            }
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.i18n.text("system_ram_usage")
+                        color: Md3Theme.surfaceVariantContent
+                        font.pixelSize: 11
+                    }
 
-                            Text {
-                                text: modelData.text
-                                color: Md3Theme.surfaceContent
+                    Text {
+                        text: root.percentText(root.ramUsage)
+                        color: Md3Theme.surfaceContent
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                    }
+                }
 
-                                font.pixelSize: 13
-                                font.weight: Font.DemiBold
-                            }
-                        }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
 
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 5
+                    Rectangle {
+                        Layout.preferredWidth: 9
+                        Layout.preferredHeight: 9
+                        radius: 5
+                        color: "#26C6DA"
+                    }
 
-                            visible:
-                                Number(modelData.value) >= 0
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.i18n.text("system_internal_storage_usage")
+                        color: Md3Theme.surfaceVariantContent
+                        font.pixelSize: 11
+                    }
 
-                            radius: 3
-                            color: Md3Theme.surfaceContainer
-
-                            Rectangle {
-                                width:
-                                    parent.width
-                                    * root.barValue(
-                                        Number(modelData.value)
-                                    )
-
-                                height: parent.height
-                                radius: parent.radius
-                                color: Md3Theme.primary
-
-                                Behavior on width {
-                                    NumberAnimation {
-                                        duration: 250
-                                    }
-                                }
-                            }
-                        }
+                    Text {
+                        text: root.percentText(root.internalStorageUsage)
+                        color: Md3Theme.surfaceContent
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
                     }
                 }
             }
