@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 
 import "../md3"
+import "../../services"
 
 Rectangle {
     id: root
