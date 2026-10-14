@@ -7,6 +7,7 @@ QtObject {
 
     property var target: null
     property var focusSink: null
+    property real keyboardHeight: 0
 
     readonly property bool visible:
         target !== null

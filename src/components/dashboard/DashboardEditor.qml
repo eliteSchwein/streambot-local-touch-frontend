@@ -342,8 +342,39 @@ Rectangle {
         closed()
     }
 
-    Component.onCompleted:
-        load()
+    onVisibleChanged: {
+        if (
+            visible
+            && config.sharedSettingsLoaded
+        ) {
+            load()
+        }
+    }
+
+    Connections {
+        target: root.config
+
+        function onSharedSettingsLoadedChanged() {
+            if (
+                root.visible
+                && root.config.sharedSettingsLoaded
+            ) {
+                root.load()
+            }
+        }
+
+        function onTouchDashboardChanged() {
+            // Keep the editor in sync with direct file changes while it is
+            // open, but do not overwrite an active selector operation.
+            if (
+                root.visible
+                && root.config.sharedSettingsLoaded
+                && !root.selectorOpen
+            ) {
+                root.load()
+            }
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -668,19 +699,72 @@ Rectangle {
         Rectangle {
             id: selectorDialog
 
-            anchors.centerIn: parent
-
             width:
                 Math.min(
                     selectorDialogLayer.width - 80,
                     640
                 )
 
+            readonly property real keyboardHeight:
+                KeyboardController.visible
+                ? KeyboardController.keyboardHeight
+                : 0
+
+            readonly property real availableHeight:
+                Math.max(
+                    180,
+                    selectorDialogLayer.height
+                    - keyboardHeight
+                    - 32
+                )
+
             height:
                 Math.min(
-                    selectorDialogLayer.height - 70,
+                    availableHeight,
                     430
                 )
+
+            x:
+                Math.round(
+                    (selectorDialogLayer.width - width) / 2
+                )
+
+            y: {
+                const usableHeight =
+                    selectorDialogLayer.height
+                    - keyboardHeight
+
+                const centered =
+                    Math.round(
+                        (usableHeight - height) / 2
+                    )
+
+                // While typing, bias the dialog upward a little so the list
+                // remains comfortably clear of the keyboard.
+                return Math.max(
+                    12,
+                    centered
+                    - (
+                        KeyboardController.visible
+                        ? 18
+                        : 0
+                    )
+                )
+            }
+
+            Behavior on y {
+                NumberAnimation {
+                    duration: 160
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on height {
+                NumberAnimation {
+                    duration: 160
+                    easing.type: Easing.OutCubic
+                }
+            }
 
             radius: Md3Theme.radiusExtraLarge
             color: Md3Theme.surfaceContainer

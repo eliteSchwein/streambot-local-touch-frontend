@@ -46,6 +46,18 @@ Item {
         )
         : 0
 
+    onHeightChanged:
+        KeyboardController.keyboardHeight =
+            visible ? height : 0
+
+    onVisibleChanged:
+        KeyboardController.keyboardHeight =
+            visible ? height : 0
+
+    Component.onCompleted:
+        KeyboardController.keyboardHeight =
+            visible ? height : 0
+
     Rectangle {
         anchors.fill: parent
         color: Md3Theme.surfaceContainer

@@ -63,34 +63,49 @@ Item {
         )
 
         implicitHeight: dialogLayout.implicitHeight
-        height: implicitHeight
+
+        readonly property real keyboardHeight:
+            KeyboardController.visible
+            ? KeyboardController.keyboardHeight
+            : 0
+
+        readonly property real availableHeight:
+            Math.max(
+                140,
+                root.height
+                - keyboardHeight
+                - 24
+            )
+
+        height:
+            Math.min(
+                implicitHeight,
+                availableHeight
+            )
+
+        clip: height < implicitHeight
 
         x: Math.round(
             (root.width - width) / 2
         )
 
         y: {
+            const usableHeight =
+                root.height
+                - keyboardHeight
+
             const centered =
                 Math.round(
-                    (root.height - height) / 2
-                )
-
-            if (!KeyboardController.visible)
-                return centered
-
-            // Move dialog upward while keyboard is visible.
-            const keyboardTop =
-                root.height
-                - Math.min(
-                    260,
-                    root.height * 0.43
+                    (usableHeight - height) / 2
                 )
 
             return Math.max(
                 12,
-                Math.min(
-                    centered - 40,
-                    keyboardTop - height - 12
+                centered
+                - (
+                    KeyboardController.visible
+                    ? 18
+                    : 0
                 )
             )
         }
@@ -102,6 +117,13 @@ Item {
         border.color: Md3Theme.outlineVariant
 
         Behavior on y {
+            NumberAnimation {
+                duration: 160
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on height {
             NumberAnimation {
                 duration: 160
                 easing.type: Easing.OutCubic

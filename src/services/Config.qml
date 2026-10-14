@@ -29,6 +29,7 @@ QtObject {
     property string language: "en"
     property string touchWallpaper: ""
     property var touchDashboard: defaultTouchDashboard()
+    property bool sharedSettingsLoaded: false
 
     function defaultTouchDashboard() {
         // Exact legacy dashboard:
@@ -362,12 +363,12 @@ QtObject {
     }
 
     function loadSharedSettings() {
+        if (!settingsFile.loaded)
+            return
+
         language = "en"
         touchWallpaper = ""
         touchDashboard = defaultTouchDashboard()
-
-        if (!settingsFile.loaded)
-            return
 
         try {
             const data = JSON.parse(settingsFile.text())
@@ -401,7 +402,10 @@ QtObject {
                 error
             )
         }
+
+        sharedSettingsLoaded = true
     }
+
     function handleMessage(data) {
         if (!data || data.method !== "notify_settings_update")
             return
