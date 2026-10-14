@@ -49,10 +49,35 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: Md3Theme.surfaceContainer
+        z: 0
+    }
+
+    // Consume pointer input anywhere inside the keyboard surface so taps can
+    // never fall through to navigation/power controls underneath it.
+    MouseArea {
+        anchors.fill: parent
+        z: 1
+
+        acceptedButtons: Qt.AllButtons
+        hoverEnabled: false
+        preventStealing: true
+
+        onPressed: mouse => {
+            mouse.accepted = true
+        }
+
+        onReleased: mouse => {
+            mouse.accepted = true
+        }
+
+        onClicked: mouse => {
+            mouse.accepted = true
+        }
     }
 
     ColumnLayout {
         anchors.fill: parent
+        z: 2
         anchors.margins: 6
         spacing: 5
 
@@ -409,7 +434,14 @@ Item {
 
                 TapHandler {
                     id: hideTap
-                    onTapped: KeyboardController.hide()
+
+                    onTapped: {
+                        // Do not remove the keyboard from the scene while the
+                        // current pointer event is still being dispatched.
+                        Qt.callLater(function() {
+                            KeyboardController.hide()
+                        })
+                    }
                 }
             }
         }

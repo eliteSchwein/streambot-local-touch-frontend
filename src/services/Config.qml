@@ -422,23 +422,10 @@ QtObject {
         if (typeof settings.touch_wallpaper === "string")
             touchWallpaper = settings.touch_wallpaper.trim()
 
-        if (
-            settings.touch_dashboard
-            && typeof settings.touch_dashboard === "object"
-        ) {
-            touchDashboard =
-                normalizeTouchDashboard(
-                    settings.touch_dashboard
-                )
-        } else if (
-            Object.prototype.hasOwnProperty.call(
-                settings,
-                "touch_dashboard"
-            )
-        ) {
-            // Explicitly missing/null layout restores the legacy default.
-            touchDashboard = defaultTouchDashboard()
-        }
+        // touch_dashboard is intentionally NOT consumed from
+        // notify_settings_update. It is local Touch configuration and is
+        // loaded directly from streambot-settings.json by settingsFile,
+        // exactly like the persisted local settings path.
     }
 
 }
