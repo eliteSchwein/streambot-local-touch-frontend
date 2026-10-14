@@ -91,7 +91,7 @@ Item {
 
         y: {
             if (KeyboardController.visible) {
-                const gap = -12
+                const gap = -42
 
                 return Math.max(
                     8,
