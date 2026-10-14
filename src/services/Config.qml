@@ -31,6 +31,8 @@ QtObject {
     property var touchDashboard: defaultTouchDashboard()
 
     function defaultTouchDashboard() {
+        // Exact legacy dashboard:
+        // left = Interactions above Auto Macros, right = Music full column.
         return {
             version: 1,
             columns: {
@@ -366,6 +368,10 @@ QtObject {
                     normalizeTouchDashboard(
                         data.touch_dashboard
                     )
+            } else {
+                // Backwards-compatible fallback for existing installations:
+                // no touch_dashboard key means use the original dashboard.
+                touchDashboard = defaultTouchDashboard()
             }
         } catch (error) {
             console.warn(
@@ -402,6 +408,14 @@ QtObject {
                 normalizeTouchDashboard(
                     settings.touch_dashboard
                 )
+        } else if (
+            Object.prototype.hasOwnProperty.call(
+                settings,
+                "touch_dashboard"
+            )
+        ) {
+            // Explicitly missing/null layout restores the legacy default.
+            touchDashboard = defaultTouchDashboard()
         }
     }
 
