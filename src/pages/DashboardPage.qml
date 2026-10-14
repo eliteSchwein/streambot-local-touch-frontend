@@ -105,36 +105,6 @@ Item {
         }
     }
 
-    Rectangle {
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: 14
-        anchors.rightMargin: 14
-
-        width: 36
-        height: 36
-        radius: 18
-        z: 50
-
-        color: editTap.pressed
-            ? Md3Theme.surfaceContainerHigh
-            : Md3Theme.surfaceContainerHighest
-
-        border.width: 1
-        border.color: Md3Theme.outlineVariant
-
-        Text {
-            anchors.centerIn: parent
-            text: "✎"
-            color: Md3Theme.surfaceContent
-            font.pixelSize: 18
-        }
-
-        TapHandler {
-            id: editTap
-            onTapped: root.editing = true
-        }
-    }
 
     Component {
         id: interactionsComponent

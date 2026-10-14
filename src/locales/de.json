@@ -225,5 +225,10 @@
   "dashboard_right": "Rechts",
   "dashboard_limits_hint": "7-Zoll-Limits: Musik belegt immer eine komplette Spalte. Andere Spalten können maximal zwei Karten enthalten. Auto-Makros und Makros zeigen maximal vier Einträge.",
   "dashboard_no_macros": "Wähle im Dashboard-Editor bis zu 4 Makros aus.",
-  "save": "Speichern"
+  "save": "Speichern",
+  "dashboard_empty": "Leer",
+  "dashboard_left_column": "Linke Spalte",
+  "dashboard_right_column": "Rechte Spalte",
+  "dashboard_slot": "Slot",
+  "dashboard_music_full_column": "Musik belegt die komplette Spalte."
 }

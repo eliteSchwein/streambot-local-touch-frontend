@@ -133,6 +133,10 @@ ShellRoot {
             id: appRoot
 
             property int currentPage: 0
+            onCurrentPageChanged: {
+                if (currentPage !== 0)
+                    dashboardPage.editing = false
+            }
             readonly property bool backendStatusActive:
                 !backendStatus.ready || !websocket.connected
 
@@ -328,6 +332,56 @@ ShellRoot {
 
                         onClicked:
                             appRoot.currentPage = 5
+                    }
+                }
+
+                // Dashboard editor action. Only exists visually while the
+                // Dashboard page is active.
+                Rectangle {
+                    id: navDashboardEditButton
+
+                    anchors {
+                        left: parent.left
+                        leftMargin: 10
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    width: 40
+                    height: 40
+                    radius: 20
+
+                    visible:
+                        !appRoot.backendStatusActive
+                        && appRoot.currentPage === 0
+
+                    color:
+                        dashboardPage.editing
+                        ? Md3Theme.primaryContainer
+                        : (
+                            navDashboardEditTap.pressed
+                            ? Md3Theme.surfaceContainerHigh
+                            : "transparent"
+                        )
+
+                    Text {
+                        anchors.centerIn: parent
+
+                        text: "✎"
+                        color:
+                            dashboardPage.editing
+                            ? Md3Theme.surfaceContent
+                            : Md3Theme.surfaceVariantContent
+
+                        font.pixelSize: 20
+                        font.weight: Font.DemiBold
+                    }
+
+                    TapHandler {
+                        id: navDashboardEditTap
+
+                        onTapped:
+                            dashboardPage.editing =
+                                !dashboardPage.editing
                     }
                 }
 

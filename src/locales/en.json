@@ -225,5 +225,10 @@
   "dashboard_right": "Right",
   "dashboard_limits_hint": "7-inch limits: Music always uses a complete column. Other columns can contain at most two cards. Auto macros and macros show at most four entries.",
   "dashboard_no_macros": "Select up to 4 macros in the dashboard editor.",
-  "save": "Save"
+  "save": "Save",
+  "dashboard_empty": "Empty",
+  "dashboard_left_column": "Left column",
+  "dashboard_right_column": "Right column",
+  "dashboard_slot": "Slot",
+  "dashboard_music_full_column": "Music uses the complete column."
 }
