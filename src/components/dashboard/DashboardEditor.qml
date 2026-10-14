@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import "../md3"
@@ -18,6 +19,12 @@ Rectangle {
     property var leftCards: []
     property var rightCards: []
     property var macroNames: []
+    property var autoMacroNames: []
+
+    property bool selectorOpen: false
+    property string selectorType: ""
+    property string selectorSearch: ""
+    property var selectorSelection: []
 
     readonly property var cardOptions: [
         ["", root.i18n.text("dashboard_empty")],
@@ -196,6 +203,11 @@ Rectangle {
             Array.isArray(dashboard.macro_names)
             ? dashboard.macro_names.slice(0, 4)
             : []
+
+        autoMacroNames =
+            Array.isArray(dashboard.auto_macro_names)
+            ? dashboard.auto_macro_names.slice(0, 4)
+            : []
     }
 
     function availableMacroNames() {
@@ -204,6 +216,8 @@ Rectangle {
         for (const name in (store.macros ?? ({}))) {
             const value = String(name)
 
+            // Dashboard macro picker intentionally excludes generated /
+            // integration-backed macros.
             if (
                 value.startsWith("event_")
                 || value.startsWith("channel_point_")
@@ -219,41 +233,15 @@ Rectangle {
         return result
     }
 
-    function macroOptionLabels() {
-        return [root.i18n.text("dashboard_empty")]
-            .concat(availableMacroNames())
-    }
-
-    function macroIndexFor(slot) {
-        const current =
-            String(macroNames[slot] ?? "")
-
-        if (current === "")
-            return 0
-
-        const index =
-            availableMacroNames().indexOf(current)
-
-        return index >= 0
-            ? index + 1
-            : 0
-    }
-
-    function setMacroSlot(slot, index) {
-        const values = macroNames.slice()
-
-        while (values.length <= slot)
-            values.push("")
-
-        values[slot] =
-            index <= 0
-            ? ""
-            : availableMacroNames()[index - 1]
-
+    function availableAutoMacroNames() {
         const result = []
+        const all =
+            Array.isArray(store.autoMacros)
+            ? store.autoMacros
+            : []
 
-        for (const value of values) {
-            const name = String(value ?? "").trim()
+        for (const entry of all) {
+            const name = String(entry?.name ?? "").trim()
 
             if (
                 name !== ""
@@ -261,17 +249,87 @@ Rectangle {
             ) {
                 result.push(name)
             }
-
-            if (result.length >= 4)
-                break
         }
 
-        macroNames = result
+        result.sort((a, b) => a.localeCompare(b))
+        return result
+    }
+
+    function selectorCandidates() {
+        const source =
+            selectorType === "macros"
+            ? availableMacroNames()
+            : availableAutoMacroNames()
+
+        const query =
+            String(selectorSearch ?? "")
+                .trim()
+                .toLowerCase()
+
+        if (query === "")
+            return source
+
+        return source.filter(name =>
+            name.toLowerCase().includes(query)
+        )
+    }
+
+    function openSelector(type) {
+        selectorType = type
+        selectorSearch = ""
+        selectorSelection =
+            type === "macros"
+            ? macroNames.slice(0, 4)
+            : autoMacroNames.slice(0, 4)
+
+        selectorOpen = true
+        selectorDialog.open()
+    }
+
+    function selectorContains(name) {
+        return selectorSelection.includes(name)
+    }
+
+    function toggleSelectorName(name) {
+        const next = selectorSelection.slice()
+        const index = next.indexOf(name)
+
+        if (index >= 0) {
+            next.splice(index, 1)
+        } else {
+            if (next.length >= 4)
+                return
+
+            next.push(name)
+        }
+
+        selectorSelection = next
+    }
+
+    function applySelector() {
+        if (selectorType === "macros")
+            macroNames = selectorSelection.slice(0, 4)
+        else
+            autoMacroNames = selectorSelection.slice(0, 4)
+
+        selectorOpen = false
+        selectorDialog.close()
+    }
+
+    function selectionSummary(values, emptyText) {
+        if (!Array.isArray(values) || values.length === 0)
+            return emptyText
+
+        return values.join(", ")
     }
 
     readonly property bool macrosUsed:
         leftCards.includes("macros")
         || rightCards.includes("macros")
+
+    readonly property bool autoMacrosUsed:
+        leftCards.includes("auto_macros")
+        || rightCards.includes("auto_macros")
 
     function save() {
         config.setTouchDashboard({
@@ -280,7 +338,8 @@ Rectangle {
                 left: normalizedColumn(leftCards),
                 right: normalizedColumn(rightCards)
             },
-            macro_names: macroNames.slice(0, 4)
+            macro_names: macroNames.slice(0, 4),
+            auto_macro_names: autoMacroNames.slice(0, 4)
         })
 
         closed()
@@ -325,6 +384,7 @@ Rectangle {
                         defaults.columns.right.slice()
 
                     root.macroNames = []
+                    root.autoMacroNames = []
                 }
             }
 
@@ -453,13 +513,15 @@ Rectangle {
                                 root.columnCards(
                                     modelData
                                 ).includes("macros")
+                                || root.columnCards(
+                                    modelData
+                                ).includes("auto_macros")
 
                             color: Md3Theme.outlineVariant
                         }
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            Layout.fillHeight: true
                             spacing: 5
 
                             visible:
@@ -480,38 +542,99 @@ Rectangle {
                                 font.weight: Font.DemiBold
                             }
 
-                            GridLayout {
+                            Md3Button {
                                 Layout.fillWidth: true
-                                columns: 2
-                                rowSpacing: 5
-                                columnSpacing: 5
+                                implicitHeight: 40
+                                outlined: true
 
-                                Repeater {
-                                    model: 4
+                                text:
+                                    root.macroNames.length > 0
+                                    ? root.i18n.text("dashboard_selected")
+                                      + " "
+                                      + root.macroNames.length
+                                      + "/4"
+                                    : root.i18n.text(
+                                        "dashboard_choose_macros"
+                                    )
 
-                                    delegate: Md3Select {
-                                        required property int index
+                                onClicked:
+                                    root.openSelector("macros")
+                            }
 
-                                        Layout.fillWidth: true
-                                        implicitHeight: 38
+                            Text {
+                                Layout.fillWidth: true
 
-                                        model:
-                                            root.macroOptionLabels()
+                                visible:
+                                    root.macroNames.length > 0
 
-                                        currentIndex:
-                                            root.macroIndexFor(
-                                                index
-                                            )
+                                text:
+                                    root.selectionSummary(
+                                        root.macroNames,
+                                        ""
+                                    )
 
-                                        onActivated:
-                                            selectedIndex => {
-                                                root.setMacroSlot(
-                                                    index,
-                                                    selectedIndex
-                                                )
-                                            }
-                                    }
-                                }
+                                color: Md3Theme.surfaceVariantContent
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 5
+
+                            visible:
+                                root.columnCards(
+                                    modelData
+                                ).includes("auto_macros")
+
+                            Text {
+                                Layout.fillWidth: true
+
+                                text:
+                                    root.i18n.text(
+                                        "dashboard_auto_macro_selection"
+                                    )
+
+                                color: Md3Theme.surfaceContent
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                            }
+
+                            Md3Button {
+                                Layout.fillWidth: true
+                                implicitHeight: 40
+                                outlined: true
+
+                                text:
+                                    root.autoMacroNames.length > 0
+                                    ? root.i18n.text("dashboard_selected")
+                                      + " "
+                                      + root.autoMacroNames.length
+                                      + "/4"
+                                    : root.i18n.text(
+                                        "dashboard_choose_auto_macros"
+                                    )
+
+                                onClicked:
+                                    root.openSelector("auto_macros")
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+
+                                visible:
+                                    root.autoMacroNames.length > 0
+
+                                text:
+                                    root.selectionSummary(
+                                        root.autoMacroNames,
+                                        ""
+                                    )
+
+                                color: Md3Theme.surfaceVariantContent
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
                             }
                         }
 
@@ -523,4 +646,221 @@ Rectangle {
             }
         }
     }
+
+    Popup {
+        id: selectorDialog
+
+        parent: Overlay.overlay
+
+        modal: true
+        focus: true
+
+        closePolicy:
+            Popup.CloseOnEscape
+            | Popup.CloseOnPressOutside
+
+        width:
+            Math.min(
+                Overlay.overlay.width - 80,
+                640
+            )
+
+        height:
+            Math.min(
+                Overlay.overlay.height - 70,
+                430
+            )
+
+        x:
+            Math.round(
+                (Overlay.overlay.width - width) / 2
+            )
+
+        y:
+            Math.round(
+                (Overlay.overlay.height - height) / 2
+            )
+
+        padding: 0
+
+        onClosed: {
+            root.selectorOpen = false
+            root.selectorSearch = ""
+        }
+
+        background: Rectangle {
+            radius: Md3Theme.radiusExtraLarge
+            color: Md3Theme.surfaceContainer
+
+            border.width: 1
+            border.color: Md3Theme.outlineVariant
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 9
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 36
+                spacing: 8
+
+                Text {
+                    Layout.fillWidth: true
+
+                    text:
+                        root.selectorType === "macros"
+                        ? root.i18n.text(
+                            "dashboard_choose_macros"
+                        )
+                        : root.i18n.text(
+                            "dashboard_choose_auto_macros"
+                        )
+
+                    color: Md3Theme.surfaceContent
+                    font.pixelSize: 16
+                    font.weight: Font.DemiBold
+                }
+
+                Text {
+                    text:
+                        root.selectorSelection.length
+                        + "/4"
+
+                    color:
+                        root.selectorSelection.length >= 4
+                        ? Md3Theme.primary
+                        : Md3Theme.surfaceVariantContent
+
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
+                }
+            }
+
+            Md3TextField {
+                id: selectorSearchField
+
+                Layout.fillWidth: true
+                implicitHeight: 44
+
+                placeholderText:
+                    root.i18n.text(
+                        "dashboard_search"
+                    )
+
+                text:
+                    root.selectorSearch
+
+                onTextChanged:
+                    root.selectorSearch = text
+            }
+
+            ListView {
+                id: selectorList
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                clip: true
+                spacing: 5
+
+                model:
+                    root.selectorCandidates()
+
+                delegate: Rectangle {
+                    required property string modelData
+
+                    width: selectorList.width
+                    height: 44
+                    radius: Md3Theme.radiusMedium
+
+                    color:
+                        selectorTap.pressed
+                        ? Md3Theme.surfaceContainerHigh
+                        : (
+                            root.selectorContains(modelData)
+                            ? Md3Theme.primaryContainer
+                            : Md3Theme.surfaceContainerHighest
+                        )
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
+
+                        Text {
+                            Layout.fillWidth: true
+
+                            text: modelData
+                            color: Md3Theme.surfaceContent
+
+                            font.pixelSize: 11
+                            font.weight:
+                                root.selectorContains(modelData)
+                                ? Font.DemiBold
+                                : Font.Medium
+
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            visible:
+                                root.selectorContains(modelData)
+
+                            text: "✓"
+                            color: Md3Theme.primary
+
+                            font.pixelSize: 18
+                            font.weight: Font.Bold
+                        }
+                    }
+
+                    TapHandler {
+                        id: selectorTap
+
+                        enabled:
+                            root.selectorContains(modelData)
+                            || root.selectorSelection.length < 4
+
+                        onTapped:
+                            root.toggleSelectorName(
+                                modelData
+                            )
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 38
+                spacing: 8
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                Md3Button {
+                    text:
+                        root.i18n.text("cancel")
+                    outlined: true
+                    implicitHeight: 36
+
+                    onClicked:
+                        selectorDialog.close()
+                }
+
+                Md3Button {
+                    text:
+                        root.i18n.text("apply")
+                    implicitHeight: 36
+
+                    onClicked:
+                        root.applySelector()
+                }
+            }
+        }
+    }
+
 }

@@ -230,5 +230,11 @@
   "dashboard_left_column": "Left column",
   "dashboard_right_column": "Right column",
   "dashboard_slot": "Slot",
-  "dashboard_music_full_column": "Music uses the complete column."
+  "dashboard_music_full_column": "Music uses the complete column.",
+  "dashboard_auto_macro_selection": "Auto macros",
+  "dashboard_choose_macros": "Choose macros",
+  "dashboard_choose_auto_macros": "Choose auto macros",
+  "dashboard_selected": "Selected",
+  "dashboard_search": "Search…",
+  "apply": "Apply"
 }

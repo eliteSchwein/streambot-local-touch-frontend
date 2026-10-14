@@ -119,10 +119,26 @@ Item {
             root.runState = "idle"
     }
 
+    Rectangle {
+        anchors.fill: parent
+        radius: Md3Theme.radiusMedium
+
+        color:
+            rowTap.pressed
+            ? Md3Theme.surfaceContainerHigh
+            : "transparent"
+
+        Behavior on color {
+            ColorAnimation {
+                duration: 100
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 14
-        anchors.rightMargin: 8
+        anchors.rightMargin: 14
 
         spacing: 10
 
@@ -133,33 +149,17 @@ Item {
             text: root.name
             color: Md3Theme.surfaceContent
 
-            font.pixelSize: 13
+            font.pixelSize: 12
             font.weight: Font.DemiBold
 
             elide: Text.ElideRight
             verticalAlignment: Text.AlignVCenter
         }
 
-        Rectangle {
+        Item {
+            Layout.preferredWidth: 26
+            Layout.preferredHeight: 26
             Layout.alignment: Qt.AlignVCenter
-
-            implicitWidth: 44
-            implicitHeight: 44
-
-            radius: 22
-
-            color: {
-                if (root.runState === "success")
-                    return Md3Theme.success
-
-                if (root.runState === "error")
-                    return Md3Theme.error
-
-                if (root.runState === "loading")
-                    return Md3Theme.surfaceContainerHigh
-
-                return Md3Theme.primary
-            }
 
             MdiIcon {
                 anchors.centerIn: parent
@@ -174,18 +174,21 @@ Item {
                     return "play"
                 }
 
-                size: 21
+                size: 19
                 selected:
                     root.runState !== "loading"
             }
-
-            TapHandler {
-                enabled:
-                    root.runState !== "loading"
-
-                onTapped:
-                    root.triggerMacro()
-            }
         }
+    }
+
+    TapHandler {
+        id: rowTap
+
+        enabled:
+            root.runState !== "loading"
+            && root.websocket.connected
+
+        onTapped:
+            root.triggerMacro()
     }
 }

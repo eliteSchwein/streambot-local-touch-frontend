@@ -9,15 +9,45 @@ Md3Card {
     required property var i18n
     required property var store
     required property var websocket
+    property var autoMacroNames: []
     backgroundOpacity: 0.88
 
     title: ""
 
     // Hard cap for the 7-inch Touch dashboard.
-    readonly property var visibleAutoMacros:
-        Array.isArray(root.store.autoMacros)
-        ? root.store.autoMacros.slice(0, 4)
-        : []
+    readonly property var visibleAutoMacros: {
+        const all =
+            Array.isArray(root.store.autoMacros)
+            ? root.store.autoMacros
+            : []
+
+        const selected =
+            Array.isArray(root.autoMacroNames)
+            ? root.autoMacroNames.slice(0, 4)
+            : []
+
+        // Backwards-compatible default: with no explicit selection, show the
+        // first four entries exactly like the old dashboard did.
+        if (selected.length === 0)
+            return all.slice(0, 4)
+
+        const result = []
+
+        for (const name of selected) {
+            const entry =
+                all.find(item =>
+                    String(item?.name ?? "") === String(name)
+                )
+
+            if (entry)
+                result.push(entry)
+
+            if (result.length >= 4)
+                break
+        }
+
+        return result
+    }
 
     Item {
         Layout.fillWidth: true

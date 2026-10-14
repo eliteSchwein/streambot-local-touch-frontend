@@ -44,7 +44,8 @@ QtObject {
                     "music"
                 ]
             },
-            macro_names: []
+            macro_names: [],
+            auto_macro_names: []
         }
     }
 
@@ -119,13 +120,34 @@ QtObject {
                 break
         }
 
+        const autoMacros = []
+        const configuredAutoMacros =
+            Array.isArray(value.auto_macro_names)
+            ? value.auto_macro_names
+            : []
+
+        for (const raw of configuredAutoMacros) {
+            const name = String(raw ?? "").trim()
+
+            if (
+                name !== ""
+                && !autoMacros.includes(name)
+            ) {
+                autoMacros.push(name)
+            }
+
+            if (autoMacros.length >= 4)
+                break
+        }
+
         return {
             version: 1,
             columns: {
                 left: left,
                 right: right
             },
-            macro_names: macros
+            macro_names: macros,
+            auto_macro_names: autoMacros
         }
     }
 

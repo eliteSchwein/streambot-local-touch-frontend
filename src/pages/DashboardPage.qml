@@ -36,7 +36,7 @@ Item {
     function cardHeight(card) {
         switch (card) {
         case "interactions":
-            return 132
+            return 155
         case "auto_macros":
             return 190
         case "macros":
@@ -121,6 +121,10 @@ Item {
             i18n: root.i18n
             store: root.store
             websocket: root.websocket
+
+            autoMacroNames:
+                root.dashboard.auto_macro_names
+                ?? []
         }
     }
 

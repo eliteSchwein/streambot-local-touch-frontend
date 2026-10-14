@@ -60,7 +60,7 @@ Md3Card {
 
             visible: root.entries().length > 0
             clip: true
-            spacing: 5
+            spacing: 6
             interactive: false
 
             model: root.entries()
@@ -69,7 +69,7 @@ Md3Card {
                 required property var modelData
 
                 width: list.width
-                height: 42
+                height: 46
 
                 name: modelData.name
                 macro: modelData.macro

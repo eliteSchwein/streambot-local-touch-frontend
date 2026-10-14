@@ -230,5 +230,11 @@
   "dashboard_left_column": "Linke Spalte",
   "dashboard_right_column": "Rechte Spalte",
   "dashboard_slot": "Slot",
-  "dashboard_music_full_column": "Musik belegt die komplette Spalte."
+  "dashboard_music_full_column": "Musik belegt die komplette Spalte.",
+  "dashboard_auto_macro_selection": "Auto-Makros",
+  "dashboard_choose_macros": "Makros auswählen",
+  "dashboard_choose_auto_macros": "Auto-Makros auswählen",
+  "dashboard_selected": "Ausgewählt",
+  "dashboard_search": "Suchen…",
+  "apply": "Übernehmen"
 }
