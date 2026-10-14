@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 import "../md3"
 
 Rectangle {
@@ -61,13 +62,16 @@ Rectangle {
         return clampPercent(used / total * 100)
     }
 
-    readonly property real cpuUsage:
-        clampPercent(info?.cpu_usage)
+    // CPU metrics are read directly from the local Debian/Linux system.
+    // CPU usage comes from /proc/stat and temperature from /sys/class/thermal.
+    property real nativeCpuUsage: -1
+    property real nativeCpuTemperature: -1
 
-    readonly property real cpuTemperature: {
-        const value = numberOrNull(info?.cpu_temperature)
-        return value === null ? -1 : value
-    }
+    readonly property real cpuUsage:
+        clampPercent(nativeCpuUsage)
+
+    readonly property real cpuTemperature:
+        nativeCpuTemperature
 
     readonly property real ramUsage:
         clampPercent(info?.ram_usage)
@@ -89,6 +93,85 @@ Rectangle {
         return value >= 0
             ? Math.round(value) + " °C"
             : "—"
+    }
+
+    function refreshNativeCpu() {
+        if (nativeCpuProcess.running)
+            return
+
+        nativeCpuProcess.exec([
+            "sh",
+            "-c",
+            "read_cpu() { "
+            + "read _ user nice system idle iowait irq softirq steal _ "
+            + "< /proc/stat; "
+            + "idle_all=$((idle + iowait)); "
+            + "non_idle=$((user + nice + system + irq + softirq + steal)); "
+            + "echo $((idle_all + non_idle)) $idle_all; "
+            + "}; "
+            + "set -- $(read_cpu); total1=$1; idle1=$2; "
+            + "sleep 0.20; "
+            + "set -- $(read_cpu); total2=$1; idle2=$2; "
+            + "dt=$((total2-total1)); di=$((idle2-idle1)); "
+            + "if [ \"$dt\" -gt 0 ]; then "
+            + "cpu=$(awk -v dt=\"$dt\" -v di=\"$di\" "
+            + "'BEGIN { printf \"%.1f\", (dt-di)*100/dt }'); "
+            + "else cpu=''; fi; "
+            + "temp=''; "
+            + "for z in /sys/class/thermal/thermal_zone*; do "
+            + "[ -r \"$z/temp\" ] || continue; "
+            + "t=$(cat \"$z/temp\" 2>/dev/null) || continue; "
+            + "case \"$t\" in ''|*[!0-9-]*) continue ;; esac; "
+            + "if [ \"$t\" -gt 1000 ] 2>/dev/null; then "
+            + "v=$(awk -v t=\"$t\" 'BEGIN { printf \"%.1f\", t/1000 }'); "
+            + "else v=\"$t\"; fi; "
+            + "case \"$(cat \"$z/type\" 2>/dev/null)\" in "
+            + "*cpu*|*CPU*|*soc*|*SoC*) temp=\"$v\"; break ;; "
+            + "esac; "
+            + "[ -z \"$temp\" ] && temp=\"$v\"; "
+            + "done; "
+            + "printf '%s %s\\n' \"$cpu\" \"$temp\""
+        ])
+    }
+
+    Process {
+        id: nativeCpuProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const parts = String(text).trim().split(/\\s+/)
+
+                if (parts.length > 0) {
+                    const usage = Number(parts[0])
+                    if (Number.isFinite(usage))
+                        root.nativeCpuUsage = usage
+                }
+
+                if (parts.length > 1) {
+                    const temperature = Number(parts[1])
+                    if (Number.isFinite(temperature))
+                        root.nativeCpuTemperature = temperature
+                }
+            }
+        }
+
+        stderr: SplitParser {
+            onRead: line => {
+                const message = String(line).trim()
+                if (message !== "")
+                    console.warn("[system-native-cpu]", message)
+            }
+        }
+    }
+
+    Timer {
+        interval: 2000
+        repeat: true
+        running: true
+        triggeredOnStart: true
+
+        onTriggered:
+            root.refreshNativeCpu()
     }
 
     ColumnLayout {
