@@ -80,7 +80,7 @@ Md3Card {
                 required property var modelData
 
                 width: interactionList.width
-                height: 58
+                height: 50
 
                 radius: Md3Theme.radiusMedium
 

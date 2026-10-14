@@ -35,7 +35,10 @@ Md3Card {
 
             clip: true
             spacing: 6
-            model: root.store.autoMacros
+            model:
+                Array.isArray(root.store.autoMacros)
+                ? root.store.autoMacros.slice(0, 4)
+                : []
 
             delegate: Item {
                 id: macroRow
@@ -43,7 +46,7 @@ Md3Card {
                 required property var modelData
 
                 width: macroList.width
-                height: 48
+                height: 42
 
                 readonly property real progress: {
                     if (!modelData.enabled)

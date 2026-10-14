@@ -211,5 +211,19 @@
   "system_cpu_usage": "CPU usage",
   "system_cpu_temp": "CPU temperature",
   "system_ram_usage": "RAM usage",
-  "system_internal_storage_usage": "Internal storage"
+  "system_internal_storage_usage": "Internal storage",
+  "dashboard_edit": "Edit dashboard",
+  "dashboard_reset": "Reset",
+  "dashboard_cards": "Cards",
+  "dashboard_macro_selection": "Macros (max. 4)",
+  "dashboard_card_interactions": "Interactions",
+  "dashboard_card_auto_macros": "Auto macros",
+  "dashboard_card_macros": "Macros",
+  "dashboard_card_music": "Music",
+  "dashboard_hidden": "Off",
+  "dashboard_left": "Left",
+  "dashboard_right": "Right",
+  "dashboard_limits_hint": "7-inch limits: Music always uses a complete column. Other columns can contain at most two cards. Auto macros and macros show at most four entries.",
+  "dashboard_no_macros": "Select up to 4 macros in the dashboard editor.",
+  "save": "Save"
 }

@@ -211,5 +211,19 @@
   "system_cpu_usage": "CPU-Auslastung",
   "system_cpu_temp": "CPU-Temperatur",
   "system_ram_usage": "RAM-Auslastung",
-  "system_internal_storage_usage": "Interner Speicher"
+  "system_internal_storage_usage": "Interner Speicher",
+  "dashboard_edit": "Dashboard bearbeiten",
+  "dashboard_reset": "Zurücksetzen",
+  "dashboard_cards": "Karten",
+  "dashboard_macro_selection": "Makros (max. 4)",
+  "dashboard_card_interactions": "Interaktionen",
+  "dashboard_card_auto_macros": "Auto-Makros",
+  "dashboard_card_macros": "Makros",
+  "dashboard_card_music": "Musik",
+  "dashboard_hidden": "Aus",
+  "dashboard_left": "Links",
+  "dashboard_right": "Rechts",
+  "dashboard_limits_hint": "7-Zoll-Limits: Musik belegt immer eine komplette Spalte. Andere Spalten können maximal zwei Karten enthalten. Auto-Makros und Makros zeigen maximal vier Einträge.",
+  "dashboard_no_macros": "Wähle im Dashboard-Editor bis zu 4 Makros aus.",
+  "save": "Speichern"
 }

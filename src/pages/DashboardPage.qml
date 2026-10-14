@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 
 import "../components/dashboard"
+import "../components/md3"
 
 Item {
     id: root
@@ -9,46 +10,185 @@ Item {
     required property var i18n
     required property var websocket
     required property var store
+    required property var config
+
+    property bool editing: false
+
+    readonly property var dashboard:
+        config.normalizeTouchDashboard(
+            config.touchDashboard
+        )
+
+    function columnCards(side) {
+        const columns =
+            dashboard.columns ?? ({})
+
+        const value =
+            side === "left"
+            ? columns.left
+            : columns.right
+
+        return Array.isArray(value)
+            ? value
+            : []
+    }
+
+    function cardHeight(card) {
+        switch (card) {
+        case "interactions":
+            return 132
+        case "auto_macros":
+            return 190
+        case "macros":
+            return 190
+        default:
+            return -1
+        }
+    }
 
     RowLayout {
         anchors.fill: parent
         anchors.margins: 10
-        spacing: 10
+        spacing: 8
 
-        ColumnLayout {
-            Layout.preferredWidth: parent.width * 0.39
-            Layout.fillHeight: true
-            spacing: 8
+        Repeater {
+            model: [
+                root.columnCards("left"),
+                root.columnCards("right")
+            ]
 
-            InteractionsCard {
+            delegate: ColumnLayout {
+                required property var modelData
+
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: parent.height * 0.66
+                spacing: 8
 
-                i18n: root.i18n
-                store: root.store
-                websocket: root.websocket
-            }
+                Repeater {
+                    model: modelData
 
-            AutoMacrosCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredHeight: parent.height * 0.34
+                    delegate: Loader {
+                        required property string modelData
 
-                i18n: root.i18n
-                store: root.store
-                websocket: root.websocket
+                        Layout.fillWidth: true
+                        Layout.fillHeight:
+                            modelData === "music"
+                        Layout.preferredHeight:
+                            modelData === "music"
+                            ? -1
+                            : root.cardHeight(modelData)
+
+                        sourceComponent: {
+                            switch (modelData) {
+                            case "interactions":
+                                return interactionsComponent
+                            case "auto_macros":
+                                return autoMacrosComponent
+                            case "macros":
+                                return macrosComponent
+                            case "music":
+                                return musicComponent
+                            default:
+                                return null
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible:
+                        !modelData.includes("music")
+                }
             }
         }
+    }
+
+    Rectangle {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: 14
+        anchors.rightMargin: 14
+
+        width: 36
+        height: 36
+        radius: 18
+        z: 50
+
+        color: editTap.pressed
+            ? Md3Theme.surfaceContainerHigh
+            : Md3Theme.surfaceContainerHighest
+
+        border.width: 1
+        border.color: Md3Theme.outlineVariant
+
+        Text {
+            anchors.centerIn: parent
+            text: "✎"
+            color: Md3Theme.surfaceContent
+            font.pixelSize: 18
+        }
+
+        TapHandler {
+            id: editTap
+            onTapped: root.editing = true
+        }
+    }
+
+    Component {
+        id: interactionsComponent
+
+        InteractionsCard {
+            i18n: root.i18n
+            store: root.store
+            websocket: root.websocket
+        }
+    }
+
+    Component {
+        id: autoMacrosComponent
+
+        AutoMacrosCard {
+            i18n: root.i18n
+            store: root.store
+            websocket: root.websocket
+        }
+    }
+
+    Component {
+        id: macrosComponent
+
+        DashboardMacrosCard {
+            i18n: root.i18n
+            store: root.store
+            websocket: root.websocket
+
+            macroNames:
+                root.dashboard.macro_names
+                ?? []
+        }
+    }
+
+    Component {
+        id: musicComponent
 
         MusicPlayerCard {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.minimumWidth: 320
-
             i18n: root.i18n
             websocket: root.websocket
             store: root.store
         }
+    }
+
+    DashboardEditor {
+        anchors.fill: parent
+        visible: root.editing
+
+        i18n: root.i18n
+        config: root.config
+        store: root.store
+
+        onClosed:
+            root.editing = false
     }
 }

@@ -28,6 +28,105 @@ QtObject {
     property int restPort: 8105
     property string language: "en"
     property string touchWallpaper: ""
+    property var touchDashboard: defaultTouchDashboard()
+
+    function defaultTouchDashboard() {
+        return {
+            version: 1,
+            columns: {
+                left: [
+                    "interactions",
+                    "auto_macros"
+                ],
+                right: [
+                    "music"
+                ]
+            },
+            macro_names: []
+        }
+    }
+
+    function normalizeTouchDashboard(value) {
+        const fallback = defaultTouchDashboard()
+
+        if (!value || typeof value !== "object")
+            return fallback
+
+        const allowed = [
+            "interactions",
+            "auto_macros",
+            "macros",
+            "music"
+        ]
+
+        function cleanColumn(column) {
+            if (!Array.isArray(column))
+                return []
+
+            const result = []
+
+            for (const raw of column) {
+                const name = String(raw ?? "")
+
+                if (
+                    allowed.includes(name)
+                    && !result.includes(name)
+                ) {
+                    result.push(name)
+                }
+            }
+
+            // Music always owns the complete column.
+            if (result.includes("music"))
+                return ["music"]
+
+            // A 7-inch screen has room for at most two compact cards
+            // in one non-music column.
+            return result.slice(0, 2)
+        }
+
+        const columns =
+            value.columns
+            && typeof value.columns === "object"
+            ? value.columns
+            : ({})
+
+        let left = cleanColumn(columns.left)
+        let right = cleanColumn(columns.right)
+
+        // Do not render the same card twice.
+        right = right.filter(card => !left.includes(card))
+
+        const macros = []
+        const configuredMacros =
+            Array.isArray(value.macro_names)
+            ? value.macro_names
+            : []
+
+        for (const raw of configuredMacros) {
+            const name = String(raw ?? "").trim()
+
+            if (
+                name !== ""
+                && !macros.includes(name)
+            ) {
+                macros.push(name)
+            }
+
+            if (macros.length >= 4)
+                break
+        }
+
+        return {
+            version: 1,
+            columns: {
+                left: left,
+                right: right
+            },
+            macro_names: macros
+        }
+    }
+
 
     readonly property string assetRootPath:
         homePath + "/.config/streambot/assets"
@@ -149,6 +248,52 @@ QtObject {
         }
     }
 
+    function setTouchDashboard(value) {
+        const normalized = normalizeTouchDashboard(value)
+
+        let data = {}
+
+        if (settingsFile.loaded) {
+            const currentText = settingsFile.text()
+
+            if (currentText && currentText.trim() !== "") {
+                try {
+                    data = JSON.parse(currentText)
+                } catch (error) {
+                    console.warn(
+                        "[config] cannot save touch_dashboard because streambot-settings.json is invalid:",
+                        error
+                    )
+                    return false
+                }
+            }
+        }
+
+        data.touch_dashboard = normalized
+
+        try {
+            settingsFile.setText(
+                JSON.stringify(data, null, 2) + "\n"
+            )
+
+            touchDashboard = normalized
+
+            console.log(
+                "[config] saved touch_dashboard:",
+                JSON.stringify(normalized)
+            )
+
+            return true
+        } catch (error) {
+            console.warn(
+                "[config] failed to save touch_dashboard:",
+                error
+            )
+
+            return false
+        }
+    }
+
     function setLanguage(newLanguage) {
         if (newLanguage !== "en" && newLanguage !== "de")
             return
@@ -195,6 +340,7 @@ QtObject {
     function loadSharedSettings() {
         language = "en"
         touchWallpaper = ""
+        touchDashboard = defaultTouchDashboard()
 
         if (!settingsFile.loaded)
             return
@@ -211,6 +357,16 @@ QtObject {
 
             if (typeof data.touch_wallpaper === "string")
                 touchWallpaper = data.touch_wallpaper.trim()
+
+            if (
+                data.touch_dashboard
+                && typeof data.touch_dashboard === "object"
+            ) {
+                touchDashboard =
+                    normalizeTouchDashboard(
+                        data.touch_dashboard
+                    )
+            }
         } catch (error) {
             console.warn(
                 "[config] failed to parse streambot-settings.json:",
@@ -237,6 +393,16 @@ QtObject {
 
         if (typeof settings.touch_wallpaper === "string")
             touchWallpaper = settings.touch_wallpaper.trim()
+
+        if (
+            settings.touch_dashboard
+            && typeof settings.touch_dashboard === "object"
+        ) {
+            touchDashboard =
+                normalizeTouchDashboard(
+                    settings.touch_dashboard
+                )
+        }
     }
 
 }

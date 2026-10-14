@@ -1,3 +1,5 @@
 InteractionsCard 1.0 InteractionsCard.qml
 AutoMacrosCard 1.0 AutoMacrosCard.qml
 MusicPlayerCard 1.0 MusicPlayerCard.qml
+DashboardMacrosCard 1.0 DashboardMacrosCard.qml
+DashboardEditor 1.0 DashboardEditor.qml
