@@ -90,8 +90,17 @@ Item {
         )
 
         y: {
-            if (KeyboardController.visible)
-                return 10
+            if (KeyboardController.visible) {
+                const gap = 8
+
+                return Math.max(
+                    8,
+                    root.height
+                    - keyboardHeight
+                    - height
+                    - gap
+                )
+            }
 
             return Math.round(
                 (root.height - height) / 2

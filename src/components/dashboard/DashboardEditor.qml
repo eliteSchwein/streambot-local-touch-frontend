@@ -711,12 +711,15 @@ Rectangle {
                 ? KeyboardController.keyboardHeight
                 : 0
 
+            readonly property real keyboardGap: 8
+
             readonly property real availableHeight:
                 Math.max(
                     170,
                     selectorDialogLayer.height
                     - keyboardHeight
-                    - 20
+                    - keyboardGap
+                    - 8
                 )
 
             height:
@@ -725,8 +728,6 @@ Rectangle {
                     availableHeight
                 )
 
-            // Critical for small 7-inch layouts: when the keyboard is open,
-            // child layouts must not paint outside the reduced dialog height.
             clip: true
 
             x:
@@ -735,8 +736,18 @@ Rectangle {
                 )
 
             y: {
-                if (KeyboardController.visible)
-                    return 10
+                if (KeyboardController.visible) {
+                    // Keep the dialog visually attached to the keyboard with
+                    // just a small breathing gap instead of pinning it to the
+                    // top of the screen.
+                    return Math.max(
+                        8,
+                        selectorDialogLayer.height
+                        - keyboardHeight
+                        - height
+                        - keyboardGap
+                    )
+                }
 
                 return Math.round(
                     (selectorDialogLayer.height - height) / 2
