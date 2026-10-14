@@ -117,6 +117,7 @@ Rectangle {
 
         if (updateAllQueue.length === 0) {
             updateAllActive = false
+            websocket.sendRpc("update_refresh")
             return
         }
 
@@ -202,55 +203,22 @@ Rectangle {
                 font.weight: Font.DemiBold
             }
 
-            Rectangle {
-                implicitWidth: updateAllText.implicitWidth + 24
-                width: implicitWidth
-                height: 32
-                radius: 16
+            Md3Button {
+                text:
+                    root.updateAllActive
+                    ? root.i18n.text("system_updates_updating")
+                    : root.i18n.text("system_updates_update_all")
 
-                color:
+                implicitHeight: 34
+
+                enabled:
                     root.hasUpdates
                     && !root.updating
+                    && !root.checking
                     && !root.updateAllActive
-                    ? Md3Theme.primary
-                    : Md3Theme.surfaceContainerHighest
 
-                opacity:
-                    root.hasUpdates
-                    && !root.updating
-                    && !root.updateAllActive
-                    ? 1
-                    : 0.55
-
-                Text {
-                    id: updateAllText
-                    anchors.centerIn: parent
-
-                    text:
-                        root.updateAllActive
-                        ? root.i18n.text("system_updates_updating")
-                        : root.i18n.text("system_updates_update_all")
-
-                    color:
-                        root.hasUpdates
-                        && !root.updating
-                        && !root.updateAllActive
-                        ? Md3Theme.primaryContent
-                        : Md3Theme.surfaceVariantContent
-
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
-
-                TapHandler {
-                    enabled:
-                        root.hasUpdates
-                        && !root.updating
-                        && !root.updateAllActive
-
-                    onTapped:
-                        root.startUpdateAll()
-                }
+                onClicked:
+                    root.startUpdateAll()
             }
 
             Rectangle {

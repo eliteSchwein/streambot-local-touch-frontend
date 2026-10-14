@@ -12,6 +12,12 @@ Item {
     required property var store
     required property var config
 
+    Component.onCompleted: {
+        Qt.callLater(function() {
+            root.websocket.sendRpc("update_refresh")
+        })
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: 10

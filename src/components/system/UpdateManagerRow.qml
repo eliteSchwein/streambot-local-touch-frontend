@@ -35,8 +35,7 @@ Rectangle {
 
     implicitHeight:
             managerName === "system"
-        && Array.isArray(manager.updates)
-        && manager.updates.length > 0
+        && systemPackageCount() > 0
         ? 70
         : 52
 
@@ -46,11 +45,21 @@ Rectangle {
         : "transparent"
 
 
+    function systemUpdates() {
+        return Array.isArray(root.manager?.updates)
+            ? root.manager.updates
+            : []
+    }
+
+    function systemPackageCount() {
+        return systemUpdates().length
+    }
+
     function updatePreview() {
-        if (!Array.isArray(root.manager.updates) || root.manager.updates.length === 0)
+        if (systemPackageCount() === 0)
             return ""
 
-        const updates = root.manager.updates
+        const updates = systemUpdates()
         const preview = updates.slice(0, 3)
             .map(p => p && p.package ? p.package : "")
             .filter(name => name.length > 0)
@@ -63,9 +72,7 @@ Rectangle {
 
     function versionText() {
         if (managerName === "system") {
-            const c = Array.isArray(manager.updates)
-                ? manager.updates.length
-                : 0
+            const c = systemPackageCount()
 
             return i18n.text("system_updates_package_count")
                 .replace("{count}", c)
@@ -150,8 +157,7 @@ Rectangle {
                 Layout.fillWidth: true
                 visible:
                     root.managerName === "system"
-                    && Array.isArray(root.manager.updates)
-                    && root.manager.updates.length > 0
+                    && root.systemPackageCount() > 0
                 text: root.updatePreview()
                 color: Md3Theme.surfaceVariantContent
                 font.pixelSize: 12

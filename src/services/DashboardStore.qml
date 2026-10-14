@@ -81,7 +81,7 @@ QtObject {
             break
 
         case "notify_update_manager":
-            updateManager = params && typeof params === "object" ? params : ({})
+            updateManager = normalizeUpdateManager(params)
             break
 
         case "notify_storage_update":
@@ -168,6 +168,42 @@ QtObject {
         }
 
         return null
+    }
+
+    function normalizeUpdateManager(value) {
+        if (!value || typeof value !== "object")
+            return ({})
+
+        const source =
+            value.managers && typeof value.managers === "object"
+            ? value.managers
+            : value
+
+        const normalized = ({})
+
+        for (const name in source) {
+            const input = source[name]
+            if (!input || typeof input !== "object")
+                continue
+
+            const manager = ({})
+            for (const key in input)
+                manager[key] = input[key]
+
+            if (name === "system") {
+                manager.updates = Array.isArray(input.updates)
+                    ? input.updates.slice()
+                    : []
+
+                manager.update_available =
+                    manager.updates.length > 0
+                    || input.update_available === true
+            }
+
+            normalized[name] = manager
+        }
+
+        return normalized
     }
 
     function normalizeSystemStorage(value) {
