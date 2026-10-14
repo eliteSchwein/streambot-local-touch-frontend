@@ -104,7 +104,7 @@ Item {
 
             return Math.round(
                 (root.height - height) / 2
-            )
+            ) + 30
         }
 
         radius: Md3Theme.radiusExtraLarge

@@ -751,7 +751,7 @@ Rectangle {
 
                 return Math.round(
                     (selectorDialogLayer.height - height) / 2
-                )
+                ) + 30
             }
 
             Behavior on y {
