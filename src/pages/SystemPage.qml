@@ -30,7 +30,7 @@ Item {
 
             SystemStatsCard {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 190
+                Layout.preferredHeight: 165
 
                 i18n: root.i18n
                 info: root.store.systemInfo ?? ({})

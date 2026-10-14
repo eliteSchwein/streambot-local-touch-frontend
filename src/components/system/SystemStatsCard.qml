@@ -9,7 +9,7 @@ Rectangle {
     required property var info
     required property var storage
 
-    implicitHeight: 190
+    implicitHeight: 165
 
     radius: Md3Theme.radiusLarge
     color: "transparent"
@@ -125,8 +125,8 @@ Rectangle {
             spacing: 14
 
             Item {
-                Layout.preferredWidth: 142
-                Layout.preferredHeight: 142
+                Layout.preferredWidth: 126
+                Layout.preferredHeight: 126
                 Layout.alignment: Qt.AlignVCenter
 
                 Canvas {
@@ -185,9 +185,9 @@ Rectangle {
 
                         // Same three-ring hierarchy as Commander 2.0:
                         // CPU outer, RAM middle, internal storage inner.
-                        drawRing(ctx, cx, cy, 58, 9, cpuValue, "#EF5350")
-                        drawRing(ctx, cx, cy, 44, 9, ramValue, "#FFB300")
-                        drawRing(ctx, cx, cy, 30, 9, storageValue, "#26C6DA")
+                        drawRing(ctx, cx, cy, 52, 6, cpuValue, "#EF5350")
+                        drawRing(ctx, cx, cy, 40, 6, ramValue, "#FFB300")
+                        drawRing(ctx, cx, cy, 28, 6, storageValue, "#26C6DA")
                     }
                 }
             }
