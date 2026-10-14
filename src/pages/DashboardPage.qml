@@ -71,11 +71,15 @@ Item {
                         required property string modelData
 
                         Layout.fillWidth: true
-                        Layout.fillHeight:
-                            modelData === "music"
+
+                        // Every configured card participates in filling the
+                        // complete column. preferredHeight only acts as the
+                        // ratio/weight between two cards (Interactions stays
+                        // more compact than Auto Macros / Macros).
+                        Layout.fillHeight: true
                         Layout.preferredHeight:
                             modelData === "music"
-                            ? -1
+                            ? 1
                             : root.cardHeight(modelData)
 
                         sourceComponent: {
@@ -95,12 +99,6 @@ Item {
                     }
                 }
 
-                Item {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    visible:
-                        !modelData.includes("music")
-                }
             }
         }
     }

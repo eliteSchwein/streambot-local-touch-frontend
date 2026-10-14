@@ -13,6 +13,12 @@ Md3Card {
 
     title: ""
 
+    // Hard cap for the 7-inch Touch dashboard.
+    readonly property var visibleAutoMacros:
+        Array.isArray(root.store.autoMacros)
+        ? root.store.autoMacros.slice(0, 4)
+        : []
+
     Item {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -20,7 +26,7 @@ Md3Card {
         Text {
             anchors.centerIn: parent
 
-            visible: root.store.autoMacros.length === 0
+            visible: root.visibleAutoMacros.length === 0
 
             text: root.i18n.text("no_auto_macros")
             color: Md3Theme.surfaceVariantContent
@@ -31,14 +37,11 @@ Md3Card {
             id: macroList
 
             anchors.fill: parent
-            visible: root.store.autoMacros.length > 0
+            visible: root.visibleAutoMacros.length > 0
 
             clip: true
             spacing: 6
-            model:
-                Array.isArray(root.store.autoMacros)
-                ? root.store.autoMacros.slice(0, 4)
-                : []
+            model: root.visibleAutoMacros
 
             delegate: Item {
                 id: macroRow

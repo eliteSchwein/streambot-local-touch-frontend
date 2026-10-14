@@ -450,7 +450,9 @@ Rectangle {
                             Layout.preferredHeight: 1
 
                             visible:
-                                root.macrosUsed
+                                root.columnCards(
+                                    modelData
+                                ).includes("macros")
 
                             color: Md3Theme.outlineVariant
                         }
@@ -461,7 +463,9 @@ Rectangle {
                             spacing: 5
 
                             visible:
-                                root.macrosUsed
+                                root.columnCards(
+                                    modelData
+                                ).includes("macros")
 
                             Text {
                                 Layout.fillWidth: true
