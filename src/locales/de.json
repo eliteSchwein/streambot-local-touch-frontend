@@ -205,5 +205,6 @@
   "bluetooth_error_connection_failed": "Gekoppelt, aber die Verbindung ist fehlgeschlagen. Versuche erneut zu verbinden.",
   "bluetooth_error_not_available": "Das Gerät ist nicht mehr verfügbar. Bringe es näher heran und suche erneut.",
   "bluetooth_error_timeout": "Das Gerät hat nicht rechtzeitig geantwortet. Aktiviere den Kopplungsmodus erneut.",
-  "bluetooth_error_generic": "Die Bluetooth-Aktion konnte nicht abgeschlossen werden. Versuche es erneut."
+  "bluetooth_error_generic": "Die Bluetooth-Aktion konnte nicht abgeschlossen werden. Versuche es erneut.",
+  "bluetooth_device_counts": "{paired} gekoppelt • {connected} verbunden"
 }

@@ -205,5 +205,6 @@
   "bluetooth_error_connection_failed": "Paired, but the connection failed. Try connecting again.",
   "bluetooth_error_not_available": "The device is no longer available. Move it closer and scan again.",
   "bluetooth_error_timeout": "The device did not respond in time. Put it into pairing mode and retry.",
-  "bluetooth_error_generic": "Bluetooth could not complete the action. Try again."
+  "bluetooth_error_generic": "Bluetooth could not complete the action. Try again.",
+  "bluetooth_device_counts": "{paired} paired • {connected} connected"
 }

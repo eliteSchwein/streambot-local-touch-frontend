@@ -499,10 +499,16 @@ Item {
                                                 : root.i18n.text("bluetooth_scanning_le")
                                             )
                                             : root.i18n
-                                                .text("bluetooth_paired_count")
+                                                .text("bluetooth_device_counts")
                                                 .replace(
-                                                    "{count}",
+                                                    "{paired}",
                                                     root.bluetooth.pairedDevices.length
+                                                )
+                                                .replace(
+                                                    "{connected}",
+                                                    root.bluetooth.pairedDevices.filter(
+                                                        device => device.connected === true
+                                                    ).length
                                                 )
 
                                 color:
@@ -777,18 +783,30 @@ Item {
                                                 }
                                             }
 
-                                            TapHandler {
-                                                enabled:
-                                                    !root.bluetooth.busy
-                                                onTapped: {
-                                                    if (modelData.connected) {
-                                                        root.bluetooth.disconnectDevice(
-                                                            modelData
-                                                        )
-                                                    } else {
-                                                        root.bluetooth.connectDevice(
-                                                            modelData
-                                                        )
+                                            // Keep the connect/disconnect hit area away from
+                                            // the remove button so one tap can never trigger both.
+                                            Item {
+                                                anchors {
+                                                    left: parent.left
+                                                    top: parent.top
+                                                    bottom: parent.bottom
+                                                    right: parent.right
+                                                    rightMargin: 48
+                                                }
+
+                                                TapHandler {
+                                                    enabled:
+                                                        !root.bluetooth.busy
+                                                    onTapped: {
+                                                        if (modelData.connected) {
+                                                            root.bluetooth.disconnectDevice(
+                                                                modelData
+                                                            )
+                                                        } else {
+                                                            root.bluetooth.connectDevice(
+                                                                modelData
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }

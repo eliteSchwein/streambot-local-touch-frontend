@@ -231,10 +231,23 @@ QtObject {
         busyAddress = device.address
         clearError()
 
+        // Do not race a running discovery cycle or an active profile while
+        // removing a device. BlueZ is much more reliable if discovery is
+        // stopped and the device is disconnected first.
+        scanning = false
+        scanCycleDelay.stop()
+
         actionProcess.exec([
-            "bluetoothctl",
-            "remove",
-            device.address
+            "sh",
+            "-c",
+            "(bluetoothctl scan off >/dev/null 2>&1 || true); "
+            + "(bluetoothctl disconnect "
+            + shellQuote(device.address)
+            + " >/dev/null 2>&1 || true); "
+            + "sleep 0.35; "
+            + "bluetoothctl remove "
+            + shellQuote(device.address)
+            + " 2>&1"
         ])
     }
 
@@ -269,7 +282,10 @@ QtObject {
 
             result[currentAddress] = {
                 icon: icon,
-                kind: kind
+                kind: kind,
+                connected: /^\s*Connected:\s+yes\s*$/mi.test(block),
+                paired: /^\s*Paired:\s+yes\s*$/mi.test(block),
+                trusted: /^\s*Trusted:\s+yes\s*$/mi.test(block)
             }
         }
 
@@ -323,8 +339,16 @@ QtObject {
             result.push({
                 address: address,
                 name: name,
-                connected: connectedSet[address] === true,
-                paired: pairedSet[address] === true,
+                // `bluetoothctl devices Connected` is not reliable enough as
+                // the sole source on every BlueZ build. Prefer per-device
+                // `bluetoothctl info` and keep the set as a fallback.
+                connected:
+                    info.connected === true
+                    || connectedSet[address] === true,
+                paired:
+                    info.paired === true
+                    || pairedSet[address] === true,
+                trusted: info.trusted === true,
                 kind: info.kind ?? "generic",
                 kindLabel: root.deviceTypeLabel(info.kind ?? "generic")
             })
@@ -411,20 +435,20 @@ QtObject {
         const connectedSet = parseAddressSet(connectedText)
         const infoMap = parseInfoMap(infoText)
 
-        root.pairedDevices =
-            parseDeviceLines(
-                pairedText,
-                connectedSet,
-                pairedSet,
-                infoMap
-            )
-
         const allDevices =
             parseDeviceLines(
                 allText,
                 connectedSet,
                 pairedSet,
                 infoMap
+            )
+
+        // Use the complete BlueZ cache and classify each device from its own
+        // `info` state. This correctly keeps several simultaneously connected
+        // devices in the paired list.
+        root.pairedDevices =
+            allDevices.filter(
+                device => device.paired === true
             )
 
         root.discoveredDevices =
