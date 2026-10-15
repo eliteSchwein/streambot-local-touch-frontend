@@ -17,6 +17,8 @@ Item {
     property real downloadMbps: -1
     property real uploadMbps: -1
     property string errorText: ""
+    property int startRequestId: -1
+    property int statusRequestId: -1
 
     function tr(key, fallback) {
         const value = root.i18n.text(key)
@@ -61,11 +63,11 @@ Item {
         starting = true
         startGuard.restart()
 
-        const requestId = websocket.sendRpc("speedtest", {
+        startRequestId = websocket.sendRpc("speedtest", {
             action: "start"
         })
 
-        if (requestId < 0)
+        if (startRequestId < 0)
             resetStartGuard()
     }
 
@@ -73,7 +75,7 @@ Item {
         if (!websocket.connected)
             return
 
-        websocket.sendRpc("speedtest", {
+        statusRequestId = websocket.sendRpc("speedtest", {
             action: "status"
         })
     }
@@ -108,31 +110,50 @@ Item {
         function onConnectionChanged(connected) {
             if (connected)
                 Qt.callLater(root.requestStatus)
-            else
+            else {
+                root.startRequestId = -1
+                root.statusRequestId = -1
                 root.resetStartGuard()
+            }
         }
 
         function onJsonReceived(message) {
-            if (!message)
-                return
-
             if (
-                message.method === "notify_speedtest_update"
+                message?.method === "notify_speedtest_update"
                 && message.params
             ) {
                 root.applySpeedtestState(message.params)
+            }
+        }
+
+        function onRpcResponse(id, message) {
+            if (
+                id !== root.startRequestId
+                && id !== root.statusRequestId
+            ) {
                 return
             }
 
-            // Handle the direct RPC response from start/status as well.
+            if (id === root.startRequestId)
+                root.startRequestId = -1
+
+            if (id === root.statusRequestId)
+                root.statusRequestId = -1
+
+            const payload =
+                message?.result?.speedtest
+                ?? message?.result
+                ?? message?.params?.speedtest
+                ?? message?.params
+                ?? message?.data?.speedtest
+                ?? message?.data
+                ?? null
+
             if (
-                message.id !== undefined
-                && message.result
-                && message.result.speedtest
+                payload
+                && typeof payload === "object"
             ) {
-                root.applySpeedtestState(
-                    message.result.speedtest
-                )
+                root.applySpeedtestState(payload)
             }
         }
     }

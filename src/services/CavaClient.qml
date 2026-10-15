@@ -9,6 +9,7 @@ QtObject {
     property bool autoReconnect: true
     property int reconnectInterval: 2000
     property bool enabled: true
+    property string lastRawFrame: ""
 
     readonly property string url:
         baseUrl.replace(/\/$/, "")
@@ -82,6 +83,7 @@ QtObject {
         onStatusChanged: function(status) {
             switch (status) {
                 case WebSocket.Open:
+                    root.lastRawFrame = ""
                     console.log(
                         "[cava] connected:",
                         root.url
@@ -113,8 +115,29 @@ QtObject {
 
         onTextMessageReceived: message => {
             try {
-                root.jsonReceived(JSON.parse(message))
+                const data = JSON.parse(message)
+                const raw =
+                    String(data?.params?.raw ?? "")
+
+                // Backend 3.0 already coalesces CAVA to the newest frame and
+                // drops stale frames for slow clients. Avoid repainting Touch
+                // for an identical frame as well.
+                if (
+                    raw !== ""
+                    && raw === root.lastRawFrame
+                ) {
+                    return
+                }
+
+                if (raw !== "")
+                    root.lastRawFrame = raw
+
+                root.jsonReceived(data)
             } catch (error) {
+                console.warn(
+                    "[cava] invalid JSON:",
+                    error
+                )
             }
         }
     }
