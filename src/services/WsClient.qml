@@ -9,6 +9,11 @@ QtObject {
     property int reconnectInterval: 2000
     property bool enabled: true
 
+    // Backend 2.0/3.0: subscriptions are explicit per connection.
+    // Never use ["all"]; on every reconnect the complete required set is
+    // registered again. The backend sends the current state once for every
+    // registered state endpoint, then only sends that endpoint again when its
+    // state changes.
     property var endpoints: [
         "notify_interaction",
         "notify_interaction_queue",

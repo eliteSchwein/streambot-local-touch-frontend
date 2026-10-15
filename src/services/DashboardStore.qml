@@ -16,6 +16,14 @@ QtObject {
     property var systemStorage: null
     property var systemInfo: ({})
 
+    // Backend websocket contract:
+    //   first notification after registration -> complete endpoint state
+    //   later notifications                -> only changed keys
+    //
+    // Keep one accumulated snapshot per notify_* endpoint. Objects are
+    // recursively merged, arrays/scalars/null replace the previous value.
+    property var endpointSnapshots: ({})
+
     readonly property bool updatesAvailable: {
         const managers = updateManager ?? ({})
         for (const name in managers) {
@@ -28,6 +36,101 @@ QtObject {
     // CAVA preview from dedicated /cava/music_preview websocket.
     property var cava: [0, 0, 0, 0, 0]
 
+    function isPlainObject(value) {
+        return (
+            value !== null
+            && typeof value === "object"
+            && !Array.isArray(value)
+        )
+    }
+
+    function cloneValue(value) {
+        if (Array.isArray(value))
+            return value.map(item => cloneValue(item))
+
+        if (isPlainObject(value)) {
+            const out = ({})
+
+            for (const key in value)
+                out[key] = cloneValue(value[key])
+
+            return out
+        }
+
+        return value
+    }
+
+    function mergePartialState(previous, patch) {
+        // Explicit null is meaningful: it clears/replaces the old value.
+        if (patch === null)
+            return null
+
+        // Arrays are atomic websocket values. If an array changed, the
+        // backend sends that key again and the complete array replaces the
+        // previous one.
+        if (Array.isArray(patch))
+            return cloneValue(patch)
+
+        if (!isPlainObject(patch))
+            return patch
+
+        const result =
+            isPlainObject(previous)
+            ? cloneValue(previous)
+            : ({})
+
+        for (const key in patch) {
+            const nextValue = patch[key]
+
+            if (
+                isPlainObject(nextValue)
+                && isPlainObject(result[key])
+            ) {
+                result[key] =
+                    mergePartialState(
+                        result[key],
+                        nextValue
+                    )
+            } else {
+                result[key] =
+                    cloneValue(nextValue)
+            }
+        }
+
+        return result
+    }
+
+    function mergeEndpointSnapshot(method, params) {
+        const key = String(method ?? "")
+
+        if (key === "")
+            return cloneValue(params)
+
+        const current =
+            endpointSnapshots[key]
+
+        const merged =
+            mergePartialState(
+                current,
+                params
+            )
+
+        const snapshots =
+            Object.assign(
+                {},
+                endpointSnapshots
+            )
+
+        snapshots[key] = merged
+        endpointSnapshots = snapshots
+
+        return merged
+    }
+
+    function resetEndpointSnapshots() {
+        endpointSnapshots = ({})
+    }
+
     function handleMessage(data) {
         if (!data || typeof data !== "object")
             return
@@ -36,70 +139,172 @@ QtObject {
         const params = data.params
 
         switch (method) {
-        case "notify_music_update":
-            music = params ?? ({})
-            break
+        case "notify_music_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
 
-        case "notify_playlist_update":
-            playlist = params ?? ({})
+            music = state ?? ({})
             break
+        }
 
-        case "notify_audio_update":
-            audio = params ?? ({})
+        case "notify_playlist_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
+
+            playlist = state ?? ({})
             break
+        }
 
-        case "notify_audio_outputs_update":
-            audioOutputs = Array.isArray(params)
-                ? params
+        case "notify_audio_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
+
+            audio = state ?? ({})
+            break
+        }
+
+        case "notify_audio_outputs_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? []
+                )
+
+            audioOutputs = Array.isArray(state)
+                ? state
                 : (
-                    params && Array.isArray(params.outputs)
-                    ? params.outputs
+                    state && Array.isArray(state.outputs)
+                    ? state.outputs
                     : []
                 )
             break
+        }
 
-        case "notify_auto_macros_update":
-            autoMacros = Array.isArray(params) ? params : []
+        case "notify_auto_macros_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? []
+                )
+
+            autoMacros = Array.isArray(state)
+                ? state
+                : (
+                    state && Array.isArray(state.auto_macros)
+                    ? state.auto_macros
+                    : (
+                        state && Array.isArray(state.autoMacros)
+                        ? state.autoMacros
+                        : []
+                    )
+                )
             break
+        }
 
-        case "notify_macro_update":
+        case "notify_macro_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
+
             macros =
-                params && params.macros
-                ? params.macros
-                : ({})
+                state && state.macros
+                ? state.macros
+                : (
+                    state && isPlainObject(state)
+                    ? state
+                    : ({})
+                )
             break
+        }
 
-        case "notify_channel_point_update":
+        case "notify_channel_point_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
+
             channelPoints =
-                params && Array.isArray(params.all)
-                ? params.all
+                state && Array.isArray(state.all)
+                ? state.all
                 : []
 
             activeChannelPoints =
-                params && Array.isArray(params.active)
-                ? params.active
+                state && Array.isArray(state.active)
+                ? state.active
                 : []
-            break
 
-        case "notify_update_manager":
-            updateManager = normalizeUpdateManager(params)
             break
+        }
 
-        case "notify_storage_update":
-            systemStorage = normalizeSystemStorage(params)
-            console.log(
-                "[system-storage] update:",
-                JSON.stringify(systemStorage)
-            )
-            break
+        case "notify_update_manager": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
 
-        case "notify_system_info":
-            systemInfo = normalizeSystemInfo(params)
-            break
+            updateManager =
+                normalizeUpdateManager(state)
 
-        case "notify_interaction_queue":
-            interactions = Array.isArray(params) ? params : []
             break
+        }
+
+        case "notify_storage_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
+
+            systemStorage =
+                normalizeSystemStorage(state)
+
+            break
+        }
+
+        case "notify_system_info": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
+
+            systemInfo =
+                normalizeSystemInfo(state)
+
+            break
+        }
+
+        case "notify_interaction_queue": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? []
+                )
+
+            interactions =
+                Array.isArray(state)
+                ? state
+                : (
+                    state && Array.isArray(state.queue)
+                    ? state.queue
+                    : []
+                )
+
+            break
+        }
 
         case "notify_interaction":
             handleInteractionNotification(params)

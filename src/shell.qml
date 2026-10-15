@@ -81,6 +81,11 @@ ShellRoot {
             config.handleMessage(data)
             dashboardStore.handleMessage(data)
         }
+
+        function onConnectionChanged(connected) {
+            if (!connected)
+                dashboardStore.resetEndpointSnapshots()
+        }
     }
 
     Connections {
