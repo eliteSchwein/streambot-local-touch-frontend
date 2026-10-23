@@ -173,18 +173,26 @@ QtObject {
         touchWallpaperPath === "" ? "" : "file://" + touchWallpaperPath
 
     function refreshWallpapers() {
-        wallpaperScanProcess.exec([
-            "sh",
-            "-c",
-            "find \"$1\" -type f \\( "
-            + "-iname '*.png' -o "
-            + "-iname '*.jpg' -o "
-            + "-iname '*.jpeg' -o "
-            + "-iname '*.webp' "
-            + "\\) -printf '%P\\n' 2>/dev/null | sort",
-            "sh",
-            assetRootPath
-        ])
+        if (wallpaperScanProcess.running)
+            wallpaperScanProcess.running = false
+
+        Qt.callLater(function() {
+            wallpaperScanProcess.exec([
+                "sh",
+                "-c",
+                "cd \"$1\" 2>/dev/null || exit 0; "
+                + "find . -type f \\( "
+                + "-iname '*.png' -o "
+                + "-iname '*.jpg' -o "
+                + "-iname '*.jpeg' -o "
+                + "-iname '*.webp' "
+                + "\\) -print "
+                + "| sed 's#^./##' "
+                + "| sort",
+                "sh",
+                assetRootPath
+            ])
+        })
     }
 
     function setTouchWallpaper(value) {
@@ -248,6 +256,16 @@ QtObject {
                         .split(/\r?\n/)
                         .map(value => value.trim())
                         .filter(value => value !== "")
+
+                const current =
+                    String(root.touchWallpaper ?? "").trim()
+
+                if (
+                    current !== ""
+                    && !files.includes(current)
+                ) {
+                    files.unshift(current)
+                }
 
                 root.wallpaperFiles = files
             }

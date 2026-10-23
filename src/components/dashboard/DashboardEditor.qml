@@ -24,6 +24,7 @@ Rectangle {
     property var autoMacroNames: []
     property string selectedWallpaper: ""
     property string originalWallpaper: ""
+    property bool wallpaperPickerOpen: false
 
     property bool selectorOpen: false
     property string selectorType: ""
@@ -188,53 +189,64 @@ Rectangle {
     }
 
     function wallpaperOptions() {
-        const options = [
-            ["", root.i18n.text("dashboard_wallpaper_none")]
-        ]
+        const values = []
+        const current =
+            String(selectedWallpaper ?? "").trim()
 
-        for (const path of (config.wallpaperFiles ?? [])) {
-            const value = String(path ?? "").trim()
+        if (current !== "")
+            values.push(current)
 
-            if (value === "")
-                continue
+        for (const raw of (config.wallpaperFiles ?? [])) {
+            const value =
+                String(raw ?? "").trim()
 
-            const parts = value.split("/")
-            const label = parts[parts.length - 1]
-
-            options.push([value, label])
+            if (
+                value !== ""
+                && !values.includes(value)
+            ) {
+                values.push(value)
+            }
         }
 
-        return options
+        return values
     }
 
-    function wallpaperLabels() {
-        return wallpaperOptions().map(entry => entry[1])
-    }
-
-    function wallpaperIndexFor(path) {
+    function wallpaperLabel(path) {
         const value = String(path ?? "")
-        const options = wallpaperOptions()
 
-        for (let i = 0; i < options.length; i++) {
-            if (options[i][0] === value)
-                return i
-        }
+        if (value === "")
+            return root.i18n.text("dashboard_wallpaper_none")
 
-        return 0
+        const parts = value.split("/")
+        return parts[parts.length - 1]
     }
 
-    function setWallpaperPreview(index) {
-        const options = wallpaperOptions()
+    function wallpaperUrl(path) {
+        const value =
+            String(path ?? "")
+                .replace(/\\/g, "/")
+                .replace(/^\/+/, "")
 
-        if (
-            index < 0
-            || index >= options.length
-        ) {
-            return
-        }
+        if (value === "")
+            return ""
 
-        selectedWallpaper = options[index][0]
-        config.touchWallpaper = selectedWallpaper
+        return "file://" + config.assetRootPath + "/" + value
+    }
+
+    function chooseWallpaper(path) {
+        selectedWallpaper =
+            String(path ?? "")
+
+        // Live preview while editor is open.
+        config.touchWallpaper =
+            selectedWallpaper
+
+        wallpaperPickerOpen = false
+    }
+
+    function openWallpaperPicker() {
+        config.refreshWallpapers()
+        wallpaperPickerOpen = true
     }
 
     function load() {
@@ -448,6 +460,7 @@ Rectangle {
                 root.visible
                 && root.config.sharedSettingsLoaded
                 && !root.selectorOpen
+                && !root.wallpaperPickerOpen
             ) {
                 root.load()
             }
@@ -474,32 +487,82 @@ Rectangle {
                 font.weight: Font.DemiBold
             }
 
-            Md3Select {
-                id: wallpaperSelect
+            Rectangle {
+                Layout.preferredWidth: 170
+                Layout.preferredHeight: 34
 
-                Layout.preferredWidth: 190
-                implicitHeight: 34
+                radius: Md3Theme.radiusExtraLarge
+                color:
+                    wallpaperButtonTap.pressed
+                    ? Md3Theme.surfaceContainerHigh
+                    : Md3Theme.surfaceContainer
 
-                model:
-                    root.wallpaperLabels()
+                border.width: 1
+                border.color: Md3Theme.outline
 
-                currentIndex:
-                    root.wallpaperIndexFor(
-                        root.selectedWallpaper
-                    )
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 6
+                    anchors.rightMargin: 10
+                    spacing: 8
 
-                onActivated: function(index) {
-                    root.setWallpaperPreview(index)
+                    Rectangle {
+                        Layout.preferredWidth: 26
+                        Layout.preferredHeight: 26
+                        radius: 7
+                        clip: true
+                        color: Md3Theme.surfaceContainerHighest
+
+                        Image {
+                            anchors.fill: parent
+                            visible:
+                                root.selectedWallpaper !== ""
+                            source:
+                                root.wallpaperUrl(
+                                    root.selectedWallpaper
+                                )
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: false
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible:
+                                root.selectedWallpaper === ""
+                            text: "—"
+                            color: Md3Theme.surfaceVariantContent
+                            font.pixelSize: 13
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+
+                        text:
+                            root.wallpaperLabel(
+                                root.selectedWallpaper
+                            )
+
+                        color: Md3Theme.surfaceContent
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        text: "▼"
+                        color: Md3Theme.surfaceVariantContent
+                        font.pixelSize: 9
+                    }
                 }
-            }
 
-            Md3Button {
-                text: root.i18n.text("dashboard_wallpaper_refresh")
-                outlined: true
-                implicitHeight: 34
+                TapHandler {
+                    id: wallpaperButtonTap
 
-                onClicked:
-                    root.config.refreshWallpapers()
+                    onTapped:
+                        root.openWallpaperPicker()
+                }
             }
 
             Md3Button {
@@ -776,6 +839,259 @@ Rectangle {
                             Layout.fillHeight: true
                         }
                     }
+                }
+            }
+        }
+    }
+
+
+    Item {
+        id: wallpaperPickerLayer
+
+        anchors.fill: parent
+        z: 5500000
+        visible: root.wallpaperPickerOpen
+
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(0, 0, 0, 0.62)
+
+            TapHandler {
+                onTapped:
+                    root.wallpaperPickerOpen = false
+            }
+        }
+
+        Rectangle {
+            id: wallpaperPicker
+
+            width:
+                Math.min(
+                    wallpaperPickerLayer.width - 70,
+                    700
+                )
+
+            height:
+                Math.min(
+                    wallpaperPickerLayer.height - 48,
+                    430
+                )
+
+            anchors.centerIn: parent
+
+            radius: Md3Theme.radiusExtraLarge
+            color: Md3Theme.surfaceContainer
+            border.width: 1
+            border.color: Md3Theme.outlineVariant
+
+            TapHandler {
+                onTapped: {}
+            }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 14
+                spacing: 10
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 34
+                    spacing: 8
+
+                    Text {
+                        Layout.fillWidth: true
+                        text:
+                            root.i18n.text(
+                                "dashboard_wallpaper_title"
+                            )
+                        color: Md3Theme.surfaceContent
+                        font.pixelSize: 16
+                        font.weight: Font.DemiBold
+                    }
+
+                    Md3Button {
+                        text:
+                            root.i18n.text(
+                                "dashboard_wallpaper_refresh"
+                            )
+                        outlined: true
+                        implicitHeight: 32
+
+                        onClicked:
+                            root.config.refreshWallpapers()
+                    }
+
+                    Md3Button {
+                        text: root.i18n.text("cancel")
+                        outlined: true
+                        implicitHeight: 32
+
+                        onClicked:
+                            root.wallpaperPickerOpen = false
+                    }
+                }
+
+                GridView {
+                    id: wallpaperGrid
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    clip: true
+                    cellWidth:
+                        Math.max(
+                            145,
+                            Math.floor(width / 3)
+                        )
+                    cellHeight: 122
+
+                    model:
+                        ["__none__"].concat(
+                            root.wallpaperOptions()
+                        )
+
+                    delegate: Item {
+                        required property string modelData
+
+                        width: wallpaperGrid.cellWidth
+                        height: wallpaperGrid.cellHeight
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 5
+
+                            radius: Md3Theme.radiusMedium
+                            clip: true
+
+                            color:
+                                wallpaperItemTap.pressed
+                                ? Md3Theme.surfaceContainerHigh
+                                : Md3Theme.surfaceContainerHighest
+
+                            border.width:
+                                (
+                                    modelData === "__none__"
+                                    ? root.selectedWallpaper === ""
+                                    : root.selectedWallpaper === modelData
+                                )
+                                ? 2
+                                : 1
+
+                            border.color:
+                                (
+                                    modelData === "__none__"
+                                    ? root.selectedWallpaper === ""
+                                    : root.selectedWallpaper === modelData
+                                )
+                                ? Md3Theme.primary
+                                : Md3Theme.outlineVariant
+
+                            Image {
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                    right: parent.right
+                                    bottom: wallpaperName.top
+                                }
+
+                                visible:
+                                    modelData !== "__none__"
+
+                                source:
+                                    modelData !== "__none__"
+                                    ? root.wallpaperUrl(modelData)
+                                    : ""
+
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                cache: false
+                            }
+
+                            Rectangle {
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                    right: parent.right
+                                    bottom: wallpaperName.top
+                                }
+
+                                visible:
+                                    modelData === "__none__"
+
+                                color: Md3Theme.background
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "—"
+                                    color: Md3Theme.surfaceVariantContent
+                                    font.pixelSize: 24
+                                }
+                            }
+
+                            Rectangle {
+                                id: wallpaperName
+
+                                anchors {
+                                    left: parent.left
+                                    right: parent.right
+                                    bottom: parent.bottom
+                                }
+
+                                height: 28
+                                color: Md3Theme.surfaceContainerHigh
+
+                                Text {
+                                    anchors {
+                                        fill: parent
+                                        leftMargin: 7
+                                        rightMargin: 7
+                                    }
+
+                                    verticalAlignment: Text.AlignVCenter
+
+                                    text:
+                                        modelData === "__none__"
+                                        ? root.i18n.text(
+                                            "dashboard_wallpaper_none"
+                                        )
+                                        : root.wallpaperLabel(
+                                            modelData
+                                        )
+
+                                    color: Md3Theme.surfaceContent
+                                    font.pixelSize: 9
+                                    font.weight: Font.Medium
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            TapHandler {
+                                id: wallpaperItemTap
+
+                                onTapped:
+                                    root.chooseWallpaper(
+                                        modelData === "__none__"
+                                        ? ""
+                                        : modelData
+                                    )
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    visible:
+                        root.wallpaperOptions().length === 0
+
+                    text:
+                        root.i18n.text(
+                            "dashboard_wallpaper_empty"
+                        )
+
+                    color: Md3Theme.surfaceVariantContent
+                    font.pixelSize: 10
+                    horizontalAlignment: Text.AlignHCenter
                 }
             }
         }

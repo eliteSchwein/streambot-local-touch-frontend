@@ -238,5 +238,7 @@
   "dashboard_search": "Search…",
   "apply": "Apply",
   "dashboard_wallpaper_none": "No wallpaper",
-  "dashboard_wallpaper_refresh": "Wallpapers"
+  "dashboard_wallpaper_refresh": "Wallpapers",
+  "dashboard_wallpaper_title": "Choose wallpaper",
+  "dashboard_wallpaper_empty": "No images found in assets"
 }

@@ -238,5 +238,7 @@
   "dashboard_search": "Suchen…",
   "apply": "Übernehmen",
   "dashboard_wallpaper_none": "Kein Hintergrund",
-  "dashboard_wallpaper_refresh": "Hintergründe"
+  "dashboard_wallpaper_refresh": "Hintergründe",
+  "dashboard_wallpaper_title": "Hintergrund auswählen",
+  "dashboard_wallpaper_empty": "Keine Bilder in den Assets gefunden"
 }
