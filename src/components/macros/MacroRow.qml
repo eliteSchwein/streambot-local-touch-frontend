@@ -156,10 +156,25 @@ Item {
             verticalAlignment: Text.AlignVCenter
         }
 
-        Item {
-            Layout.preferredWidth: 26
-            Layout.preferredHeight: 26
+        Rectangle {
+            Layout.preferredWidth: 34
+            Layout.preferredHeight: 34
             Layout.alignment: Qt.AlignVCenter
+
+            radius: 17
+
+            color: {
+                if (root.runState === "success")
+                    return Md3Theme.success
+
+                if (root.runState === "error")
+                    return Md3Theme.error
+
+                if (root.runState === "loading")
+                    return Md3Theme.surfaceContainerHigh
+
+                return Md3Theme.primaryContainer
+            }
 
             MdiIcon {
                 anchors.centerIn: parent
@@ -174,9 +189,10 @@ Item {
                     return "play"
                 }
 
-                size: 19
+                size: 20
                 selected:
-                    root.runState !== "loading"
+                    root.runState === "success"
+                    || root.runState === "error"
             }
         }
     }
