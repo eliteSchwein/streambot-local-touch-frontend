@@ -190,7 +190,7 @@ QtObject {
                 + "| sed 's#^./##' "
                 + "| awk -F/ '{ "
                 + "for (i = 1; i <= NF; i++) "
-                + "if (tolower($i) == \"category\") next; "
+                + "if (tolower($i) == \"category_library\") next; "
                 + "print "
                 + "}' "
                 + "| sort",
@@ -271,7 +271,7 @@ QtObject {
 
                     return parts.some(
                         part =>
-                            part.toLowerCase() === "category"
+                            part.toLowerCase() === "category_library"
                     )
                 }
 

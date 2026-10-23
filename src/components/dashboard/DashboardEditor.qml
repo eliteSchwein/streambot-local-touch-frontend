@@ -908,20 +908,7 @@ Rectangle {
                         font.pixelSize: 16
                         font.weight: Font.DemiBold
                     }
-
-                    Md3Button {
-                        text:
-                            root.i18n.text(
-                                "dashboard_wallpaper_refresh"
-                            )
-                        outlined: true
-                        implicitHeight: 32
-
-                        onClicked:
-                            root.config.refreshWallpapers()
-                    }
-
-                    Md3Button {
+Md3Button {
                         text: root.i18n.text("cancel")
                         outlined: true
                         implicitHeight: 32
