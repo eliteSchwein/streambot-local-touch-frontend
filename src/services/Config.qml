@@ -181,7 +181,10 @@ QtObject {
                 "sh",
                 "-c",
                 "cd \"$1\" 2>/dev/null || exit 0; "
-                + "find . -type f \\( "
+                + "find . "
+                + "-path './category' -prune -o "
+                + "-path './category/*' -prune -o "
+                + "-type f \\( "
                 + "-iname '*.png' -o "
                 + "-iname '*.jpg' -o "
                 + "-iname '*.jpeg' -o "

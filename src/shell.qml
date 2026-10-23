@@ -118,6 +118,15 @@ ShellRoot {
             asynchronous: true
             cache: false
 
+            onStatusChanged: {
+                if (status === Image.Error) {
+                    console.warn(
+                        "[wallpaper] failed to decode:",
+                        source
+                    )
+                }
+            }
+
             Component.onCompleted:
                 Md3Theme.wallpaperItem = touchWallpaper
         }
