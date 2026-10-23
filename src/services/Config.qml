@@ -28,6 +28,7 @@ QtObject {
     property int restPort: 8105
     property string language: "en"
     property string touchWallpaper: ""
+    property var wallpaperFiles: []
     property var touchDashboard: defaultTouchDashboard()
     property bool sharedSettingsLoaded: false
 
@@ -170,6 +171,98 @@ QtObject {
 
     readonly property string touchWallpaperUrl:
         touchWallpaperPath === "" ? "" : "file://" + touchWallpaperPath
+
+    function refreshWallpapers() {
+        wallpaperScanProcess.exec([
+            "sh",
+            "-c",
+            "find \"$1\" -type f \\( "
+            + "-iname '*.png' -o "
+            + "-iname '*.jpg' -o "
+            + "-iname '*.jpeg' -o "
+            + "-iname '*.webp' "
+            + "\\) -printf '%P\\n' 2>/dev/null | sort",
+            "sh",
+            assetRootPath
+        ])
+    }
+
+    function setTouchWallpaper(value) {
+        const normalized =
+            String(value ?? "")
+                .trim()
+                .replace(/\\/g, "/")
+                .replace(/^\/+/, "")
+
+        if (normalized.split("/").includes(".."))
+            return false
+
+        let data = {}
+
+        if (settingsFile.loaded) {
+            const currentText = settingsFile.text()
+
+            if (currentText && currentText.trim() !== "") {
+                try {
+                    data = JSON.parse(currentText)
+                } catch (error) {
+                    console.warn(
+                        "[config] cannot save touch_wallpaper because streambot-settings.json is invalid:",
+                        error
+                    )
+                    return false
+                }
+            }
+        }
+
+        data.touch_wallpaper = normalized
+
+        try {
+            settingsFile.setText(
+                JSON.stringify(data, null, 2) + "\n"
+            )
+
+            touchWallpaper = normalized
+
+            console.log(
+                "[config] saved touch_wallpaper:",
+                normalized
+            )
+
+            return true
+        } catch (error) {
+            console.warn(
+                "[config] failed to save touch_wallpaper:",
+                error
+            )
+
+            return false
+        }
+    }
+
+    property Process wallpaperScanProcess: Process {
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const files =
+                    text
+                        .split(/\r?\n/)
+                        .map(value => value.trim())
+                        .filter(value => value !== "")
+
+                root.wallpaperFiles = files
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() !== "")
+                    console.warn("[config] wallpaper scan:", text.trim())
+            }
+        }
+    }
+
+    Component.onCompleted:
+        Qt.callLater(refreshWallpapers)
 
     readonly property string websocketUrl:
         "ws://" + host + ":" + websocketPort

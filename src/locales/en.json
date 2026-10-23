@@ -236,5 +236,7 @@
   "dashboard_choose_auto_macros": "Choose auto macros",
   "dashboard_selected": "Selected",
   "dashboard_search": "Search…",
-  "apply": "Apply"
+  "apply": "Apply",
+  "dashboard_wallpaper_none": "No wallpaper",
+  "dashboard_wallpaper_refresh": "Wallpapers"
 }

@@ -22,6 +22,8 @@ Rectangle {
     property var rightCards: []
     property var macroNames: []
     property var autoMacroNames: []
+    property string selectedWallpaper: ""
+    property string originalWallpaper: ""
 
     property bool selectorOpen: false
     property string selectorType: ""
@@ -185,6 +187,56 @@ Rectangle {
         setColumnCards(side, cards)
     }
 
+    function wallpaperOptions() {
+        const options = [
+            ["", root.i18n.text("dashboard_wallpaper_none")]
+        ]
+
+        for (const path of (config.wallpaperFiles ?? [])) {
+            const value = String(path ?? "").trim()
+
+            if (value === "")
+                continue
+
+            const parts = value.split("/")
+            const label = parts[parts.length - 1]
+
+            options.push([value, label])
+        }
+
+        return options
+    }
+
+    function wallpaperLabels() {
+        return wallpaperOptions().map(entry => entry[1])
+    }
+
+    function wallpaperIndexFor(path) {
+        const value = String(path ?? "")
+        const options = wallpaperOptions()
+
+        for (let i = 0; i < options.length; i++) {
+            if (options[i][0] === value)
+                return i
+        }
+
+        return 0
+    }
+
+    function setWallpaperPreview(index) {
+        const options = wallpaperOptions()
+
+        if (
+            index < 0
+            || index >= options.length
+        ) {
+            return
+        }
+
+        selectedWallpaper = options[index][0]
+        config.touchWallpaper = selectedWallpaper
+    }
+
     function load() {
         const dashboard =
             config.normalizeTouchDashboard(
@@ -210,6 +262,14 @@ Rectangle {
             Array.isArray(dashboard.auto_macro_names)
             ? dashboard.auto_macro_names.slice(0, 4)
             : []
+
+        selectedWallpaper =
+            String(config.touchWallpaper ?? "")
+
+        originalWallpaper =
+            selectedWallpaper
+
+        config.refreshWallpapers()
     }
 
     function availableMacroNames() {
@@ -343,6 +403,20 @@ Rectangle {
             auto_macro_names: autoMacroNames.slice(0, 4)
         })
 
+        config.setTouchWallpaper(
+            selectedWallpaper
+        )
+
+        originalWallpaper =
+            selectedWallpaper
+
+        closed()
+    }
+
+    function cancelEdit() {
+        config.touchWallpaper =
+            originalWallpaper
+
         closed()
     }
 
@@ -400,6 +474,34 @@ Rectangle {
                 font.weight: Font.DemiBold
             }
 
+            Md3Select {
+                id: wallpaperSelect
+
+                Layout.preferredWidth: 190
+                implicitHeight: 34
+
+                model:
+                    root.wallpaperLabels()
+
+                currentIndex:
+                    root.wallpaperIndexFor(
+                        root.selectedWallpaper
+                    )
+
+                onActivated: function(index) {
+                    root.setWallpaperPreview(index)
+                }
+            }
+
+            Md3Button {
+                text: root.i18n.text("dashboard_wallpaper_refresh")
+                outlined: true
+                implicitHeight: 34
+
+                onClicked:
+                    root.config.refreshWallpapers()
+            }
+
             Md3Button {
                 text: root.i18n.text("dashboard_reset")
                 outlined: true
@@ -426,7 +528,7 @@ Rectangle {
                 implicitHeight: 34
 
                 onClicked:
-                    root.closed()
+                    root.cancelEdit()
             }
 
             Md3Button {

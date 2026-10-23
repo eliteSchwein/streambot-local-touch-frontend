@@ -236,5 +236,7 @@
   "dashboard_choose_auto_macros": "Auto-Makros auswählen",
   "dashboard_selected": "Ausgewählt",
   "dashboard_search": "Suchen…",
-  "apply": "Übernehmen"
+  "apply": "Übernehmen",
+  "dashboard_wallpaper_none": "Kein Hintergrund",
+  "dashboard_wallpaper_refresh": "Hintergründe"
 }
