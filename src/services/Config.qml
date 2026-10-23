@@ -181,16 +181,18 @@ QtObject {
                 "sh",
                 "-c",
                 "cd \"$1\" 2>/dev/null || exit 0; "
-                + "find . "
-                + "-path './category' -prune -o "
-                + "-path './category/*' -prune -o "
-                + "-type f \\( "
+                + "find . -type f \\( "
                 + "-iname '*.png' -o "
                 + "-iname '*.jpg' -o "
                 + "-iname '*.jpeg' -o "
                 + "-iname '*.webp' "
                 + "\\) -print "
                 + "| sed 's#^./##' "
+                + "| awk -F/ '{ "
+                + "for (i = 1; i <= NF; i++) "
+                + "if (tolower($i) == \"category\") next; "
+                + "print "
+                + "}' "
                 + "| sort",
                 "sh",
                 assetRootPath
@@ -260,17 +262,36 @@ QtObject {
                         .map(value => value.trim())
                         .filter(value => value !== "")
 
+                function isCategoryAsset(path) {
+                    const parts =
+                        String(path ?? "")
+                            .replace(/\\/g, "/")
+                            .split("/")
+                            .filter(part => part !== "")
+
+                    return parts.some(
+                        part =>
+                            part.toLowerCase() === "category"
+                    )
+                }
+
+                const filtered =
+                    files.filter(
+                        path => !isCategoryAsset(path)
+                    )
+
                 const current =
                     String(root.touchWallpaper ?? "").trim()
 
                 if (
                     current !== ""
-                    && !files.includes(current)
+                    && !isCategoryAsset(current)
+                    && !filtered.includes(current)
                 ) {
-                    files.unshift(current)
+                    filtered.unshift(current)
                 }
 
-                root.wallpaperFiles = files
+                root.wallpaperFiles = filtered
             }
         }
 
