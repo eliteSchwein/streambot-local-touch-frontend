@@ -13,7 +13,9 @@ Rectangle {
 
     signal closed()
 
-    color: Md3Theme.background
+    // Keep the normal dashboard wallpaper visible while editing.
+    // Cards/dialogs still provide their own surfaces for readability.
+    color: "transparent"
     z: 1000
 
     property var leftCards: []
