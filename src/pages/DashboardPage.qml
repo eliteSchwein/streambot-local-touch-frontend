@@ -47,6 +47,10 @@ Item {
     }
 
     RowLayout {
+        // Do not render the live dashboard underneath the editor. The editor
+        // itself is transparent so the global wallpaper remains visible.
+        visible: !root.editing
+
         anchors.fill: parent
         anchors.margins: 10
         spacing: 8
