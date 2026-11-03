@@ -81,10 +81,10 @@ Item {
                         Layout.fillWidth: true
 
                         opacity:
-                            built ? 1 : 0
+                            built ? 1 : 0.72
 
                         scale:
-                            built ? 1 : 0.94
+                            built ? 1 : 0.975
 
                         transformOrigin:
                             Item.Center
@@ -121,7 +121,7 @@ Item {
                             id: cardBuildTimer
 
                             interval:
-                                90 + index * 75
+                                35 + index * 55
 
                             repeat: false
 
@@ -131,15 +131,15 @@ Item {
 
                         Behavior on opacity {
                             NumberAnimation {
-                                duration: 260
+                                duration: 180
                                 easing.type: Easing.OutCubic
                             }
                         }
 
                         Behavior on scale {
                             NumberAnimation {
-                                duration: 360
-                                easing.type: Easing.OutBack
+                                duration: 260
+                                easing.type: Easing.OutCubic
                             }
                         }
                     }
