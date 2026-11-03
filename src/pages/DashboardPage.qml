@@ -78,28 +78,11 @@ Item {
 
                         property bool built: false
                         property int cardIndex: index
-                        property int buildDirection:
-                            cardIndex % 3 === 0
-                            ? 1
-                            : (
-                                cardIndex % 3 === 1
-                                ? -1
-                                : 0
-                            )
 
                         Layout.fillWidth: true
 
                         opacity:
-                            built ? 1 : 0.76
-
-                        y:
-                            built
-                            ? 0
-                            : (
-                                buildDirection === 0
-                                ? 10
-                                : buildDirection * 12
-                            )
+                            built ? 1 : 0
 
                         // Every configured card participates in filling the
                         // complete column. preferredHeight only acts as the
@@ -133,7 +116,7 @@ Item {
                             id: cardBuildTimer
 
                             interval:
-                                25 + cardLoader.cardIndex * 45
+                                40 + cardLoader.cardIndex * 70
 
                             repeat: false
 
@@ -143,14 +126,7 @@ Item {
 
                         Behavior on opacity {
                             NumberAnimation {
-                                duration: 150
-                                easing.type: Easing.OutCubic
-                            }
-                        }
-
-                        Behavior on y {
-                            NumberAnimation {
-                                duration: 210
+                                duration: 220
                                 easing.type: Easing.OutCubic
                             }
                         }

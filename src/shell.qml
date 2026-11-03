@@ -174,20 +174,38 @@ ShellRoot {
 
                 required property bool active
                 property int direction: 1
+                property bool shown: false
 
-                visible: active
-                enabled: active
+                visible:
+                    active || shown
 
-                opacity: 1
+                enabled:
+                    active
 
                 x:
-                    active
-                    ? 0
-                    : direction * width
+                    shown ? 0 : direction * width
+
+                onActiveChanged: {
+                    if (active) {
+                        shown = false
+
+                        Qt.callLater(function() {
+                            if (transitionRoot.active)
+                                transitionRoot.shown = true
+                        })
+                    } else {
+                        shown = false
+                    }
+                }
+
+                Component.onCompleted: {
+                    if (active)
+                        shown = true
+                }
 
                 Behavior on x {
                     NumberAnimation {
-                        duration: 210
+                        duration: 220
                         easing.type: Easing.OutCubic
                     }
                 }
@@ -215,33 +233,6 @@ ShellRoot {
                     id: dashboardPage
 
                     anchors.fill: parent
-
-                    opacity:
-                        appRoot.bootAnimationStarted
-                            ? 1
-                            : 0
-
-                    scale:
-                        appRoot.bootAnimationStarted
-                            ? 1
-                            : 0.965
-
-                    transformOrigin:
-                        Item.Center
-
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: 420
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 520
-                            easing.type: Easing.OutBack
-                        }
-                    }
 
                     z:
                         dashboardPage.editing
