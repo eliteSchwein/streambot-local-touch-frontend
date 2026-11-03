@@ -175,17 +175,15 @@ ShellRoot {
                 required property bool active
                 property int direction: 1
 
-                visible:
-                    active
-                    || Math.abs(x) < width
+                visible: active
+                enabled: active
 
-                opacity:
-                    active ? 1 : 0.98
+                opacity: 1
 
                 x:
                     active
                     ? 0
-                    : -direction * width
+                    : direction * width
 
                 Behavior on x {
                     NumberAnimation {
