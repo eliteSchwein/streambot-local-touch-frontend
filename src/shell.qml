@@ -342,7 +342,7 @@ ShellRoot {
                     Md3NavButton {
                         icon: "server"
                         selected: appRoot.currentPage === 4
-                        badge: dashboardStore.updatesAvailable
+                        badgeCount: dashboardStore.updatesAvailableCount
 
                         onClicked:
                             appRoot.currentPage = 4

@@ -33,6 +33,26 @@ QtObject {
         return false
     }
 
+    readonly property int updatesAvailableCount: {
+        const managers = updateManager ?? ({})
+        let count = 0
+
+        for (const name in managers) {
+            const manager = managers[name]
+
+            if (!manager || manager.update_available !== true)
+                continue
+
+            if (Array.isArray(manager.updates) && manager.updates.length > 0) {
+                count += manager.updates.length
+            } else {
+                count += 1
+            }
+        }
+
+        return count
+    }
+
     // CAVA preview from dedicated /cava/music_preview websocket.
     property var cava: [0, 0, 0, 0, 0]
 
@@ -706,8 +726,26 @@ QtObject {
                     ? input.updates.slice()
                     : []
 
+                const packageCount = firstNumber([
+                    input.package_count,
+                    input.packageCount,
+                    input.packages_count,
+                    input.packagesCount,
+                    input.update_count,
+                    input.updateCount,
+                    input.updates_count,
+                    input.updatesCount,
+                    input.count
+                ])
+
+                manager.package_count =
+                    packageCount !== null
+                    ? Math.max(0, Math.floor(packageCount))
+                    : manager.updates.length
+
                 manager.update_available =
-                    manager.updates.length > 0
+                    manager.package_count > 0
+                    || manager.updates.length > 0
                     || input.update_available === true
             }
 
