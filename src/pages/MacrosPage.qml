@@ -140,30 +140,58 @@ Item {
         anchors.margins: 10
         spacing: 8
 
-        RowLayout {
+        Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            spacing: 6
+            Layout.preferredHeight: 44
 
-            TabButton {
-                Layout.fillWidth: true
-                text: root.i18n.text("macros")
-                selected: root.currentTab === 0
-                onClicked: root.currentTab = 0
-            }
+            radius: 22
+            color: Qt.rgba(
+                Md3Theme.surfaceContainerHighest.r,
+                Md3Theme.surfaceContainerHighest.g,
+                Md3Theme.surfaceContainerHighest.b,
+                0.94
+            )
 
-            TabButton {
-                Layout.fillWidth: true
-                text: root.i18n.text("auto_macros")
-                selected: root.currentTab === 1
-                onClicked: root.currentTab = 1
-            }
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 4
+                spacing: 4
 
-            TabButton {
-                Layout.fillWidth: true
-                text: root.i18n.text("channel_points")
-                selected: root.currentTab === 2
-                onClicked: root.currentTab = 2
+                SegmentTab {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    text: root.i18n.text("macros")
+                    iconName: "dialpad"
+                    selected: root.currentTab === 0
+
+                    onTapped:
+                        root.currentTab = 0
+                }
+
+                SegmentTab {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    text: root.i18n.text("auto_macros")
+                    iconName: "auto-mode"
+                    selected: root.currentTab === 1
+
+                    onTapped:
+                        root.currentTab = 1
+                }
+
+                SegmentTab {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    text: root.i18n.text("channel_points")
+                    iconName: "motion-play-outline"
+                    selected: root.currentTab === 2
+
+                    onTapped:
+                        root.currentTab = 2
+                }
             }
         }
 
@@ -364,38 +392,66 @@ Item {
         }
     }
 
-    component TabButton: Rectangle {
+    component SegmentTab: Rectangle {
         id: tab
 
         required property string text
+        required property string iconName
         property bool selected: false
-        signal clicked()
 
-        radius: 20
+        signal tapped()
+
+        radius: 18
 
         color:
             selected
             ? Md3Theme.primary
-            : Md3Theme.surfaceContainerHighest
+            : (
+                tabMouse.pressed
+                ? Md3Theme.surfaceContainerHigh
+                : "transparent"
+            )
 
-        opacity:
-            tabTap.pressed ? 0.82 : 1
-
-        Text {
-            anchors.centerIn: parent
-            text: tab.text
-            color:
-                tab.selected
-                ? Md3Theme.primaryContent
-                : Md3Theme.surfaceVariantContent
-            font.pixelSize: 12
-            font.weight: Font.DemiBold
-            elide: Text.ElideRight
+        Behavior on color {
+            ColorAnimation {
+                duration: 120
+            }
         }
 
-        TapHandler {
-            id: tabTap
-            onTapped: tab.clicked()
+        Row {
+            anchors.centerIn: parent
+            spacing: 6
+
+            MdiIcon {
+                anchors.verticalCenter: parent.verticalCenter
+
+                name: tab.iconName
+                size: 16
+                selected: tab.selected
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+
+                text: tab.text
+                color:
+                    tab.selected
+                    ? Md3Theme.primaryContent
+                    : Md3Theme.surfaceVariantContent
+
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+            }
+        }
+
+        MouseArea {
+            id: tabMouse
+
+            anchors.fill: parent
+
+            onClicked:
+                tab.tapped()
         }
     }
 
