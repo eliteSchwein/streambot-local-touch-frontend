@@ -15,6 +15,14 @@ QtObject {
     property var updateManager: ({})
     property var systemStorage: null
     property var systemInfo: ({})
+    property var speedtest: ({
+        running: false,
+        stage: "idle",
+        ping_ms: null,
+        download_mbps: null,
+        upload_mbps: null,
+        error: ""
+    })
 
     // Backend websocket contract:
     //   first notification after registration -> complete endpoint state
@@ -303,6 +311,19 @@ QtObject {
 
             systemInfo =
                 normalizeSystemInfo(state)
+
+            break
+        }
+
+        case "notify_speedtest_update": {
+            const state =
+                mergeEndpointSnapshot(
+                    method,
+                    params ?? ({})
+                )
+
+            speedtest =
+                normalizeSpeedtest(state)
 
             break
         }
@@ -753,6 +774,50 @@ QtObject {
         }
 
         return normalized
+    }
+
+    function normalizeSpeedtest(value) {
+        const previous =
+            speedtest && typeof speedtest === "object"
+            ? speedtest
+            : ({})
+
+        const input =
+            value && typeof value === "object"
+            ? value
+            : ({})
+
+        return {
+            running:
+                "running" in input
+                ? input.running === true
+                : previous.running === true,
+
+            stage:
+                "stage" in input
+                ? String(input.stage || "idle")
+                : String(previous.stage || "idle"),
+
+            ping_ms:
+                "ping_ms" in input
+                ? input.ping_ms
+                : previous.ping_ms,
+
+            download_mbps:
+                "download_mbps" in input
+                ? input.download_mbps
+                : previous.download_mbps,
+
+            upload_mbps:
+                "upload_mbps" in input
+                ? input.upload_mbps
+                : previous.upload_mbps,
+
+            error:
+                "error" in input
+                ? String(input.error || "")
+                : String(previous.error || "")
+        }
     }
 
     function normalizeSystemStorage(value) {

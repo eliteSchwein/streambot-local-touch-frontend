@@ -263,6 +263,7 @@ ShellRoot {
 
                 i18n: i18n
                 websocket: websocket
+                store: dashboardStore
             }
 
             BackendStatusView {

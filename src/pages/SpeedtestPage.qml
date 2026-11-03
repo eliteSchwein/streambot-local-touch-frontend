@@ -9,16 +9,36 @@ Item {
 
     required property var i18n
     required property var websocket
+    required property var store
 
-    property bool running: false
     property bool starting: false
-    property string stage: "idle"
-    property real pingMs: -1
-    property real downloadMbps: -1
-    property real uploadMbps: -1
     property string errorText: ""
     property int startRequestId: -1
     property int statusRequestId: -1
+
+    readonly property var speedtest:
+        store?.speedtest ?? ({})
+
+    readonly property bool running:
+        speedtest.running === true
+
+    readonly property string stage:
+        String(speedtest.stage || "idle")
+
+    readonly property real pingMs:
+        speedtest.ping_ms === null || speedtest.ping_ms === undefined
+        ? -1
+        : Number(speedtest.ping_ms)
+
+    readonly property real downloadMbps:
+        speedtest.download_mbps === null || speedtest.download_mbps === undefined
+        ? -1
+        : Number(speedtest.download_mbps)
+
+    readonly property real uploadMbps:
+        speedtest.upload_mbps === null || speedtest.upload_mbps === undefined
+        ? -1
+        : Number(speedtest.upload_mbps)
 
     function tr(key, fallback) {
         const value = root.i18n.text(key)
@@ -31,45 +51,37 @@ Item {
     }
 
     function applySpeedtestState(state) {
-        if (!state)
+        if (!state || !root.store)
             return
 
-        running = state.running === true
-        stage = state.stage || "idle"
-        pingMs = state.ping_ms === null || state.ping_ms === undefined
-            ? -1
-            : Number(state.ping_ms)
-        downloadMbps = state.download_mbps === null || state.download_mbps === undefined
-            ? -1
-            : Number(state.download_mbps)
-        uploadMbps = state.upload_mbps === null || state.upload_mbps === undefined
-            ? -1
-            : Number(state.upload_mbps)
-        errorText = state.error || ""
+        const merged = ({})
 
-        if (running || stage === "finished" || stage === "error")
+        const current =
+            root.store.speedtest && typeof root.store.speedtest === "object"
+            ? root.store.speedtest
+            : ({})
+
+        for (const key in current)
+            merged[key] = current[key]
+
+        for (const key in state)
+            merged[key] = state[key]
+
+        root.store.speedtest = root.store.normalizeSpeedtest(merged)
+
+        if (
+            root.store.speedtest.running === true
+            || root.store.speedtest.stage === "finished"
+            || root.store.speedtest.stage === "error"
+        ) {
             resetStartGuard()
+        }
     }
 
     function startSpeedtest() {
         if (
             running
-            || starting
-            || !websocket.connected
-        ) {
-            return
-        }
-
-        starting = true
-        startGuard.restart()
-
-        startRequestId = websocket.sendRpc("speedtest", {
-            action: "start"
-        })
-
-        if (startRequestId < 0)
-            resetStartGuard()
-    }
+// ... existing code ...
 
     function requestStatus() {
         if (!websocket.connected)
