@@ -317,6 +317,8 @@ ShellRoot {
                     : 0
 
                 transform: Translate {
+                    id: navigationBootTranslate
+
                     y:
                         appRoot.bootAnimationStarted
                         ? 0
