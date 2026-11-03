@@ -77,17 +77,29 @@ Item {
                         required property string modelData
 
                         property bool built: false
+                        property int cardIndex: index
+                        property int buildDirection:
+                            cardIndex % 3 === 0
+                            ? 1
+                            : (
+                                cardIndex % 3 === 1
+                                ? -1
+                                : 0
+                            )
 
                         Layout.fillWidth: true
 
                         opacity:
-                            built ? 1 : 0.72
+                            built ? 1 : 0.76
 
-                        scale:
-                            built ? 1 : 0.975
-
-                        transformOrigin:
-                            Item.Center
+                        y:
+                            built
+                            ? 0
+                            : (
+                                buildDirection === 0
+                                ? 10
+                                : buildDirection * 12
+                            )
 
                         // Every configured card participates in filling the
                         // complete column. preferredHeight only acts as the
@@ -121,7 +133,7 @@ Item {
                             id: cardBuildTimer
 
                             interval:
-                                35 + index * 55
+                                25 + cardLoader.cardIndex * 45
 
                             repeat: false
 
@@ -131,14 +143,14 @@ Item {
 
                         Behavior on opacity {
                             NumberAnimation {
-                                duration: 180
+                                duration: 150
                                 easing.type: Easing.OutCubic
                             }
                         }
 
-                        Behavior on scale {
+                        Behavior on y {
                             NumberAnimation {
-                                duration: 260
+                                duration: 210
                                 easing.type: Easing.OutCubic
                             }
                         }

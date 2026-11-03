@@ -177,37 +177,19 @@ ShellRoot {
 
                 visible:
                     active
-                    || opacity > 0.02
+                    || Math.abs(x) < width
 
                 opacity:
-                    active ? 1 : 0
+                    active ? 1 : 0.98
 
-                scale:
-                    active ? 1 : 0.985
+                x:
+                    active
+                    ? 0
+                    : -direction * width
 
-                y:
-                    active ? 0 : 8
-
-                transformOrigin:
-                    Item.Center
-
-                Behavior on opacity {
+                Behavior on x {
                     NumberAnimation {
-                        duration: 135
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 180
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                Behavior on y {
-                    NumberAnimation {
-                        duration: 180
+                        duration: 210
                         easing.type: Easing.OutCubic
                     }
                 }
