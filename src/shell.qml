@@ -153,7 +153,7 @@ ShellRoot {
 
             onCurrentPageChanged: {
                 pageTransitionDirection =
-                    currentPage >= previousPage ? 1 : -1
+                        currentPage >= previousPage ? 1 : -1
 
                 previousPage = currentPage
 
@@ -184,8 +184,8 @@ ShellRoot {
 
                 x:
                     active
-                    ? 0
-                    : -direction * 18
+                        ? 0
+                        : -direction * 18
 
                 Behavior on opacity {
                     NumberAnimation {
@@ -201,9 +201,6 @@ ShellRoot {
                     }
                 }
             }
-
-            readonly property bool backendStatusActive:
-                !backendStatus.ready || !websocket.connected
 
             anchors.fill: parent
             color: touchWallpaper.visible ? "transparent" : Md3Theme.background
@@ -230,13 +227,13 @@ ShellRoot {
 
                     opacity:
                         appRoot.bootAnimationStarted
-                        ? 1
-                        : 0
+                            ? 1
+                            : 0
 
                     scale:
                         appRoot.bootAnimationStarted
-                        ? 1
-                        : 0.965
+                            ? 1
+                            : 0.965
 
                     transformOrigin:
                         Item.Center
@@ -257,8 +254,8 @@ ShellRoot {
 
                     z:
                         dashboardPage.editing
-                        ? 100000
-                        : 0
+                            ? 100000
+                            : 0
 
                     i18n: i18n
                     websocket: websocket
@@ -373,8 +370,6 @@ ShellRoot {
 
                 visible: appRoot.backendStatusActive
 
-                visible: appRoot.backendStatusActive
-
                 anchors {
                     top: parent.top
                     left: parent.left
@@ -401,16 +396,16 @@ ShellRoot {
 
                 opacity:
                     appRoot.bootAnimationStarted
-                    ? 1
-                    : 0
+                        ? 1
+                        : 0
 
                 transform: Translate {
                     id: navigationBootTranslate
 
                     y:
                         appRoot.bootAnimationStarted
-                        ? 0
-                        : 24
+                            ? 0
+                            : 24
 
                     Behavior on y {
                         NumberAnimation {
@@ -429,8 +424,8 @@ ShellRoot {
 
                 property real bootOffset:
                     appRoot.bootAnimationStarted
-                    ? 0
-                    : 24
+                        ? 0
+                        : 24
 
                 Behavior on bootOffset {
                     NumberAnimation {
@@ -516,12 +511,12 @@ ShellRoot {
 
                     color:
                         dashboardPage.editing
-                        ? Md3Theme.primaryContainer
-                        : (
-                            navDashboardEditTap.pressed
-                            ? Md3Theme.surfaceContainerHigh
-                            : "transparent"
-                        )
+                            ? Md3Theme.primaryContainer
+                            : (
+                                navDashboardEditTap.pressed
+                                    ? Md3Theme.surfaceContainerHigh
+                                    : "transparent"
+                            )
 
                     Text {
                         anchors.centerIn: parent
@@ -529,8 +524,8 @@ ShellRoot {
                         text: "✎"
                         color:
                             dashboardPage.editing
-                            ? Md3Theme.surfaceContent
-                            : Md3Theme.surfaceVariantContent
+                                ? Md3Theme.surfaceContent
+                                : Md3Theme.surfaceVariantContent
 
                         font.pixelSize: 20
                         font.weight: Font.DemiBold
