@@ -369,21 +369,21 @@ ShellRoot {
 
                     Md3NavButton {
                         icon: "server"
-                        selected: appRoot.currentPage === 4
+                        selected: appRoot.currentPage === 5
                         badgeCount: dashboardStore.updatesAvailableCount
 
                         onClicked:
-                            appRoot.currentPage = 4
+                            appRoot.currentPage = 5
                     }
 
                     Md3NavButton {
                         // "swap-vertical" reads as network transfer and avoids
                         // the unresolved speedometer glyph.
                         icon: "speedometer"
-                        selected: appRoot.currentPage === 5
+                        selected: appRoot.currentPage === 6
 
                         onClicked:
-                            appRoot.currentPage = 5
+                            appRoot.currentPage = 6
                     }
                 }
 
