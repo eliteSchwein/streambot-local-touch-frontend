@@ -244,6 +244,51 @@ ShellRoot {
                 }
             }
 
+            component PageTransition: Item {
+                id: transitionRoot
+
+                required property bool active
+                property bool keepVisible: false
+
+                visible:
+                    active || keepVisible || opacity > 0.01
+
+                enabled:
+                    active
+
+                opacity:
+                    active ? 1 : 0
+
+                z:
+                    active ? 2 : 1
+
+                onActiveChanged: {
+                    if (active)
+                        keepVisible = true
+                }
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Timer {
+                    id: visibilityReleaseTimer
+                    interval: 220
+                    repeat: false
+
+                    onTriggered:
+                        transitionRoot.keepVisible = false
+                }
+
+                onOpacityChanged: {
+                    if (!active && opacity <= 0.01)
+                        visibilityReleaseTimer.restart()
+                }
+            }
+
             anchors.fill: parent
             color: touchWallpaper.visible ? "transparent" : Md3Theme.background
 
