@@ -50,6 +50,26 @@ Item {
         startGuard.stop()
     }
 
+    function startSpeedtest() {
+        if (
+            running
+            || starting
+            || !websocket.connected
+        ) {
+            return
+        }
+
+        starting = true
+        startGuard.restart()
+
+        startRequestId = websocket.sendRpc("speedtest", {
+            action: "start"
+        })
+
+        if (startRequestId < 0)
+            resetStartGuard()
+    }
+
     function applySpeedtestState(state) {
         if (!state || !root.store)
             return
@@ -78,10 +98,6 @@ Item {
         }
     }
 
-    function startSpeedtest() {
-        if (
-            running
-// ... existing code ...
 
     function requestStatus() {
         if (!websocket.connected)
