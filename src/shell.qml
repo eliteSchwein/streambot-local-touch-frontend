@@ -352,7 +352,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "robot"
+                        icon: "auto-mode"
                         selected: appRoot.currentPage === 3
 
                         onClicked:
