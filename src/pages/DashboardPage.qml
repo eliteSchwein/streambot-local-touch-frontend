@@ -72,9 +72,22 @@ Item {
                     model: modelData
 
                     delegate: Loader {
+                        id: cardLoader
+
                         required property string modelData
 
+                        property bool built: false
+
                         Layout.fillWidth: true
+
+                        opacity:
+                            built ? 1 : 0
+
+                        scale:
+                            built ? 1 : 0.94
+
+                        transformOrigin:
+                            Item.Center
 
                         // Every configured card participates in filling the
                         // complete column. preferredHeight only acts as the
@@ -98,6 +111,35 @@ Item {
                                 return musicComponent
                             default:
                                 return null
+                            }
+                        }
+
+                        Component.onCompleted:
+                            cardBuildTimer.start()
+
+                        Timer {
+                            id: cardBuildTimer
+
+                            interval:
+                                90 + index * 75
+
+                            repeat: false
+
+                            onTriggered:
+                                cardLoader.built = true
+                        }
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: 260
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+
+                        Behavior on scale {
+                            NumberAnimation {
+                                duration: 360
+                                easing.type: Easing.OutBack
                             }
                         }
                     }
