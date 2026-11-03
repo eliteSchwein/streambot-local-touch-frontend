@@ -66,6 +66,9 @@
   "unknown_artist": "Unbekannter Künstler",
   "auto_macros": "Auto-Makros",
   "no_auto_macros": "Keine Auto-Makros",
+  "auto_macro_search": "Auto-Makros suchen",
+  "auto_macro_no_results": "Keine Auto-Makros gefunden",
+  "auto_macro_next_in": "Nächster Lauf in {seconds}s"
   "queued": "in Warteschlange",
   "active": "Aktiv",
   "next": "Als Nächstes",
