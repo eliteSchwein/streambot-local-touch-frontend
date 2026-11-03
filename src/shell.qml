@@ -174,40 +174,73 @@ ShellRoot {
 
                 required property bool active
                 property int direction: 1
-                property bool shown: false
+                property real slideX: 0
+                property bool animating: false
 
                 visible:
-                    active || shown
+                    active || animating
 
                 enabled:
                     active
 
+                z:
+                    active ? 2 : 1
+
                 x:
-                    shown ? 0 : direction * width
+                    slideX
 
                 onActiveChanged: {
-                    if (active) {
-                        shown = false
+                    enterAnimation.stop()
+                    exitAnimation.stop()
 
-                        Qt.callLater(function() {
-                            if (transitionRoot.active)
-                                transitionRoot.shown = true
-                        })
-                    } else {
-                        shown = false
+                    if (active) {
+                        animating = true
+                        slideX = direction * width
+                        enterAnimation.start()
+                    } else if (visible) {
+                        animating = true
+                        slideX = 0
+                        exitAnimation.start()
                     }
                 }
 
                 Component.onCompleted: {
-                    if (active)
-                        shown = true
+                    if (active) {
+                        slideX = 0
+                        animating = false
+                    } else {
+                        slideX = direction * width
+                        animating = false
+                    }
                 }
 
-                Behavior on x {
-                    NumberAnimation {
-                        duration: 220
-                        easing.type: Easing.OutCubic
-                    }
+                NumberAnimation {
+                    id: enterAnimation
+
+                    target: transitionRoot
+                    property: "slideX"
+                    to: 0
+                    duration: 230
+                    easing.type: Easing.OutCubic
+
+                    onStopped:
+                        transitionRoot.animating = false
+                }
+
+                NumberAnimation {
+                    id: exitAnimation
+
+                    target: transitionRoot
+                    property: "slideX"
+                    to:
+                        -transitionRoot.direction
+                        * transitionRoot.width
+
+                    duration: 230
+                    easing.type: Easing.OutCubic
+
+                    onStopped:
+                        transitionRoot.animating = false
                 }
             }
 
