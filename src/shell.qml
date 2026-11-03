@@ -219,47 +219,9 @@ ShellRoot {
                 websocket: websocket
             }
 
-            AutoMacrosPage {
-                id: autoMacrosPage
-
-                visible:
-                    !appRoot.backendStatusActive
-                    && appRoot.currentPage === 3
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                i18n: i18n
-                store: dashboardStore
-                websocket: websocket
-            }
-
-            ChannelPointsPage {
-                id: channelPointsPage
-
-                visible:
-                    !appRoot.backendStatusActive
-                    && appRoot.currentPage === 4
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
-            }
-
             SystemPage {
                 id: systemPage
-                visible: !appRoot.backendStatusActive && appRoot.currentPage === 5
+                visible: !appRoot.backendStatusActive && appRoot.currentPage === 3
                 anchors { top: parent.top; left: parent.left; right: parent.right; bottom: navigation.top }
                 i18n: i18n
                 websocket: websocket
@@ -271,7 +233,7 @@ ShellRoot {
             SpeedtestPage {
                 id: speedtestPage
 
-                visible: !appRoot.backendStatusActive && appRoot.currentPage === 6
+                visible: !appRoot.backendStatusActive && appRoot.currentPage === 4
 
                 anchors {
                     top: parent.top
