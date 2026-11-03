@@ -175,10 +175,11 @@ ShellRoot {
                 required property bool active
                 property int direction: 1
                 property bool animating: false
+                property real transitionX: 0
 
-                // Alternative transition:
-                // fade + tiny scale + vertical lift. This avoids horizontal
-                // slide races while keeping the current page layout intact.
+                // Material-style shared-axis transition:
+                // directional motion is subtle enough to stay smooth on the Pi,
+                // but still makes forward/back navigation feel spatial.
                 visible:
                     active || animating
 
@@ -188,51 +189,82 @@ ShellRoot {
                 z:
                     active ? 2 : 1
 
+                x:
+                    transitionX
+
                 opacity:
                     active ? 1.0 : 0.0
 
-                scale:
-                    active ? 1.0 : 0.985
-
-                y:
-                    active ? 0 : 8
-
                 onActiveChanged: {
+                    enterAnimation.stop()
+                    exitAnimation.stop()
+
                     animating = true
-                    settleTimer.restart()
+
+                    if (active) {
+                        // New page comes in from the navigation direction.
+                        transitionX = direction * 28
+                        opacity = 0.0
+                        enterAnimation.start()
+                    } else {
+                        // Old page moves only half as far, creating a layered
+                        // shared-axis feel rather than a full swipe.
+                        transitionX = 0
+                        opacity = 1.0
+                        exitAnimation.start()
+                    }
                 }
 
                 Component.onCompleted: {
+                    transitionX = 0
+                    opacity = active ? 1.0 : 0.0
                     animating = false
                 }
 
-                Behavior on opacity {
+                ParallelAnimation {
+                    id: enterAnimation
+
                     NumberAnimation {
-                        duration: 180
+                        target: transitionRoot
+                        property: "transitionX"
+                        to: 0
+                        duration: 210
                         easing.type: Easing.OutCubic
                     }
-                }
 
-                Behavior on scale {
                     NumberAnimation {
-                        duration: 180
-                        easing.type: Easing.OutCubic
+                        target: transitionRoot
+                        property: "opacity"
+                        to: 1.0
+                        duration: 150
+                        easing.type: Easing.OutQuad
                     }
+
+                    onStopped:
+                        transitionRoot.animating = false
                 }
 
-                Behavior on y {
+                ParallelAnimation {
+                    id: exitAnimation
+
                     NumberAnimation {
+                        target: transitionRoot
+                        property: "transitionX"
+                        to:
+                            -transitionRoot.direction * 14
                         duration: 180
-                        easing.type: Easing.OutCubic
+                        easing.type: Easing.InOutCubic
                     }
-                }
 
-                Timer {
-                    id: settleTimer
-                    interval: 200
-                    repeat: false
+                    NumberAnimation {
+                        target: transitionRoot
+                        property: "opacity"
+                        to: 0.0
+                        duration: 135
+                        easing.type: Easing.InQuad
+                    }
 
-                    onTriggered:
+                    onStopped:
                         transitionRoot.animating = false
                 }
             }
