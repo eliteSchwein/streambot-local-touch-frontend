@@ -306,7 +306,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "dialpad"
+                        icon: "tune"
                         selected: appRoot.currentPage === 2
 
                         onClicked:
