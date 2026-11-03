@@ -147,9 +147,16 @@ ShellRoot {
             id: appRoot
 
             property int currentPage: 0
+            property int previousPage: 0
+            property int pageTransitionDirection: 1
             property bool bootAnimationStarted: false
 
             onCurrentPageChanged: {
+                pageTransitionDirection =
+                        currentPage >= previousPage ? 1 : -1
+
+                previousPage = currentPage
+
                 if (currentPage !== 0)
                     dashboardPage.editing = false
             }
@@ -162,12 +169,98 @@ ShellRoot {
             readonly property bool backendStatusActive:
                 !backendStatus.ready || !websocket.connected
 
-            Item {
-                id: pagesViewport
+            component PageTransition: Item {
+                id: transitionRoot
 
-                visible: !appRoot.backendStatusActive
-                enabled: visible
-                clip: true
+                required property bool active
+                property int direction: 1
+                property real slideX: 0
+                property bool animating: false
+
+                visible:
+                    active || animating
+
+                enabled:
+                    active
+
+                z:
+                    active ? 2 : 1
+
+                x:
+                    slideX
+
+                onActiveChanged: {
+                    enterAnimation.stop()
+                    exitAnimation.stop()
+
+                    if (active) {
+                        // Incoming page starts just outside the viewport and
+                        // slides into place.
+                        animating = true
+                        slideX = direction * width
+                        enterAnimation.start()
+                    } else {
+                        // Do not check `visible` here. `visible` is bound to
+                        // `active || animating`, so it becomes false as soon as
+                        // `active` changes unless we mark the page animating
+                        // first. That was preventing the outgoing page from
+                        // ever running its slide-out animation.
+                        animating = true
+                        slideX = 0
+                        exitAnimation.start()
+                    }
+                }
+
+                Component.onCompleted: {
+                    if (active) {
+                        slideX = 0
+                        animating = false
+                    } else {
+                        slideX = direction * width
+                        animating = false
+                    }
+                }
+
+                NumberAnimation {
+                    id: enterAnimation
+
+                    target: transitionRoot
+                    property: "slideX"
+                    to: 0
+                    duration: 230
+                    easing.type: Easing.OutCubic
+
+                    onStopped:
+                        transitionRoot.animating = false
+                }
+
+                NumberAnimation {
+                    id: exitAnimation
+
+                    target: transitionRoot
+                    property: "slideX"
+                    to:
+                        -transitionRoot.direction
+                        * transitionRoot.width
+
+                    duration: 230
+                    easing.type: Easing.OutCubic
+
+                    onStopped:
+                        transitionRoot.animating = false
+                }
+            }
+
+            anchors.fill: parent
+            color: touchWallpaper.visible ? "transparent" : Md3Theme.background
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 0
+
+                direction:
+                    appRoot.pageTransitionDirection
 
                 anchors {
                     top: parent.top
@@ -176,100 +269,121 @@ ShellRoot {
                     bottom: navigation.top
                 }
 
-                Item {
-                    id: pagesTrack
+                DashboardPage {
+                    id: dashboardPage
 
-                    width: pagesViewport.width * 5
-                    height: pagesViewport.height
+                    anchors.fill: parent
 
-                    // One continuous horizontal track gives page changes a
-                    // proper swipe-style transition. This avoids the old
-                    // per-page enter/exit animations fighting over direction.
-                    x: -appRoot.currentPage * pagesViewport.width
+                    z:
+                        dashboardPage.editing
+                            ? 100000
+                            : 0
 
-                    Behavior on x {
-                        NumberAnimation {
-                            duration: 260
-                            easing.type: Easing.OutCubic
-                        }
-                    }
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                    config: config
+                }
+            }
 
-                    Item {
-                        x: pagesViewport.width * 0
-                        width: pagesViewport.width
-                        height: pagesViewport.height
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 1
 
-                        DashboardPage {
-                            id: dashboardPage
-                            anchors.fill: parent
+                direction:
+                    appRoot.pageTransitionDirection
 
-                            i18n: i18n
-                            websocket: websocket
-                            store: dashboardStore
-                            config: config
-                        }
-                    }
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
 
-                    Item {
-                        x: pagesViewport.width * 1
-                        width: pagesViewport.width
-                        height: pagesViewport.height
+                AudioPage {
+                    id: audioPage
+                    anchors.fill: parent
 
-                        AudioPage {
-                            id: audioPage
-                            anchors.fill: parent
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                }
+            }
 
-                            i18n: i18n
-                            websocket: websocket
-                            store: dashboardStore
-                        }
-                    }
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 2
 
-                    Item {
-                        x: pagesViewport.width * 2
-                        width: pagesViewport.width
-                        height: pagesViewport.height
+                direction:
+                    appRoot.pageTransitionDirection
 
-                        MacrosPage {
-                            id: macrosPage
-                            anchors.fill: parent
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
 
-                            i18n: i18n
-                            store: dashboardStore
-                            websocket: websocket
-                        }
-                    }
+                MacrosPage {
+                    id: macrosPage
+                    anchors.fill: parent
 
-                    Item {
-                        x: pagesViewport.width * 3
-                        width: pagesViewport.width
-                        height: pagesViewport.height
+                    i18n: i18n
+                    store: dashboardStore
+                    websocket: websocket
+                }
+            }
 
-                        SystemPage {
-                            id: systemPage
-                            anchors.fill: parent
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 3
 
-                            i18n: i18n
-                            websocket: websocket
-                            store: dashboardStore
-                            config: config
-                        }
-                    }
+                direction:
+                    appRoot.pageTransitionDirection
 
-                    Item {
-                        x: pagesViewport.width * 4
-                        width: pagesViewport.width
-                        height: pagesViewport.height
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
 
-                        SpeedtestPage {
-                            id: speedtestPage
-                            anchors.fill: parent
+                SystemPage {
+                    id: systemPage
+                    anchors.fill: parent
 
-                            i18n: i18n
-                            websocket: websocket
-                            store: dashboardStore
-                        }
-                    }
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                    config: config
+                }
+            }
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 4
+
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                SpeedtestPage {
+                    id: speedtestPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
                 }
             }
 
