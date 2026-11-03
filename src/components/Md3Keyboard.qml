@@ -37,26 +37,77 @@ Item {
             : ["z","x","c","v","b","n","m"]
         )
 
-    visible: KeyboardController.visible
-    z: 1000000
-    height: visible
-        ? Math.min(
+    readonly property bool keyboardShown:
+        KeyboardController.visible
+
+    property bool renderVisible:
+        keyboardShown
+
+    readonly property real keyboardFullHeight:
+        Math.min(
             root.symbols ? 300 : 250,
             parent.height * (root.symbols ? 0.50 : 0.42)
         )
-        : 0
+
+    visible: renderVisible
+    z: 1000000
+    height: keyboardFullHeight
+
+    transform: Translate {
+        id: keyboardSlide
+
+        y:
+            root.keyboardShown
+            ? 0
+            : root.height
+
+        Behavior on y {
+            NumberAnimation {
+                duration: 220
+                easing.type:
+                    root.keyboardShown
+                    ? Easing.OutCubic
+                    : Easing.InCubic
+            }
+        }
+    }
+
+    onKeyboardShownChanged: {
+        if (keyboardShown) {
+            hideAfterSlide.stop()
+            renderVisible = true
+        } else {
+            // Keep the keyboard rendered until the slide-out finishes.
+            renderVisible = true
+            hideAfterSlide.restart()
+        }
+
+        KeyboardController.keyboardHeight =
+            keyboardShown ? height : 0
+    }
 
     onHeightChanged:
         KeyboardController.keyboardHeight =
-            visible ? height : 0
+            keyboardShown ? height : 0
 
-    onVisibleChanged:
-        KeyboardController.keyboardHeight =
-            visible ? height : 0
+    Component.onCompleted: {
+        renderVisible = keyboardShown
 
-    Component.onCompleted:
         KeyboardController.keyboardHeight =
-            visible ? height : 0
+            keyboardShown ? height : 0
+    }
+
+    Timer {
+        id: hideAfterSlide
+
+        interval: 230
+        repeat: false
+
+        onTriggered: {
+            if (!root.keyboardShown)
+                root.renderVisible = false
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
