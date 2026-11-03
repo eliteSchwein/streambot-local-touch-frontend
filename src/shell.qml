@@ -147,10 +147,18 @@ ShellRoot {
             id: appRoot
 
             property int currentPage: 0
+            property bool bootAnimationStarted: false
+
+            Component.onCompleted:
+                Qt.callLater(function() {
+                    appRoot.bootAnimationStarted = true
+                })
+
             onCurrentPageChanged: {
                 if (currentPage !== 0)
                     dashboardPage.editing = false
             }
+
             readonly property bool backendStatusActive:
                 !backendStatus.ready || !websocket.connected
 
@@ -161,6 +169,33 @@ ShellRoot {
                 id: dashboardPage
 
                 visible: !appRoot.backendStatusActive && appRoot.currentPage === 0
+
+                opacity:
+                    appRoot.bootAnimationStarted
+                    ? 1
+                    : 0
+
+                scale:
+                    appRoot.bootAnimationStarted
+                    ? 1
+                    : 0.965
+
+                transformOrigin:
+                    Item.Center
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 420
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Behavior on scale {
+                    NumberAnimation {
+                        duration: 520
+                        easing.type: Easing.OutBack
+                    }
+                }
 
                 // While editing, the dashboard and its modal selector must sit
                 // above the bottom navigation bar. Keyboard still has the
@@ -276,11 +311,38 @@ ShellRoot {
                 height: 52
                 color: Md3Theme.surfaceContainer
 
+                opacity:
+                    appRoot.bootAnimationStarted
+                    ? 1
+                    : 0
+
+                transform: Translate {
+                    y:
+                        appRoot.bootAnimationStarted
+                        ? 0
+                        : 24
+                }
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 360
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Behavior on transform.y {
+                    NumberAnimation {
+                        duration: 420
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
                 // While the drawer is open, its bottom gesture area overlaps
                 // the nav visually. Disable the whole nav subtree so taps
                 // cannot leak through and steal the drag gesture.
                 enabled:
-                    !settingsDrawer.open
+                    appRoot.bootAnimationStarted
+                    && !settingsDrawer.open
                     && !KeyboardController.visible
 
                 // Keep actual page navigation centered regardless of
