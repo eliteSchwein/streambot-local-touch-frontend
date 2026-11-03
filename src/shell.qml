@@ -147,16 +147,59 @@ ShellRoot {
             id: appRoot
 
             property int currentPage: 0
+            property int previousPage: 0
+            property int pageTransitionDirection: 1
             property bool bootAnimationStarted: false
+
+            onCurrentPageChanged: {
+                pageTransitionDirection =
+                    currentPage >= previousPage ? 1 : -1
+
+                previousPage = currentPage
+
+                if (currentPage !== 0)
+                    dashboardPage.editing = false
+            }
 
             Component.onCompleted:
                 Qt.callLater(function() {
                     appRoot.bootAnimationStarted = true
                 })
 
-            onCurrentPageChanged: {
-                if (currentPage !== 0)
-                    dashboardPage.editing = false
+            readonly property bool backendStatusActive:
+                !backendStatus.ready || !websocket.connected
+
+            component PageTransition: Item {
+                id: transitionRoot
+
+                required property bool active
+                property int direction: 1
+
+                visible:
+                    active
+                    || opacity > 0.01
+
+                opacity:
+                    active ? 1 : 0
+
+                x:
+                    active
+                    ? 0
+                    : -direction * 18
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Behavior on x {
+                    NumberAnimation {
+                        duration: 220
+                        easing.type: Easing.OutCubic
+                    }
+                }
             }
 
             readonly property bool backendStatusActive:
@@ -165,45 +208,13 @@ ShellRoot {
             anchors.fill: parent
             color: touchWallpaper.visible ? "transparent" : Md3Theme.background
 
-            DashboardPage {
-                id: dashboardPage
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 0
 
-                visible: !appRoot.backendStatusActive && appRoot.currentPage === 0
-
-                opacity:
-                    appRoot.bootAnimationStarted
-                    ? 1
-                    : 0
-
-                scale:
-                    appRoot.bootAnimationStarted
-                    ? 1
-                    : 0.965
-
-                transformOrigin:
-                    Item.Center
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 420
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 520
-                        easing.type: Easing.OutBack
-                    }
-                }
-
-                // While editing, the dashboard and its modal selector must sit
-                // above the bottom navigation bar. Keyboard still has the
-                // global higher z value.
-                z:
-                    dashboardPage.editing
-                    ? 100000
-                    : 0
+                direction:
+                    appRoot.pageTransitionDirection
 
                 anchors {
                     top: parent.top
@@ -212,16 +223,57 @@ ShellRoot {
                     bottom: navigation.top
                 }
 
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
-                config: config
+                DashboardPage {
+                    id: dashboardPage
+
+                    anchors.fill: parent
+
+                    opacity:
+                        appRoot.bootAnimationStarted
+                        ? 1
+                        : 0
+
+                    scale:
+                        appRoot.bootAnimationStarted
+                        ? 1
+                        : 0.965
+
+                    transformOrigin:
+                        Item.Center
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 420
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 520
+                            easing.type: Easing.OutBack
+                        }
+                    }
+
+                    z:
+                        dashboardPage.editing
+                        ? 100000
+                        : 0
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                    config: config
+                }
             }
 
-            AudioPage {
-                id: audioPage
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 1
 
-                visible: !appRoot.backendStatusActive && appRoot.currentPage === 1
+                direction:
+                    appRoot.pageTransitionDirection
 
                 anchors {
                     top: parent.top
@@ -230,45 +282,23 @@ ShellRoot {
                     bottom: navigation.top
                 }
 
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
+                AudioPage {
+                    id: audioPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                }
             }
 
-            MacrosPage {
-                id: macrosPage
-
-                visible:
+            PageTransition {
+                active:
                     !appRoot.backendStatusActive
                     && appRoot.currentPage === 2
 
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                i18n: i18n
-                store: dashboardStore
-                websocket: websocket
-            }
-
-            SystemPage {
-                id: systemPage
-                visible: !appRoot.backendStatusActive && appRoot.currentPage === 3
-                anchors { top: parent.top; left: parent.left; right: parent.right; bottom: navigation.top }
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
-                config: config
-            }
-
-
-            SpeedtestPage {
-                id: speedtestPage
-
-                visible: !appRoot.backendStatusActive && appRoot.currentPage === 4
+                direction:
+                    appRoot.pageTransitionDirection
 
                 anchors {
                     top: parent.top
@@ -277,13 +307,71 @@ ShellRoot {
                     bottom: navigation.top
                 }
 
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
+                MacrosPage {
+                    id: macrosPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    store: dashboardStore
+                    websocket: websocket
+                }
+            }
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 3
+
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                SystemPage {
+                    id: systemPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                    config: config
+                }
+            }
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 4
+
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                SpeedtestPage {
+                    id: speedtestPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                }
             }
 
             BackendStatusView {
                 id: backendStatusView
+
+                visible: appRoot.backendStatusActive
 
                 visible: appRoot.backendStatusActive
 
