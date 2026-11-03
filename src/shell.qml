@@ -174,9 +174,11 @@ ShellRoot {
 
                 required property bool active
                 property int direction: 1
-                property real slideX: 0
                 property bool animating: false
 
+                // Alternative transition:
+                // fade + tiny scale + vertical lift. This avoids horizontal
+                // slide races while keeping the current page layout intact.
                 visible:
                     active || animating
 
@@ -186,67 +188,51 @@ ShellRoot {
                 z:
                     active ? 2 : 1
 
-                x:
-                    slideX
+                opacity:
+                    active ? 1.0 : 0.0
+
+                scale:
+                    active ? 1.0 : 0.985
+
+                y:
+                    active ? 0 : 8
 
                 onActiveChanged: {
-                    enterAnimation.stop()
-                    exitAnimation.stop()
-
-                    if (active) {
-                        // Incoming page starts just outside the viewport and
-                        // slides into place.
-                        animating = true
-                        slideX = direction * width
-                        enterAnimation.start()
-                    } else {
-                        // Do not check `visible` here. `visible` is bound to
-                        // `active || animating`, so it becomes false as soon as
-                        // `active` changes unless we mark the page animating
-                        // first. That was preventing the outgoing page from
-                        // ever running its slide-out animation.
-                        animating = true
-                        slideX = 0
-                        exitAnimation.start()
-                    }
+                    animating = true
+                    settleTimer.restart()
                 }
 
                 Component.onCompleted: {
-                    if (active) {
-                        slideX = 0
-                        animating = false
-                    } else {
-                        slideX = direction * width
-                        animating = false
+                    animating = false
+                }
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
                     }
                 }
 
-                NumberAnimation {
-                    id: enterAnimation
-
-                    target: transitionRoot
-                    property: "slideX"
-                    to: 0
-                    duration: 230
-                    easing.type: Easing.OutCubic
-
-                    onStopped:
-                        transitionRoot.animating = false
+                Behavior on scale {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
                 }
 
-                NumberAnimation {
-                    id: exitAnimation
+                Behavior on y {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
+                }
 
-                    target: transitionRoot
-                    property: "slideX"
-                    to:
-                        -transitionRoot.direction
-                        * transitionRoot.width
+                Timer {
+                    id: settleTimer
+                    interval: 200
+                    repeat: false
 
-                    duration: 230
-                    easing.type: Easing.OutCubic
-
-                    onStopped:
+                    onTriggered:
                         transitionRoot.animating = false
                 }
             }
