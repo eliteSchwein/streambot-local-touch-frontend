@@ -147,16 +147,9 @@ ShellRoot {
             id: appRoot
 
             property int currentPage: 0
-            property int previousPage: 0
-            property int pageTransitionDirection: 1
             property bool bootAnimationStarted: false
 
             onCurrentPageChanged: {
-                pageTransitionDirection =
-                        currentPage >= previousPage ? 1 : -1
-
-                previousPage = currentPage
-
                 if (currentPage !== 0)
                     dashboardPage.editing = false
             }
@@ -169,214 +162,114 @@ ShellRoot {
             readonly property bool backendStatusActive:
                 !backendStatus.ready || !websocket.connected
 
-            component PageTransition: Item {
-                id: transitionRoot
+            Item {
+                id: pagesViewport
 
-                required property bool active
-                property int direction: 1
-                property real slideX: 0
-                property bool animating: false
+                visible: !appRoot.backendStatusActive
+                enabled: visible
+                clip: true
 
-                visible:
-                    active || animating
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
 
-                enabled:
-                    active
+                Item {
+                    id: pagesTrack
 
-                z:
-                    active ? 2 : 1
+                    width: pagesViewport.width * 5
+                    height: pagesViewport.height
 
-                x:
-                    slideX
+                    // One continuous horizontal track gives page changes a
+                    // proper swipe-style transition. This avoids the old
+                    // per-page enter/exit animations fighting over direction.
+                    x: -appRoot.currentPage * pagesViewport.width
 
-                onActiveChanged: {
-                    enterAnimation.stop()
-                    exitAnimation.stop()
-
-                    if (active) {
-                        animating = true
-                        slideX = direction * width
-                        enterAnimation.start()
-                    } else if (visible) {
-                        animating = true
-                        slideX = 0
-                        exitAnimation.start()
+                    Behavior on x {
+                        NumberAnimation {
+                            duration: 260
+                            easing.type: Easing.OutCubic
+                        }
                     }
-                }
 
-                Component.onCompleted: {
-                    if (active) {
-                        slideX = 0
-                        animating = false
-                    } else {
-                        slideX = direction * width
-                        animating = false
+                    Item {
+                        x: pagesViewport.width * 0
+                        width: pagesViewport.width
+                        height: pagesViewport.height
+
+                        DashboardPage {
+                            id: dashboardPage
+                            anchors.fill: parent
+
+                            i18n: i18n
+                            websocket: websocket
+                            store: dashboardStore
+                            config: config
+                        }
                     }
-                }
 
-                NumberAnimation {
-                    id: enterAnimation
+                    Item {
+                        x: pagesViewport.width * 1
+                        width: pagesViewport.width
+                        height: pagesViewport.height
 
-                    target: transitionRoot
-                    property: "slideX"
-                    to: 0
-                    duration: 230
-                    easing.type: Easing.OutCubic
+                        AudioPage {
+                            id: audioPage
+                            anchors.fill: parent
 
-                    onStopped:
-                        transitionRoot.animating = false
-                }
+                            i18n: i18n
+                            websocket: websocket
+                            store: dashboardStore
+                        }
+                    }
 
-                NumberAnimation {
-                    id: exitAnimation
+                    Item {
+                        x: pagesViewport.width * 2
+                        width: pagesViewport.width
+                        height: pagesViewport.height
 
-                    target: transitionRoot
-                    property: "slideX"
-                    to:
-                        -transitionRoot.direction
-                        * transitionRoot.width
+                        MacrosPage {
+                            id: macrosPage
+                            anchors.fill: parent
 
-                    duration: 230
-                    easing.type: Easing.OutCubic
+                            i18n: i18n
+                            store: dashboardStore
+                            websocket: websocket
+                        }
+                    }
 
-                    onStopped:
-                        transitionRoot.animating = false
-                }
-            }
+                    Item {
+                        x: pagesViewport.width * 3
+                        width: pagesViewport.width
+                        height: pagesViewport.height
 
-            anchors.fill: parent
-            color: touchWallpaper.visible ? "transparent" : Md3Theme.background
+                        SystemPage {
+                            id: systemPage
+                            anchors.fill: parent
 
-            PageTransition {
-                active:
-                    !appRoot.backendStatusActive
-                    && appRoot.currentPage === 0
+                            i18n: i18n
+                            websocket: websocket
+                            store: dashboardStore
+                            config: config
+                        }
+                    }
 
-                direction:
-                    appRoot.pageTransitionDirection
+                    Item {
+                        x: pagesViewport.width * 4
+                        width: pagesViewport.width
+                        height: pagesViewport.height
 
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
+                        SpeedtestPage {
+                            id: speedtestPage
+                            anchors.fill: parent
 
-                DashboardPage {
-                    id: dashboardPage
-
-                    anchors.fill: parent
-
-                    z:
-                        dashboardPage.editing
-                            ? 100000
-                            : 0
-
-                    i18n: i18n
-                    websocket: websocket
-                    store: dashboardStore
-                    config: config
-                }
-            }
-
-            PageTransition {
-                active:
-                    !appRoot.backendStatusActive
-                    && appRoot.currentPage === 1
-
-                direction:
-                    appRoot.pageTransitionDirection
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                AudioPage {
-                    id: audioPage
-                    anchors.fill: parent
-
-                    i18n: i18n
-                    websocket: websocket
-                    store: dashboardStore
-                }
-            }
-
-            PageTransition {
-                active:
-                    !appRoot.backendStatusActive
-                    && appRoot.currentPage === 2
-
-                direction:
-                    appRoot.pageTransitionDirection
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                MacrosPage {
-                    id: macrosPage
-                    anchors.fill: parent
-
-                    i18n: i18n
-                    store: dashboardStore
-                    websocket: websocket
-                }
-            }
-
-            PageTransition {
-                active:
-                    !appRoot.backendStatusActive
-                    && appRoot.currentPage === 3
-
-                direction:
-                    appRoot.pageTransitionDirection
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                SystemPage {
-                    id: systemPage
-                    anchors.fill: parent
-
-                    i18n: i18n
-                    websocket: websocket
-                    store: dashboardStore
-                    config: config
-                }
-            }
-
-            PageTransition {
-                active:
-                    !appRoot.backendStatusActive
-                    && appRoot.currentPage === 4
-
-                direction:
-                    appRoot.pageTransitionDirection
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                SpeedtestPage {
-                    id: speedtestPage
-                    anchors.fill: parent
-
-                    i18n: i18n
-                    websocket: websocket
-                    store: dashboardStore
+                            i18n: i18n
+                            websocket: websocket
+                            store: dashboardStore
+                        }
+                    }
                 }
             }
 
