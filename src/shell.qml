@@ -323,6 +323,13 @@ ShellRoot {
                         appRoot.bootAnimationStarted
                         ? 0
                         : 24
+
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: 420
+                            easing.type: Easing.OutCubic
+                        }
+                    }
                 }
 
                 Behavior on opacity {
