@@ -339,7 +339,12 @@ ShellRoot {
                     }
                 }
 
-                Behavior on transform.y {
+                property real bootOffset:
+                    appRoot.bootAnimationStarted
+                    ? 0
+                    : 24
+
+                Behavior on bootOffset {
                     NumberAnimation {
                         duration: 420
                         easing.type: Easing.OutCubic
