@@ -68,7 +68,7 @@
   "no_auto_macros": "Keine Auto-Makros",
   "auto_macro_search": "Auto-Makros suchen",
   "auto_macro_no_results": "Keine Auto-Makros gefunden",
-  "auto_macro_next_in": "Nächster Lauf in {seconds}s"
+  "auto_macro_next_in": "Nächster Lauf in {seconds}s",
   "queued": "in Warteschlange",
   "active": "Aktiv",
   "next": "Als Nächstes",
@@ -214,6 +214,8 @@
   "system_cpu_usage": "CPU-Auslastung",
   "system_cpu_temp": "CPU-Temperatur",
   "system_ram_usage": "RAM-Auslastung",
+  "system_swap_usage": "Swap-Auslastung",
+  "system_no_swap": "Kein Swap",
   "system_internal_storage_usage": "Interner Speicher",
   "dashboard_edit": "Dashboard bearbeiten",
   "dashboard_reset": "Zurücksetzen",

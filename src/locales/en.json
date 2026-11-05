@@ -214,6 +214,8 @@
   "system_cpu_usage": "CPU usage",
   "system_cpu_temp": "CPU temperature",
   "system_ram_usage": "RAM usage",
+  "system_swap_usage": "Swap usage",
+  "system_no_swap": "No swap",
   "system_internal_storage_usage": "Internal storage",
   "dashboard_edit": "Edit dashboard",
   "dashboard_reset": "Reset",

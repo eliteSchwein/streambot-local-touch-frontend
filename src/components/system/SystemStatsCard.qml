@@ -72,6 +72,29 @@ Rectangle {
     readonly property real ramUsage:
         clampPercent(info?.ram_usage)
 
+    readonly property bool hasSwap:
+        (numberOrNull(info?.swap_total) ?? 0) > 0
+
+    readonly property real swapUsage:
+        hasSwap ? clampPercent(info?.swap_usage) : -1
+
+    readonly property color cpuColor: "#EF5350"
+    readonly property color ramColor: "#FFB300"
+    readonly property color swapColor: "#AB47BC"
+    readonly property color storageColor: "#26C6DA"
+
+    // Same thresholds as the admin panel: orange from 80 %, red from 90 %.
+    readonly property real usageWarningPercent: 80
+    readonly property real usageCriticalPercent: 90
+
+    function usageColor(value) {
+        if (value >= usageCriticalPercent)
+            return Md3Theme.error
+        if (value >= usageWarningPercent)
+            return "#FF9800"
+        return Md3Theme.surfaceContent
+    }
+
     readonly property real internalStorageUsage: {
         const backendValue = clampPercent(info?.internal_storage_usage)
         return backendValue >= 0
@@ -135,10 +158,12 @@ Rectangle {
 
                     property real cpuValue: root.cpuUsage
                     property real ramValue: root.ramUsage
+                    property real swapValue: root.swapUsage
                     property real storageValue: root.internalStorageUsage
 
                     onCpuValueChanged: requestPaint()
                     onRamValueChanged: requestPaint()
+                    onSwapValueChanged: requestPaint()
                     onStorageValueChanged: requestPaint()
                     onWidthChanged: requestPaint()
                     onHeightChanged: requestPaint()
@@ -183,11 +208,12 @@ Rectangle {
                         const cx = width / 2
                         const cy = height / 2
 
-                        // Same three-ring hierarchy as Commander 2.0:
-                        // CPU outer, RAM middle, internal storage inner.
-                        drawRing(ctx, cx, cy, 52, 6, cpuValue, "#EF5350")
-                        drawRing(ctx, cx, cy, 40, 6, ramValue, "#FFB300")
-                        drawRing(ctx, cx, cy, 28, 6, storageValue, "#26C6DA")
+                        // Same ring hierarchy as the admin panel:
+                        // CPU outer, RAM, swap, internal storage inner.
+                        drawRing(ctx, cx, cy, 54, 6, cpuValue, root.cpuColor)
+                        drawRing(ctx, cx, cy, 43, 6, ramValue, root.ramColor)
+                        drawRing(ctx, cx, cy, 32, 6, swapValue, root.swapColor)
+                        drawRing(ctx, cx, cy, 21, 6, storageValue, root.storageColor)
                     }
                 }
             }
@@ -198,81 +224,65 @@ Rectangle {
                 Layout.alignment: Qt.AlignVCenter
                 spacing: 8
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
+                Repeater {
+                    model: [
+                        {
+                            label: "system_cpu_usage",
+                            color: root.cpuColor,
+                            value: root.cpuUsage,
+                            available: true
+                        },
+                        {
+                            label: "system_ram_usage",
+                            color: root.ramColor,
+                            value: root.ramUsage,
+                            available: true
+                        },
+                        {
+                            label: "system_swap_usage",
+                            color: root.swapColor,
+                            value: root.swapUsage,
+                            available: root.hasSwap
+                        },
+                        {
+                            label: "system_internal_storage_usage",
+                            color: root.storageColor,
+                            value: root.internalStorageUsage,
+                            available: true
+                        }
+                    ]
 
-                    Rectangle {
-                        Layout.preferredWidth: 9
-                        Layout.preferredHeight: 9
-                        radius: 5
-                        color: "#EF5350"
-                    }
+                    delegate: RowLayout {
+                        required property var modelData
 
-                    Text {
                         Layout.fillWidth: true
-                        text: root.i18n.text("system_cpu_usage")
-                        color: Md3Theme.surfaceVariantContent
-                        font.pixelSize: 11
-                    }
+                        spacing: 8
 
-                    Text {
-                        text: root.percentText(root.cpuUsage)
-                        color: Md3Theme.surfaceContent
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
-                    }
-                }
+                        Rectangle {
+                            Layout.preferredWidth: 9
+                            Layout.preferredHeight: 9
+                            radius: 5
+                            color: modelData.color
+                        }
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
+                        Text {
+                            Layout.fillWidth: true
+                            text: root.i18n.text(modelData.label)
+                            color: Md3Theme.surfaceVariantContent
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
 
-                    Rectangle {
-                        Layout.preferredWidth: 9
-                        Layout.preferredHeight: 9
-                        radius: 5
-                        color: "#FFB300"
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: root.i18n.text("system_ram_usage")
-                        color: Md3Theme.surfaceVariantContent
-                        font.pixelSize: 11
-                    }
-
-                    Text {
-                        text: root.percentText(root.ramUsage)
-                        color: Md3Theme.surfaceContent
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Rectangle {
-                        Layout.preferredWidth: 9
-                        Layout.preferredHeight: 9
-                        radius: 5
-                        color: "#26C6DA"
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: root.i18n.text("system_internal_storage_usage")
-                        color: Md3Theme.surfaceVariantContent
-                        font.pixelSize: 11
-                    }
-
-                    Text {
-                        text: root.percentText(root.internalStorageUsage)
-                        color: Md3Theme.surfaceContent
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
+                        Text {
+                            text: modelData.available
+                                ? root.percentText(modelData.value)
+                                : root.i18n.text("system_no_swap")
+                            color: modelData.available
+                                ? root.usageColor(modelData.value)
+                                : Md3Theme.surfaceVariantContent
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                        }
                     }
                 }
             }

@@ -702,6 +702,34 @@ QtObject {
             raw.ramUsage
         ])
 
+        const swap =
+            components.swap && typeof components.swap === "object"
+            ? components.swap
+            : (
+                raw.swap && typeof raw.swap === "object"
+                ? raw.swap
+                : ({})
+            )
+
+        const swapTotal = firstNumber([
+            swap?.total,
+            components.swap_total,
+            components.swapTotal,
+            raw.swap_total,
+            raw.swapTotal
+        ])
+
+        const swapUsage = firstNumber([
+            swap?.usage_percent,
+            swap?.usagePercent,
+            swap?.percent,
+            swap?.usage,
+            components.swap_usage,
+            components.swapUsage,
+            raw.swap_usage,
+            raw.swapUsage
+        ])
+
         const internalStorageUsage = firstNumber([
             internal?.usage_percent,
             internal?.usagePercent,
@@ -717,6 +745,8 @@ QtObject {
             cpu_usage: cpuUsage,
             cpu_temperature: cpuTemp,
             ram_usage: ramUsage,
+            swap_usage: swapUsage,
+            swap_total: swapTotal,
             internal_storage_usage: internalStorageUsage,
             raw: raw
         }
