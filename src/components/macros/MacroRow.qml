@@ -166,6 +166,7 @@ Item {
 
             MdiIcon {
                 anchors.centerIn: parent
+                visible: root.runState !== "loading"
 
                 name: {
                     if (root.runState === "success")
@@ -181,6 +182,17 @@ Item {
                 selected:
                     root.runState === "success"
                     || root.runState === "error"
+            }
+
+            // Running macro: spinner in the color of the play icon
+            // (fixed fill of icons/mdi/play.svg).
+            Md3Spinner {
+                anchors.centerIn: parent
+                visible: root.runState === "loading"
+
+                color: "#E6E1E5"
+                size: root.compact ? 16 : 20
+                strokeWidth: root.compact ? 2 : 2.5
             }
         }
     }
