@@ -33,11 +33,27 @@ Rectangle {
         && manager.updating !== true
         && !blockedByUpdate
 
-    implicitHeight:
+    readonly property var progress:
+        manager.updating === true && manager.progress
+            ? manager.progress
+            : null
+
+    readonly property bool hasPercent:
+        progress !== null && typeof progress.percent === "number"
+
+    readonly property bool hasPackage:
+        progress !== null && !!progress.package
+
+    readonly property int baseHeight:
             managerName === "system"
         && systemPackageCount() > 0
         ? 70
         : 52
+
+    implicitHeight: baseHeight
+        + (manager.updating === true
+            ? progressColumn.implicitHeight + 6
+            : 0)
 
     radius: Md3Theme.radiusMedium
     color: manager.update_available === true
@@ -70,6 +86,31 @@ Rectangle {
             : "")
     }
 
+    function formatPercent(value) {
+        return Math.round(Number(value) || 0) + "%"
+    }
+
+    function stageText() {
+        if (!progress)
+            return i18n.text("system_updates_updating")
+
+        const key = "system_updates_stage_" + progress.stage
+        const label = i18n.text(key)
+        return label === key ? String(progress.stage) : label
+    }
+
+    function packageText() {
+        if (!hasPackage)
+            return ""
+
+        if (progress.package_index && progress.package_total)
+            return progress.package
+                + " (" + progress.package_index
+                + "/" + progress.package_total + ")"
+
+        return progress.package
+    }
+
     function versionText() {
         if (managerName === "system") {
             const c = systemPackageCount()
@@ -87,8 +128,12 @@ Rectangle {
     }
 
     RowLayout {
-        anchors.fill: parent
+        id: mainRow
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.margins: 3
+        height: root.baseHeight - 6
         spacing: 6
 
         MdiIcon {
@@ -208,6 +253,85 @@ Rectangle {
                     { name: root.managerName }
                 )
             }
+        }
+    }
+
+    ColumnLayout {
+        id: progressColumn
+        visible: root.manager.updating === true
+        anchors.top: mainRow.bottom
+        anchors.topMargin: 3
+        anchors.left: parent.left
+        anchors.right: parent.right
+        // Align with the text column (icon 18 + spacing 6 + margin 3).
+        anchors.leftMargin: 27
+        anchors.rightMargin: 3
+        spacing: 3
+
+        RowLayout {
+            Layout.fillWidth: true
+
+            Text {
+                Layout.fillWidth: true
+                text: root.stageText()
+                color: Md3Theme.surfaceContent
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
+
+            Text {
+                visible: root.hasPercent
+                text: root.formatPercent(root.progress?.percent)
+                color: Md3Theme.surfaceVariantContent
+                font.pixelSize: 12
+            }
+        }
+
+        UpdateProgressBar {
+            Layout.fillWidth: true
+            barHeight: 6
+            value: root.hasPercent ? root.progress.percent : -1
+            barColor: Md3Theme.primary
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            visible: root.hasPackage
+
+            Text {
+                Layout.fillWidth: true
+                text: root.packageText()
+                color: Md3Theme.surfaceVariantContent
+                font.pixelSize: 12
+                elide: Text.ElideMiddle
+            }
+
+            Text {
+                visible: typeof root.progress?.package_percent === "number"
+                text: root.formatPercent(root.progress?.package_percent)
+                color: Md3Theme.surfaceVariantContent
+                font.pixelSize: 12
+            }
+        }
+
+        UpdateProgressBar {
+            Layout.fillWidth: true
+            visible: root.hasPackage
+            barHeight: 3
+            value: typeof root.progress?.package_percent === "number"
+                ? root.progress.package_percent
+                : -1
+            barColor: Md3Theme.secondary
+        }
+
+        Text {
+            Layout.fillWidth: true
+            visible: !!root.progress?.message
+            text: root.progress?.message ?? ""
+            color: Md3Theme.surfaceVariantContent
+            opacity: 0.8
+            font.pixelSize: 11
+            elide: Text.ElideRight
         }
     }
 }
