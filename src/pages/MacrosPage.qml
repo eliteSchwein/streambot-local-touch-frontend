@@ -470,8 +470,15 @@ Item {
         readonly property bool enabled:
             autoMacro?.enabled === true
 
+        // While a temporary interval is active the backend counts down
+        // from it instead of the configured one.
         readonly property real interval:
-            Math.max(1, Number(autoMacro?.interval ?? 1))
+            Math.max(
+                0.05,
+                Number(autoMacro?.temporary_interval_ms) > 0
+                    ? Number(autoMacro.temporary_interval_ms) / 1000
+                    : Number(autoMacro?.interval ?? 1)
+            )
 
         readonly property real currentInterval:
             Math.max(

@@ -85,10 +85,15 @@ Md3Card {
                     if (!modelData.enabled)
                         return 0
 
+                    // While a temporary interval is active the backend
+                    // counts down from it instead of the configured one.
+                    const temporary = Number(modelData.temporary_interval_ms)
                     const interval =
                         Math.max(
-                            1,
-                            Number(modelData.interval ?? 1)
+                            0.05,
+                            temporary > 0
+                                ? temporary / 1000
+                                : Number(modelData.interval ?? 1)
                         )
 
                     const remaining =
