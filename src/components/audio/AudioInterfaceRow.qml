@@ -43,6 +43,10 @@ Rectangle {
             || device.pipewire_sink === "true"
         )
 
+    // Per-link control: volume is set per output in the link dialog.
+    readonly property bool perLink:
+        pipewireSink && device.per_link_control === true
+
     readonly property real minVolume:
         Number(device.min_range ?? 0)
 
@@ -175,8 +179,14 @@ Rectangle {
         }
 
         if (muted) {
+            // Restore the retained volume; the backend then also restores
+            // the individual link volumes (per link control).
+            const retained = Number(device.current_volume)
+
             setVolume(
-                Math.max(
+                device.muted === true && retained > 0
+                ? retained
+                : Math.max(
                     previousVolume,
                     Number(device.default_volume ?? 0.2)
                 )
@@ -298,11 +308,25 @@ Rectangle {
 
             spacing: 2
 
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 26
+                visible: root.perLink
+
+                text: root.i18n.text("audio_per_link_hint")
+                color: Md3Theme.surfaceVariantContent
+                font.pixelSize: 10
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+
             Md3Slider {
                 id: volumeSlider
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: 26
+                visible: !root.perLink
 
                 from: root.minVolume
                 to: root.maxVolume
@@ -335,6 +359,7 @@ Rectangle {
                     AudioControlButton {
                         icon: "minus"
                         enabled: !root.muted
+                        visible: !root.perLink
 
                         onClicked:
                             root.stepVolume(-1)
@@ -379,7 +404,9 @@ Rectangle {
 
                             Text {
                                 text:
-                                    Math.round(
+                                    root.perLink
+                                    ? root.i18n.text("audio_per_link_short")
+                                    : Math.round(
                                         root.draftVolume * 100
                                     )
                                     + "%"
@@ -405,6 +432,7 @@ Rectangle {
                     AudioControlButton {
                         icon: "plus"
                         enabled: !root.muted
+                        visible: !root.perLink
 
                         onClicked:
                             root.stepVolume(1)

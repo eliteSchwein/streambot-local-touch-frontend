@@ -255,5 +255,10 @@
   "dashboard_wallpaper_none": "Kein Hintergrund",
   "dashboard_wallpaper_refresh": "Hintergründe",
   "dashboard_wallpaper_title": "Hintergrund auswählen",
-  "dashboard_wallpaper_empty": "Keine Bilder in den Assets gefunden"
+  "dashboard_wallpaper_empty": "Keine Bilder in den Assets gefunden",
+  "audio_per_link_control": "Pro-Verbindung-Steuerung",
+  "audio_per_link_hint": "Lautstärke pro Verbindung – Link-Button antippen",
+  "audio_per_link_short": "Links",
+  "audio_not_connected": "nicht verbunden",
+  "audio_remove_link": "Entfernen"
 }

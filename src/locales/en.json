@@ -255,5 +255,10 @@
   "dashboard_wallpaper_none": "No wallpaper",
   "dashboard_wallpaper_refresh": "Wallpapers",
   "dashboard_wallpaper_title": "Choose wallpaper",
-  "dashboard_wallpaper_empty": "No images found in assets"
+  "dashboard_wallpaper_empty": "No images found in assets",
+  "audio_per_link_control": "Per link control",
+  "audio_per_link_hint": "Volume per link — tap the link button",
+  "audio_per_link_short": "Links",
+  "audio_not_connected": "not connected",
+  "audio_remove_link": "Remove"
 }
