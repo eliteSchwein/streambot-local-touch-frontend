@@ -70,8 +70,17 @@ Md3Card {
             visible: root.visibleAutoMacros.length > 0
 
             clip: true
-            spacing: 6
+            spacing: 4
+            interactive: false
             model: root.visibleAutoMacros
+
+            // Rows shrink so all (up to 4) auto macros fit into the card.
+            // 32px minimum: the switch itself is 32px high.
+            readonly property real rowHeight: {
+                const rows = Math.max(1, macroList.count)
+                const available = (macroList.height - macroList.spacing * (rows - 1)) / rows
+                return Math.max(32, Math.min(42, Math.floor(available)))
+            }
 
             delegate: Item {
                 id: macroRow
@@ -79,7 +88,7 @@ Md3Card {
                 required property var modelData
 
                 width: macroList.width
-                height: 42
+                height: macroList.rowHeight
 
                 readonly property real progress: {
                     if (!modelData.enabled)
@@ -202,9 +211,9 @@ Md3Card {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 9
-                    spacing: 8
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 6
+                    spacing: 6
 
                     Text {
                         Layout.fillWidth: true
