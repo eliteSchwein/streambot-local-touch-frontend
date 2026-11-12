@@ -178,10 +178,10 @@ Item {
                     return "play"
                 }
 
+                // Always the light icon variant (same color as play and the
+                // spinner); the "selected" variant is dark and barely visible
+                // on the row.
                 size: root.compact ? 16 : 20
-                selected:
-                    root.runState === "success"
-                    || root.runState === "error"
             }
 
             // Running macro: spinner in the color of the play icon
