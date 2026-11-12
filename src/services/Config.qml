@@ -385,8 +385,9 @@ QtObject {
     // dashboard and then the wallpaper lost the dashboard layout).
     property string pendingSettingsText: ""
 
-    Timer {
-        id: pendingSettingsTimer
+    // Declared as a property: this object has no default property, so child
+    // objects are not allowed (same as the FileViews below).
+    property Timer pendingSettingsTimer: Timer {
         interval: 3000
         repeat: false
         // Never keep the pending copy for long, so later changes made by the
@@ -426,7 +427,7 @@ QtObject {
         try {
             const text = JSON.stringify(data, null, 2) + "\n"
             pendingSettingsText = text
-            pendingSettingsTimer.restart()
+            root.pendingSettingsTimer.restart()
             settingsFile.setText(text)
             return true
         } catch (error) {
