@@ -33,14 +33,14 @@ Item {
             : []
     }
 
+    // Equal weight for all list cards, so cards in one column share its
+    // height evenly (music keeps its own compact size).
     function cardHeight(card) {
         switch (card) {
         case "interactions":
-            return 155
         case "auto_macros":
-            return 190
         case "macros":
-            return 190
+            return 180
         default:
             return -1
         }
@@ -86,8 +86,8 @@ Item {
 
                         // Every configured card participates in filling the
                         // complete column. preferredHeight only acts as the
-                        // ratio/weight between two cards (Interactions stays
-                        // more compact than Auto Macros / Macros).
+                        // ratio/weight between the cards (equal for all
+                        // list cards).
                         Layout.fillHeight: true
                         Layout.preferredHeight:
                             modelData === "music"

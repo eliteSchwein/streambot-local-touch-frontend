@@ -10,6 +10,9 @@ Item {
     required property var macro
     required property var websocket
 
+    // Smaller text/icon for tight places like the dashboard card.
+    property bool compact: false
+
     property string runState: "idle"
     property int requestId: -1
 
@@ -137,10 +140,10 @@ Item {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 14
-        anchors.rightMargin: 14
+        anchors.leftMargin: root.compact ? 10 : 14
+        anchors.rightMargin: root.compact ? 8 : 14
 
-        spacing: 10
+        spacing: root.compact ? 6 : 10
 
         Text {
             Layout.fillWidth: true
@@ -149,7 +152,7 @@ Item {
             text: root.name
             color: Md3Theme.surfaceContent
 
-            font.pixelSize: 12
+            font.pixelSize: root.compact ? 11 : 12
             font.weight: Font.DemiBold
 
             elide: Text.ElideRight
@@ -157,8 +160,8 @@ Item {
         }
 
         Item {
-            Layout.preferredWidth: 34
-            Layout.preferredHeight: 34
+            Layout.preferredWidth: root.compact ? 26 : 34
+            Layout.preferredHeight: root.compact ? 26 : 34
             Layout.alignment: Qt.AlignVCenter
 
             MdiIcon {
@@ -174,7 +177,7 @@ Item {
                     return "play"
                 }
 
-                size: 20
+                size: root.compact ? 16 : 20
                 selected:
                     root.runState === "success"
                     || root.runState === "error"

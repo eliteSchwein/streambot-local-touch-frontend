@@ -60,16 +60,24 @@ Md3Card {
 
             visible: root.entries().length > 0
             clip: true
-            spacing: 6
+            spacing: 4
             interactive: false
 
             model: root.entries()
+
+            // Rows shrink so all (up to 4) macros fit into the card.
+            readonly property real rowHeight: {
+                const rows = Math.max(1, list.count)
+                const available = (list.height - list.spacing * (rows - 1)) / rows
+                return Math.max(30, Math.min(46, Math.floor(available)))
+            }
 
             delegate: MacroRow {
                 required property var modelData
 
                 width: list.width
-                height: 46
+                height: list.rowHeight
+                compact: true
 
                 name: modelData.name
                 macro: modelData.macro
