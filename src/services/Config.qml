@@ -210,47 +210,15 @@ QtObject {
         if (normalized.split("/").includes(".."))
             return false
 
-        let data = {}
-
-        if (settingsFile.loaded) {
-            const currentText = settingsFile.text()
-
-            if (currentText && currentText.trim() !== "") {
-                try {
-                    data = JSON.parse(currentText)
-                } catch (error) {
-                    console.warn(
-                        "[config] cannot save touch_wallpaper because streambot-settings.json is invalid:",
-                        error
-                    )
-                    return false
-                }
-            }
-        }
-
-        data.touch_wallpaper = normalized
-
-        try {
-            settingsFile.setText(
-                JSON.stringify(data, null, 2) + "\n"
-            )
-
-            touchWallpaper = normalized
-
-            console.log(
-                "[config] saved touch_wallpaper:",
-                normalized
-            )
-
-            return true
-        } catch (error) {
-            console.warn(
-                "[config] failed to save touch_wallpaper:",
-                error
-            )
-
+        if (!updateSettingsFile("touch_wallpaper", data => {
+            data.touch_wallpaper = normalized
+        })) {
             return false
         }
+
+        touchWallpaper = normalized
+        console.log("[config] saved touch_wallpaper:", normalized)
+        return true
     }
 
     property Process wallpaperScanProcess: Process {
@@ -333,7 +301,10 @@ QtObject {
         watchChanges: true
         printErrors: false
 
-        onLoaded: root.loadSharedSettings()
+        onLoaded: {
+            root.pendingSettingsText = ""
+            root.loadSharedSettings()
+        }
         onFileChanged: reload()
 
         onTextChanged: {
@@ -408,93 +379,88 @@ QtObject {
         }
     }
 
-    function setTouchDashboard(value) {
-        const normalized = normalizeTouchDashboard(value)
+    // Text of our last settings write. FileView.text() still returns the old
+    // file contents for a moment after setText(); building the next change on
+    // top of it would silently undo the previous one (e.g. saving the
+    // dashboard and then the wallpaper lost the dashboard layout).
+    property string pendingSettingsText: ""
 
+    Timer {
+        id: pendingSettingsTimer
+        interval: 3000
+        repeat: false
+        // Never keep the pending copy for long, so later changes made by the
+        // backend to the same file are not overwritten.
+        onTriggered: root.pendingSettingsText = ""
+    }
+
+    function currentSettingsText() {
+        if (pendingSettingsText !== "")
+            return pendingSettingsText
+
+        return settingsFile.loaded ? settingsFile.text() : ""
+    }
+
+    /**
+     * Reads streambot-settings.json (including not yet reloaded own writes),
+     * lets mutate() change it and writes it back. Returns false on errors.
+     */
+    function updateSettingsFile(label, mutate) {
         let data = {}
+        const currentText = currentSettingsText()
 
-        if (settingsFile.loaded) {
-            const currentText = settingsFile.text()
-
-            if (currentText && currentText.trim() !== "") {
-                try {
-                    data = JSON.parse(currentText)
-                } catch (error) {
-                    console.warn(
-                        "[config] cannot save touch_dashboard because streambot-settings.json is invalid:",
-                        error
-                    )
-                    return false
-                }
+        if (currentText && currentText.trim() !== "") {
+            try {
+                data = JSON.parse(currentText)
+            } catch (error) {
+                console.warn(
+                    "[config] cannot save " + label + " because streambot-settings.json is invalid:",
+                    error
+                )
+                return false
             }
         }
 
-        data.touch_dashboard = normalized
+        mutate(data)
 
         try {
-            settingsFile.setText(
-                JSON.stringify(data, null, 2) + "\n"
-            )
-
-            touchDashboard = normalized
-
-            console.log(
-                "[config] saved touch_dashboard:",
-                JSON.stringify(normalized)
-            )
-
+            const text = JSON.stringify(data, null, 2) + "\n"
+            pendingSettingsText = text
+            pendingSettingsTimer.restart()
+            settingsFile.setText(text)
             return true
         } catch (error) {
-            console.warn(
-                "[config] failed to save touch_dashboard:",
-                error
-            )
-
+            console.warn("[config] failed to save " + label + ":", error)
             return false
         }
+    }
+
+    function setTouchDashboard(value) {
+        const normalized = normalizeTouchDashboard(value)
+
+        if (!updateSettingsFile("touch_dashboard", data => {
+            data.touch_dashboard = normalized
+        })) {
+            return false
+        }
+
+        touchDashboard = normalized
+        console.log("[config] saved touch_dashboard:", JSON.stringify(normalized))
+        return true
     }
 
     function setLanguage(newLanguage) {
         if (newLanguage !== "en" && newLanguage !== "de")
             return
 
-        let data = {}
-
-        if (settingsFile.loaded) {
-            const currentText = settingsFile.text()
-
-            if (currentText && currentText.trim() !== "") {
-                try {
-                    data = JSON.parse(currentText)
-                } catch (error) {
-                    console.warn(
-                        "[config] cannot save language because streambot-settings.json is invalid:",
-                        error
-                    )
-                    return
-                }
-            }
+        if (!updateSettingsFile("language", data => {
+            data.language = newLanguage
+        })) {
+            return
         }
 
-        data.language = newLanguage
-
-        try {
-            settingsFile.setText(
-                JSON.stringify(data, null, 2) + "\n"
-            )
-
-            language = newLanguage
-
-            console.log(
-                "[config] saved language:",
-                newLanguage
-            )
-        } catch (error) {
-            console.warn(
-                "[config] failed to save language:",
-                error
-            )
-        }
+        language = newLanguage
+        console.log("[config] saved language:", newLanguage)
     }
 
     function loadSharedSettings() {
