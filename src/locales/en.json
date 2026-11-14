@@ -157,6 +157,7 @@
   "system_asset_config_used": "Used by asset configs",
   "system_tts_used": "Used by TTS",
   "system_ollama_used": "Used by Ollama",
+  "system_webcam_used": "Used by the webcam blur",
   "system_updates": "Updates",
   "system_updates_refresh": "Refresh update check",
   "system_updates_update": "Update",

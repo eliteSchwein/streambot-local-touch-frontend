@@ -163,6 +163,14 @@ Rectangle {
                     s.ollamaUsed
                 ]),
                 "#3F51B5"
+            ],
+            [
+                // Webcam privacy blur: Python env, detection models, GPU/Coral runtimes.
+                "system_webcam_used",
+                firstNumber([
+                    f.webcam
+                ]),
+                "#26C6DA"
             ]
         ].filter(row => Number(row[1]) > 0)
     }
