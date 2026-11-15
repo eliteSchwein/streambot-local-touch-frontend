@@ -1,0 +1,1560 @@
+import { LineEdit, ScrollView } from "std-widgets.slint";
+
+// Original Quickshell Material 3 fallback palette (Md3Theme.qml).
+export global Theme {
+    out property <color> background: #111318;
+    out property <color> surface: #1d2024;
+    out property <color> elevated: #282a2f;
+    out property <color> raised: #33353a;
+    out property <color> primary: #a8c7fa;
+    out property <color> on-primary: #062e6f;
+    out property <color> text: #e2e2e9;
+    out property <color> muted: #c4c6d0;
+    out property <color> success: #a8d5a2;
+}
+
+export struct InteractionEntry {
+    name: string,
+    meta: string,
+    uuid: string,
+    active: bool,
+    failed: bool,
+    progress: float,
+}
+
+export struct AutoMacroEntry {
+    name: string,
+    enabled: bool,
+    progress: float,
+}
+
+component DashboardSwitch inherits Rectangle {
+    in property <bool> checked: false;
+    callback toggled();
+    width: 52px;
+    height: 32px;
+    border-radius: 16px;
+    background: checked ? Theme.primary : Theme.raised;
+    border-width: checked ? 0px : 2px;
+    border-color: Theme.muted;
+    Rectangle {
+        width: root.checked ? 24px : 16px;
+        height: root.checked ? 24px : 16px;
+        x: root.checked ? 24px : 6px;
+        y: (parent.height - self.height) / 2;
+        background: root.checked ? Theme.on-primary : Theme.muted;
+        border-radius: self.width / 2;
+    }
+    TouchArea { clicked => { root.toggled(); } }
+}
+
+component MusicIconButton inherits Rectangle {
+    in property <string> glyph: "";
+    in property <bool> filled: false;
+    in property <bool> selected: false;
+    callback clicked();
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
+    background: filled ? Theme.primary : (selected ? Theme.elevated : transparent);
+    Text {
+        text: root.glyph;
+        color: root.filled ? Theme.on-primary : Theme.text;
+        font-size: 24px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+component PillButton inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> selected: false;
+    callback clicked();
+    height: 40px;
+    border-radius: 20px;
+    background: selected ? Theme.primary : Theme.elevated;
+    Text {
+        text: root.label;
+        color: root.selected ? Theme.on-primary : Theme.text;
+        font-size: 13px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+// Key caps match the original Md3Keyboard (8px radius, small gaps, pressed state).
+component TouchKey inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> accent: false;
+    callback clicked();
+    height: 42px;
+    border-radius: 8px;
+    background: touch.pressed ? Theme.primary : (accent ? Theme.elevated : Theme.raised);
+    Text {
+        text: root.label;
+        color: touch.pressed ? Theme.on-primary : Theme.text;
+        font-size: 17px;
+        font-weight: 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component CardSelector inherits Rectangle {
+    in-out property <string> value: "";
+    callback changed(string);
+    height: 42px;
+    background: Theme.elevated;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Theme.raised;
+    Text {
+        x: 12px;
+        width: parent.width - 34px;
+        height: parent.height;
+        text: root.value == "" ? "Empty" : root.value == "auto_macros" ? "Auto Macros" : root.value == "interactions" ? "Interactions" : root.value == "macros" ? "Macros" : "Music";
+        color: Theme.text;
+        font-size: 13px;
+        vertical-alignment: center;
+    }
+    Text { text: "▼"; height: parent.height; x: parent.width - 25px; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+    TouchArea { clicked => { root.changed("open"); } }
+}
+
+export struct PickerEntry {
+    name: string,
+    selected: bool,
+    thumbnail: image,
+}
+
+component NavItem inherits Rectangle {
+    in property <image> icon;
+    in property <image> active-icon;
+    in property <bool> active: false;
+    callback clicked();
+    width: 72px;
+    height: 42px;
+    background: transparent;
+    Rectangle {
+        width: 56px;
+        height: 32px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 18px;
+        background: root.active ? Theme.primary : transparent;
+        Image {
+            width: 21px;
+            height: 21px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            source: root.active ? root.active-icon : root.icon;
+            image-fit: contain;
+        }
+    }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+
+export component App inherits Window {
+    title: "Streambot Touch";
+    preferred-width: 1024px;
+    preferred-height: 600px;
+    min-width: 700px;
+    min-height: 450px;
+    background: Theme.background;
+
+    in-out property <int> page: 0;
+    in-out property <string> connection: "Waiting for backend";
+    in-out property <string> backend-stage: "";
+    in-out property <string> detail: "";
+    in-out property <string> track: "No track information";
+    in-out property <string> music-state: "";
+    in-out property <string> interaction-summary: "No interactions";
+    in-out property <string> system-summary: "No system statistics yet";
+    in-out property <string> storage-summary: "No storage information yet";
+    in-out property <string> speedtest-summary: "Not run";
+    in-out property <string> update-summary: "No update information yet";
+    in-out property <[string]> macros: [];
+    in-out property <[string]> auto-macros: [];
+    in-out property <[string]> channel-points: [];
+    in-out property <[string]> audio-interfaces: [];
+    in-out property <string> search: "";
+    in-out property <int> macro-tab: 0;
+    in-out property <string> feedback: "";
+    in-out property <bool> dashboard-editing: false;
+    in-out property <string> left-slot-0: "interactions";
+    in-out property <string> left-slot-1: "auto_macros";
+    in-out property <string> right-slot-0: "music";
+    in-out property <string> right-slot-1: "";
+    in-out property <string> edit-left-0: "interactions";
+    in-out property <string> edit-left-1: "auto_macros";
+    in-out property <string> edit-right-0: "music";
+    in-out property <string> edit-right-1: "";
+    in-out property <bool> power-menu-open: false;
+    in-out property <bool> network-drawer-open: false;
+    in-out property <bool> drawer-swipe-armed: false;
+    in-out property <string> drawer-network: "Checking network...";
+    in-out property <string> drawer-bluetooth: "Checking Bluetooth...";
+    in-out property <bool> touch-keyboard-open: false;
+    in-out property <bool> touch-keyboard-shift: false;
+    in-out property <bool> touch-keyboard-symbols: false;
+    callback refresh-drawer();
+    callback drawer-command(string);
+    callback keyboard-input(string);
+    callback dashboard-save(string, string, string, string);
+    callback dashboard-cancel();
+    callback power-action(string);
+    in-out property <bool> dashboard-picker-open: false;
+    in-out property <string> dashboard-picker-kind: "";
+    in-out property <string> dashboard-picker-search: "";
+    in-out property <[PickerEntry]> dashboard-picker-items: [];
+    in-out property <string> dashboard-selected-macros: "None selected";
+    in-out property <string> dashboard-selected-auto-macros: "None selected";
+    in-out property <image> wallpaper-image;
+    in-out property <string> wallpaper-label: "No wallpaper";
+    in-out property <[string]> dashboard-macro-list: [];
+    callback dashboard-open-picker(string);
+    callback dashboard-filter(string);
+    callback dashboard-select-option(string);
+    callback dashboard-apply-picker();
+    callback dashboard-editor-open();
+    callback dashboard-editor-reset();
+
+
+    in-out property <bool> show-dashboard-macros: false;
+    in-out property <[InteractionEntry]> dashboard-interactions: [];
+    in-out property <[AutoMacroEntry]> dashboard-auto-macros: [];
+    in-out property <string> music-title: "No song";
+    in-out property <string> music-artist: "Unknown artist";
+    in-out property <bool> music-playing: false;
+    in-out property <bool> music-shuffle: false;
+    in-out property <bool> music-loop: false;
+    in-out property <bool> music-song-requests: false;
+    in-out property <float> music-progress: 0;
+    in-out property <string> music-position: "0:00";
+    in-out property <string> music-duration: "0:00";
+    in-out property <[float]> cava-bars: [0, 0, 0, 0, 0];
+
+    callback remove-interaction(string);
+    callback trigger-macro(int);
+    callback trigger-dashboard-macro(string);
+    callback toggle-dashboard-auto-macro(string);
+    callback toggle-auto-macro(int);
+    callback toggle-channel-point(int);
+    callback music-action(string);
+    callback speedtest-start();
+    callback update-refresh();
+    callback change-volume(int, float);
+
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.wallpaper-image;
+        image-fit: cover;
+    }
+    VerticalLayout {
+        spacing: 0px;
+        Rectangle {
+            vertical-stretch: 1;
+            background: transparent;
+            // Quickshell's content area ends directly above the bottom navigation.
+            // DashboardPage.qml: 10px margins, 8px columns, no card headings.
+            if root.page == 0 && !root.dashboard-editing : HorizontalLayout {
+                padding: 10px;
+                spacing: 8px;
+                VerticalLayout {
+                    spacing: 8px;
+                    horizontal-stretch: 1;
+                    if root.left-slot-0 == "interactions" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 5px;
+                                                if root.dashboard-interactions.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No interactions";
+                                                        color: Theme.muted;
+                                                        font-size: 13px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                if root.dashboard-interactions.length > 0 : ScrollView {
+                                                    vertical-stretch: 1;
+                                                    VerticalLayout {
+                                                        spacing: 5px;
+                                                        for item[i] in root.dashboard-interactions : Rectangle {
+                                                            height: 50px;
+                                                            border-radius: 12px;
+                                                            background: item.active ? Theme.elevated : Theme.raised;
+                                                            Rectangle {
+                                                                height: 3px;
+                                                                y: parent.height - self.height;
+                                                                x: 0px;
+                                                                width: parent.width * max(0, min(1, item.progress));
+                                                                border-radius: 2px;
+                                                                background: Theme.success;
+                                                                visible: item.active;
+                                                            }
+                                                            HorizontalLayout {
+                                                                padding-left: 10px;
+                                                                padding-right: 6px;
+                                                                spacing: 8px;
+                                                                Rectangle {
+                                                                    width: 8px;
+                                                                    height: 8px;
+                                                                    border-radius: 4px;
+                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
+                                                                }
+                                                                VerticalLayout {
+                                                                    horizontal-stretch: 1;
+                                                                    spacing: 1px;
+                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
+                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
+                                                                }
+                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.left-slot-0 == "auto_macros" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 4px;
+                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No auto macros";
+                                                        color: Theme.muted;
+                                                        font-size: 10px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                for item[i] in root.dashboard-auto-macros : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    border-radius: 12px;
+                                                    background: Theme.raised;
+                                                    Rectangle {
+                                                        x: 0px;
+                                                        width: parent.width * max(0, min(1, item.progress));
+                                                        height: parent.height;
+                                                        border-radius: 12px;
+                                                        background: Theme.elevated;
+                                                        visible: item.enabled;
+                                                    }
+                                                    HorizontalLayout {
+                                                        padding-left: 10px;
+                                                        padding-right: 6px;
+                                                        spacing: 6px;
+                                                        Text {
+                                                            text: item.name;
+                                                            horizontal-stretch: 1;
+                                                            color: Theme.text;
+                                                            font-size: 11px;
+                                                            overflow: elide;
+                                                            vertical-alignment: center;
+                                                        }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.left-slot-0 == "macros" : Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 6px;
+                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            for item[i] in root.dashboard-macro-list : Rectangle {
+                                vertical-stretch: 1;
+                                background: Theme.raised;
+                                border-radius: 12px;
+                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
+                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                            }
+                        }
+                    }
+                    if root.left-slot-0 == "music" : Rectangle {
+                                        horizontal-stretch: 1;
+                                        background: Theme.surface;
+                                        border-radius: 16px;
+                                        VerticalLayout {
+                                            padding: 18px;
+                                            spacing: 10px;
+                                            VerticalLayout {
+                                                spacing: 2px;
+                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
+                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
+                                            }
+                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
+                                            // never the Music card's preferred size or layout stretch.
+                                            Rectangle {
+                                                vertical-stretch: 1;
+                                                background: transparent;
+                                                Rectangle {
+                                                    height: 110px;
+                                                    width: 106px;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: parent.height - self.height;
+                                                    background: transparent;
+                                                    for level[i] in root.cava-bars : Rectangle {
+                                                        width: 14px;
+                                                        x: i * 23px;
+                                                        height: max(6px, min(110px, level * 1.1px));
+                                                        y: parent.height - self.height;
+                                                        background: Theme.primary;
+                                                        border-radius: 7px;
+                                                    }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 12px;
+                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
+                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
+                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
+                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
+                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
+                                            }
+                                            VerticalLayout {
+                                                spacing: 3px;
+                                                Rectangle {
+                                                    height: 7px;
+                                                    background: Theme.raised;
+                                                    border-radius: 4px;
+                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
+                                                }
+                                                HorizontalLayout {
+                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
+                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 8px;
+                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
+                                            }
+                                        }
+                                    }
+                    if root.left-slot-1 == "interactions" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 5px;
+                                                if root.dashboard-interactions.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No interactions";
+                                                        color: Theme.muted;
+                                                        font-size: 13px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                if root.dashboard-interactions.length > 0 : ScrollView {
+                                                    vertical-stretch: 1;
+                                                    VerticalLayout {
+                                                        spacing: 5px;
+                                                        for item[i] in root.dashboard-interactions : Rectangle {
+                                                            height: 50px;
+                                                            border-radius: 12px;
+                                                            background: item.active ? Theme.elevated : Theme.raised;
+                                                            Rectangle {
+                                                                height: 3px;
+                                                                y: parent.height - self.height;
+                                                                x: 0px;
+                                                                width: parent.width * max(0, min(1, item.progress));
+                                                                border-radius: 2px;
+                                                                background: Theme.success;
+                                                                visible: item.active;
+                                                            }
+                                                            HorizontalLayout {
+                                                                padding-left: 10px;
+                                                                padding-right: 6px;
+                                                                spacing: 8px;
+                                                                Rectangle {
+                                                                    width: 8px;
+                                                                    height: 8px;
+                                                                    border-radius: 4px;
+                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
+                                                                }
+                                                                VerticalLayout {
+                                                                    horizontal-stretch: 1;
+                                                                    spacing: 1px;
+                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
+                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
+                                                                }
+                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.left-slot-1 == "auto_macros" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 4px;
+                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No auto macros";
+                                                        color: Theme.muted;
+                                                        font-size: 10px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                for item[i] in root.dashboard-auto-macros : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    border-radius: 12px;
+                                                    background: Theme.raised;
+                                                    Rectangle {
+                                                        x: 0px;
+                                                        width: parent.width * max(0, min(1, item.progress));
+                                                        height: parent.height;
+                                                        border-radius: 12px;
+                                                        background: Theme.elevated;
+                                                        visible: item.enabled;
+                                                    }
+                                                    HorizontalLayout {
+                                                        padding-left: 10px;
+                                                        padding-right: 6px;
+                                                        spacing: 6px;
+                                                        Text {
+                                                            text: item.name;
+                                                            horizontal-stretch: 1;
+                                                            color: Theme.text;
+                                                            font-size: 11px;
+                                                            overflow: elide;
+                                                            vertical-alignment: center;
+                                                        }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.left-slot-1 == "macros" : Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 6px;
+                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            for item[i] in root.dashboard-macro-list : Rectangle {
+                                vertical-stretch: 1;
+                                background: Theme.raised;
+                                border-radius: 12px;
+                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
+                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                            }
+                        }
+                    }
+                    if root.left-slot-1 == "music" : Rectangle {
+                                        horizontal-stretch: 1;
+                                        background: Theme.surface;
+                                        border-radius: 16px;
+                                        VerticalLayout {
+                                            padding: 18px;
+                                            spacing: 10px;
+                                            VerticalLayout {
+                                                spacing: 2px;
+                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
+                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
+                                            }
+                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
+                                            // never the Music card's preferred size or layout stretch.
+                                            Rectangle {
+                                                vertical-stretch: 1;
+                                                background: transparent;
+                                                Rectangle {
+                                                    height: 110px;
+                                                    width: 106px;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: parent.height - self.height;
+                                                    background: transparent;
+                                                    for level[i] in root.cava-bars : Rectangle {
+                                                        width: 14px;
+                                                        x: i * 23px;
+                                                        height: max(6px, min(110px, level * 1.1px));
+                                                        y: parent.height - self.height;
+                                                        background: Theme.primary;
+                                                        border-radius: 7px;
+                                                    }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 12px;
+                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
+                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
+                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
+                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
+                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
+                                            }
+                                            VerticalLayout {
+                                                spacing: 3px;
+                                                Rectangle {
+                                                    height: 7px;
+                                                    background: Theme.raised;
+                                                    border-radius: 4px;
+                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
+                                                }
+                                                HorizontalLayout {
+                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
+                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 8px;
+                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
+                                            }
+                                        }
+                                    }
+                }
+                VerticalLayout {
+                    spacing: 8px;
+                    horizontal-stretch: 1;
+                    if root.right-slot-0 == "interactions" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 5px;
+                                                if root.dashboard-interactions.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No interactions";
+                                                        color: Theme.muted;
+                                                        font-size: 13px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                if root.dashboard-interactions.length > 0 : ScrollView {
+                                                    vertical-stretch: 1;
+                                                    VerticalLayout {
+                                                        spacing: 5px;
+                                                        for item[i] in root.dashboard-interactions : Rectangle {
+                                                            height: 50px;
+                                                            border-radius: 12px;
+                                                            background: item.active ? Theme.elevated : Theme.raised;
+                                                            Rectangle {
+                                                                height: 3px;
+                                                                y: parent.height - self.height;
+                                                                x: 0px;
+                                                                width: parent.width * max(0, min(1, item.progress));
+                                                                border-radius: 2px;
+                                                                background: Theme.success;
+                                                                visible: item.active;
+                                                            }
+                                                            HorizontalLayout {
+                                                                padding-left: 10px;
+                                                                padding-right: 6px;
+                                                                spacing: 8px;
+                                                                Rectangle {
+                                                                    width: 8px;
+                                                                    height: 8px;
+                                                                    border-radius: 4px;
+                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
+                                                                }
+                                                                VerticalLayout {
+                                                                    horizontal-stretch: 1;
+                                                                    spacing: 1px;
+                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
+                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
+                                                                }
+                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.right-slot-0 == "auto_macros" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 4px;
+                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No auto macros";
+                                                        color: Theme.muted;
+                                                        font-size: 10px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                for item[i] in root.dashboard-auto-macros : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    border-radius: 12px;
+                                                    background: Theme.raised;
+                                                    Rectangle {
+                                                        x: 0px;
+                                                        width: parent.width * max(0, min(1, item.progress));
+                                                        height: parent.height;
+                                                        border-radius: 12px;
+                                                        background: Theme.elevated;
+                                                        visible: item.enabled;
+                                                    }
+                                                    HorizontalLayout {
+                                                        padding-left: 10px;
+                                                        padding-right: 6px;
+                                                        spacing: 6px;
+                                                        Text {
+                                                            text: item.name;
+                                                            horizontal-stretch: 1;
+                                                            color: Theme.text;
+                                                            font-size: 11px;
+                                                            overflow: elide;
+                                                            vertical-alignment: center;
+                                                        }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.right-slot-0 == "macros" : Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 6px;
+                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            for item[i] in root.dashboard-macro-list : Rectangle {
+                                vertical-stretch: 1;
+                                background: Theme.raised;
+                                border-radius: 12px;
+                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
+                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                            }
+                        }
+                    }
+                    if root.right-slot-0 == "music" : Rectangle {
+                                        horizontal-stretch: 1;
+                                        background: Theme.surface;
+                                        border-radius: 16px;
+                                        VerticalLayout {
+                                            padding: 18px;
+                                            spacing: 10px;
+                                            VerticalLayout {
+                                                spacing: 2px;
+                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
+                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
+                                            }
+                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
+                                            // never the Music card's preferred size or layout stretch.
+                                            Rectangle {
+                                                vertical-stretch: 1;
+                                                background: transparent;
+                                                Rectangle {
+                                                    height: 110px;
+                                                    width: 106px;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: parent.height - self.height;
+                                                    background: transparent;
+                                                    for level[i] in root.cava-bars : Rectangle {
+                                                        width: 14px;
+                                                        x: i * 23px;
+                                                        height: max(6px, min(110px, level * 1.1px));
+                                                        y: parent.height - self.height;
+                                                        background: Theme.primary;
+                                                        border-radius: 7px;
+                                                    }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 12px;
+                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
+                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
+                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
+                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
+                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
+                                            }
+                                            VerticalLayout {
+                                                spacing: 3px;
+                                                Rectangle {
+                                                    height: 7px;
+                                                    background: Theme.raised;
+                                                    border-radius: 4px;
+                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
+                                                }
+                                                HorizontalLayout {
+                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
+                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 8px;
+                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
+                                            }
+                                        }
+                                    }
+                    if root.right-slot-1 == "interactions" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 5px;
+                                                if root.dashboard-interactions.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No interactions";
+                                                        color: Theme.muted;
+                                                        font-size: 13px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                if root.dashboard-interactions.length > 0 : ScrollView {
+                                                    vertical-stretch: 1;
+                                                    VerticalLayout {
+                                                        spacing: 5px;
+                                                        for item[i] in root.dashboard-interactions : Rectangle {
+                                                            height: 50px;
+                                                            border-radius: 12px;
+                                                            background: item.active ? Theme.elevated : Theme.raised;
+                                                            Rectangle {
+                                                                height: 3px;
+                                                                y: parent.height - self.height;
+                                                                x: 0px;
+                                                                width: parent.width * max(0, min(1, item.progress));
+                                                                border-radius: 2px;
+                                                                background: Theme.success;
+                                                                visible: item.active;
+                                                            }
+                                                            HorizontalLayout {
+                                                                padding-left: 10px;
+                                                                padding-right: 6px;
+                                                                spacing: 8px;
+                                                                Rectangle {
+                                                                    width: 8px;
+                                                                    height: 8px;
+                                                                    border-radius: 4px;
+                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
+                                                                }
+                                                                VerticalLayout {
+                                                                    horizontal-stretch: 1;
+                                                                    spacing: 1px;
+                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
+                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
+                                                                }
+                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.right-slot-1 == "auto_macros" : Rectangle {
+                                            vertical-stretch: 1;
+                                            background: Theme.surface;
+                                            border-radius: 16px;
+                                            VerticalLayout {
+                                                padding: 14px;
+                                                spacing: 4px;
+                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    background: transparent;
+                                                    Text {
+                                                        text: "No auto macros";
+                                                        color: Theme.muted;
+                                                        font-size: 10px;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                                for item[i] in root.dashboard-auto-macros : Rectangle {
+                                                    vertical-stretch: 1;
+                                                    border-radius: 12px;
+                                                    background: Theme.raised;
+                                                    Rectangle {
+                                                        x: 0px;
+                                                        width: parent.width * max(0, min(1, item.progress));
+                                                        height: parent.height;
+                                                        border-radius: 12px;
+                                                        background: Theme.elevated;
+                                                        visible: item.enabled;
+                                                    }
+                                                    HorizontalLayout {
+                                                        padding-left: 10px;
+                                                        padding-right: 6px;
+                                                        spacing: 6px;
+                                                        Text {
+                                                            text: item.name;
+                                                            horizontal-stretch: 1;
+                                                            color: Theme.text;
+                                                            font-size: 11px;
+                                                            overflow: elide;
+                                                            vertical-alignment: center;
+                                                        }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                    }
+                                                }
+                                            }
+                                        }
+                    if root.right-slot-1 == "macros" : Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 6px;
+                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            for item[i] in root.dashboard-macro-list : Rectangle {
+                                vertical-stretch: 1;
+                                background: Theme.raised;
+                                border-radius: 12px;
+                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
+                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                            }
+                        }
+                    }
+                    if root.right-slot-1 == "music" : Rectangle {
+                                        horizontal-stretch: 1;
+                                        background: Theme.surface;
+                                        border-radius: 16px;
+                                        VerticalLayout {
+                                            padding: 18px;
+                                            spacing: 10px;
+                                            VerticalLayout {
+                                                spacing: 2px;
+                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
+                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
+                                            }
+                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
+                                            // never the Music card's preferred size or layout stretch.
+                                            Rectangle {
+                                                vertical-stretch: 1;
+                                                background: transparent;
+                                                Rectangle {
+                                                    height: 110px;
+                                                    width: 106px;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: parent.height - self.height;
+                                                    background: transparent;
+                                                    for level[i] in root.cava-bars : Rectangle {
+                                                        width: 14px;
+                                                        x: i * 23px;
+                                                        height: max(6px, min(110px, level * 1.1px));
+                                                        y: parent.height - self.height;
+                                                        background: Theme.primary;
+                                                        border-radius: 7px;
+                                                    }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 12px;
+                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
+                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
+                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
+                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
+                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
+                                            }
+                                            VerticalLayout {
+                                                spacing: 3px;
+                                                Rectangle {
+                                                    height: 7px;
+                                                    background: Theme.raised;
+                                                    border-radius: 4px;
+                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
+                                                }
+                                                HorizontalLayout {
+                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
+                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 8px;
+                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
+                                            }
+                                        }
+                                    }
+                }
+            }
+            if root.page == 0 && root.dashboard-editing : VerticalLayout {
+                padding: 10px;
+                spacing: 10px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text { text: "Edit dashboard"; color: Theme.text; font-size: 17px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
+                    PillButton { width: 170px; label: root.wallpaper-label; clicked => { root.dashboard-open-picker("wallpaper"); } }
+                    PillButton { width: 82px; label: "Reset"; clicked => { root.dashboard-editor-reset(); } }
+                    PillButton { width: 82px; label: "Cancel"; clicked => { root.dashboard-cancel(); root.dashboard-editing = false; } }
+                    PillButton { width: 82px; label: "Save"; selected: true; clicked => { root.dashboard-save(root.edit-left-0, root.edit-left-1, root.edit-right-0, root.edit-right-1); } }
+                }
+                Text { text: root.feedback; color: Theme.muted; font-size: 11px; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 8px;
+                            Text { text: "Left column"; color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: "Slot 1"; color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-left-0; changed(card) => { root.dashboard-open-picker("slot:left-0"); } }
+                            Text { text: "Slot 2"; color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-left-1; changed(card) => { root.dashboard-open-picker("slot:left-1"); } }
+                            if root.edit-left-0 == "macros" || root.edit-left-1 == "macros" : VerticalLayout {
+                                spacing: 4px;
+                                Text { text: "Dashboard macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.dashboard-selected-macros; clicked => { root.dashboard-open-picker("macros"); } }
+                            }
+                            if root.edit-left-0 == "auto_macros" || root.edit-left-1 == "auto_macros" : VerticalLayout {
+                                spacing: 4px;
+                                Text { text: "Auto macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.dashboard-selected-auto-macros; clicked => { root.dashboard-open-picker("auto_macros"); } }
+                            }
+
+                            Rectangle { vertical-stretch: 1; background: transparent; }
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 8px;
+                            Text { text: "Right column"; color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: "Slot 1"; color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-right-0; changed(card) => { root.dashboard-open-picker("slot:right-0"); } }
+                            Text { text: "Slot 2"; color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-right-1; changed(card) => { root.dashboard-open-picker("slot:right-1"); } }
+                            if root.edit-right-0 == "macros" || root.edit-right-1 == "macros" : VerticalLayout {
+                                spacing: 4px;
+                                Text { text: "Dashboard macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.dashboard-selected-macros; clicked => { root.dashboard-open-picker("macros"); } }
+                            }
+                            if root.edit-right-0 == "auto_macros" || root.edit-right-1 == "auto_macros" : VerticalLayout {
+                                spacing: 4px;
+                                Text { text: "Auto macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.dashboard-selected-auto-macros; clicked => { root.dashboard-open-picker("auto_macros"); } }
+                            }
+
+                            Rectangle { vertical-stretch: 1; background: transparent; }
+                        }
+                    }
+                }
+            }
+            if root.page == 1 : VerticalLayout {
+                padding: 10px;
+                spacing: 8px;
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        spacing: 8px;
+                        for item[i] in root.audio-interfaces : Rectangle {
+                            height: 78px;
+                            background: Theme.surface;
+                            border-radius: 16px;
+                            HorizontalLayout {
+                                padding: 12px;
+                                spacing: 10px;
+                                Text { text: item; color: Theme.text; font-size: 15px; horizontal-stretch: 1; vertical-alignment: center; }
+                                PillButton { width: 64px; label: "25%"; clicked => { root.change-volume(i, 0.25); } }
+                                PillButton { width: 64px; label: "50%"; clicked => { root.change-volume(i, 0.5); } }
+                                PillButton { width: 64px; label: "75%"; clicked => { root.change-volume(i, 0.75); } }
+                                PillButton { width: 64px; label: "100%"; clicked => { root.change-volume(i, 1.0); } }
+                            }
+                        }
+                    }
+                }
+            }
+            if root.page == 2 : VerticalLayout {
+                padding: 10px;
+                spacing: 8px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    PillButton { width: 132px; label: "Macros"; selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
+                    PillButton { width: 132px; label: "Auto Macros"; selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
+                    PillButton { width: 160px; label: "Channel Points"; selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
+                }
+                LineEdit { placeholder-text: "Search"; text <=> root.search; }
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        spacing: 6px;
+                        if root.macro-tab == 0 : VerticalLayout {
+                            spacing: 6px;
+                            for item[i] in root.macros : Rectangle {
+                                height: 48px;
+                                background: Theme.surface;
+                                border-radius: 12px;
+                                Text { x: 14px; text: item; color: Theme.text; vertical-alignment: center; font-size: 14px; }
+                                TouchArea { clicked => { root.trigger-macro(i); } }
+                            }
+                        }
+                        if root.macro-tab == 1 : VerticalLayout {
+                            spacing: 6px;
+                            for item[i] in root.auto-macros : Rectangle {
+                                height: 48px;
+                                background: Theme.surface;
+                                border-radius: 12px;
+                                Text { x: 14px; text: item; color: Theme.text; vertical-alignment: center; font-size: 14px; }
+                                TouchArea { clicked => { root.toggle-auto-macro(i); } }
+                            }
+                        }
+                        if root.macro-tab == 2 : VerticalLayout {
+                            spacing: 6px;
+                            for item[i] in root.channel-points : Rectangle {
+                                height: 48px;
+                                background: Theme.surface;
+                                border-radius: 12px;
+                                Text { x: 14px; text: item; color: Theme.text; vertical-alignment: center; font-size: 14px; }
+                                TouchArea { clicked => { root.toggle-channel-point(i); } }
+                            }
+                        }
+                    }
+                }
+            }
+            if root.page == 3 : HorizontalLayout {
+                padding: 10px;
+                spacing: 8px;
+                VerticalLayout {
+                    spacing: 8px;
+                    horizontal-stretch: 1;
+                    Rectangle {
+                        height: 165px;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 12px;
+                            Text { text: "System statistics"; color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.system-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 10px;
+                            Text { text: "Storage"; color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.storage-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 8px;
+                    horizontal-stretch: 1;
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 10px;
+                            Text { text: "Updates"; color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.update-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                            PillButton { width: 150px; label: "Refresh updates"; clicked => { root.update-refresh(); } }
+                        }
+                    }
+                    Rectangle {
+                        height: 118px;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            Text { text: "Language"; color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: "English"; color: Theme.muted; font-size: 14px; }
+                        }
+                    }
+                }
+            }
+            if root.page == 4 : VerticalLayout {
+                padding: 10px;
+                spacing: 10px;
+                Rectangle {
+                    vertical-stretch: 1;
+                    background: Theme.surface;
+                    border-radius: 16px;
+                    VerticalLayout {
+                        padding: 18px;
+                        spacing: 16px;
+                        Text { text: "Speedtest"; color: Theme.text; font-size: 20px; font-weight: 600; }
+                        Text { text: root.speedtest-summary; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        PillButton { width: 180px; label: "Start speedtest"; selected: true; clicked => { root.speedtest-start(); } }
+                        Rectangle { vertical-stretch: 1; background: transparent; }
+                    }
+                }
+            }
+            if root.connection != "Connected" : Rectangle {
+                background: Theme.background;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 14px;
+                    Text { text: "Connecting to Streambot"; color: Theme.text; font-size: 22px; font-weight: 600; horizontal-alignment: center; }
+                    Text { text: root.connection; color: Theme.muted; font-size: 14px; horizontal-alignment: center; }
+                    Text { text: root.backend-stage; color: Theme.primary; font-size: 12px; horizontal-alignment: center; }
+                }
+            }
+        }
+        // Quickshell bottom navigation: 52px, five centered pill icons.
+        Rectangle {
+            height: 52px;
+            background: Theme.surface;
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 0px;
+                Rectangle {
+                    width: 50px;
+                    background: transparent;
+                    if root.page == 0 : Rectangle {
+                        width: 42px;
+                        height: 42px;
+                        border-radius: 21px;
+                        background: root.dashboard-editing ? Theme.primary : transparent;
+                        Text {
+                            text: root.dashboard-editing ? "✓" : "✎";
+                            color: root.dashboard-editing ? Theme.on-primary : Theme.muted;
+                            font-size: 20px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        TouchArea { clicked => { if !root.dashboard-editing {
+                            root.edit-left-0 = root.left-slot-0; root.edit-left-1 = root.left-slot-1;
+                            root.edit-right-0 = root.right-slot-0; root.edit-right-1 = root.right-slot-1;
+                        }
+                        root.dashboard-editing = !root.dashboard-editing; if root.dashboard-editing { root.dashboard-editor-open(); } } }
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                NavItem { icon: @image-url("icons/mdi/home.svg"); active-icon: @image-url("icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.page = 0; } }
+                NavItem { icon: @image-url("icons/mdi/volume-high.svg"); active-icon: @image-url("icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.page = 1; root.dashboard-editing = false; } }
+                NavItem { icon: @image-url("icons/mdi/tune.svg"); active-icon: @image-url("icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.page = 2; root.dashboard-editing = false; } }
+                NavItem { icon: @image-url("icons/mdi/server.svg"); active-icon: @image-url("icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.page = 3; root.dashboard-editing = false; } }
+                NavItem { icon: @image-url("icons/mdi/speedometer.svg"); active-icon: @image-url("icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.page = 4; root.dashboard-editing = false; } }
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                Rectangle {
+                    width: 40px; height: 40px; border-radius: 20px; background: transparent;
+                    Image { width: 21px; height: 21px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; source: @image-url("icons/mdi/power.svg"); }
+                    TouchArea { clicked => { root.power-menu-open = true; } }
+                }
+            }
+        }
+    }
+
+    // Quickshell-style top-edge swipe. The visible grip also opens on tap.
+    Rectangle {
+        width: parent.width;
+        height: 26px;
+        background: transparent;
+        Rectangle {
+            width: 72px;
+            height: 5px;
+            x: (parent.width - self.width) / 2;
+            y: 5px;
+            border-radius: 3px;
+            background: Theme.muted;
+            opacity: 0.8;
+        }
+        top-grip := TouchArea {
+            clicked => { root.network-drawer-open = true; root.refresh-drawer(); }
+            moved => {
+                if self.pressed && self.mouse-y - self.pressed-y > 24px {
+                    root.network-drawer-open = true;
+                    root.refresh-drawer();
+                }
+            }
+        }
+    }
+
+    if root.network-drawer-open : Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #bb000000;
+        TouchArea { clicked => { root.network-drawer-open = false; } }
+        Rectangle {
+            width: parent.width;
+            height: parent.height - 34px;
+            background: Theme.background;
+            VerticalLayout {
+                padding: 14px;
+                spacing: 12px;
+                HorizontalLayout {
+                    Text { text: "Connection & devices"; color: Theme.text; font-size: 22px; font-weight: 600; horizontal-stretch: 1; }
+                    PillButton { label: "Refresh"; width: 90px; clicked => { root.refresh-drawer(); } }
+                    PillButton { label: "Close"; width: 90px; clicked => { root.network-drawer-open = false; } }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 12px;
+                            Text { text: "Network / Wi-Fi"; font-size: 18px; font-weight: 600; color: Theme.text; }
+                            Text { text: root.drawer-network; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                            HorizontalLayout {
+                                PillButton { horizontal-stretch: 1; label: "Wi-Fi on"; clicked => { root.drawer-command("wifi-on"); } }
+                                PillButton { horizontal-stretch: 1; label: "Wi-Fi off"; clicked => { root.drawer-command("wifi-off"); } }
+                            }
+                            Rectangle { vertical-stretch: 1; background: transparent; }
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: Theme.surface;
+                        border-radius: 16px;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 12px;
+                            Text { text: "Bluetooth"; font-size: 18px; font-weight: 600; color: Theme.text; }
+                            Text { text: root.drawer-bluetooth; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                            HorizontalLayout {
+                                PillButton { horizontal-stretch: 1; label: "Bluetooth on"; clicked => { root.drawer-command("bluetooth-on"); } }
+                                PillButton { horizontal-stretch: 1; label: "Bluetooth off"; clicked => { root.drawer-command("bluetooth-off"); } }
+                            }
+                            Rectangle { vertical-stretch: 1; background: transparent; }
+                        }
+                    }
+                }
+                PillButton { width: 240px; label: "Power options"; clicked => { root.network-drawer-open = false; root.power-menu-open = true; } }
+            }
+        }
+    }
+
+    if root.dashboard-picker-open : Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #aa000000;
+        TouchArea { clicked => { root.dashboard-picker-open = false; } }
+        Rectangle {
+            width: min(parent.width - 44px, 600px);
+            height: root.touch-keyboard-open ? min(parent.height - 242px, 380px) : min(parent.height - 60px, 500px);
+            x: (parent.width - self.width) / 2;
+            y: root.touch-keyboard-open ? 12px : (parent.height - self.height) / 2;
+            border-radius: 20px;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.raised;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                HorizontalLayout {
+                    Text {
+                        text: root.dashboard-picker-kind == "wallpaper" ? "Choose wallpaper" : root.dashboard-picker-kind == "macros" ? "Choose macros (up to 4)" : root.dashboard-picker-kind == "auto_macros" ? "Choose auto macros (up to 4)" : "Choose dashboard card";
+                        color: Theme.text;
+                        font-size: 18px;
+                        font-weight: 600;
+                        horizontal-stretch: 1;
+                    }
+                    PillButton { width: 68px; label: "Close"; clicked => { root.dashboard-picker-open = false; root.touch-keyboard-open = false; } }
+                }
+                if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
+                    spacing: 8px;
+                    search-entry := LineEdit {
+                        horizontal-stretch: 1;
+                        placeholder-text: "Search...";
+                        text <=> root.dashboard-picker-search;
+                        edited(search) => { root.dashboard-filter(search); }
+                        changed has-focus => {
+                            if self.has-focus { root.touch-keyboard-open = true; }
+                        }
+                    }
+                }
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        spacing: 4px;
+                        for item[i] in root.dashboard-picker-items : Rectangle {
+                            height: root.dashboard-picker-kind == "wallpaper" ? 90px : 46px;
+                            background: item.selected ? Theme.elevated : transparent;
+                            border-radius: 10px;
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                if root.dashboard-picker-kind == "wallpaper" : Rectangle {
+                                    width: 122px;
+                                    height: 72px;
+                                    border-radius: 8px;
+                                    background: Theme.raised;
+                                    clip: true;
+                                    Image { source: item.thumbnail; width: parent.width; height: parent.height; image-fit: cover; }
+                                }
+                                Text { text: item.name; color: Theme.text; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                                if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : Text {
+                                    text: item.selected ? "☑" : "□";
+                                    color: Theme.primary;
+                                    font-size: 20px;
+                                    vertical-alignment: center;
+                                }
+                                if root.dashboard-picker-kind == "wallpaper" && item.selected : Text { text: "✓"; color: Theme.primary; font-size: 18px; }
+                            }
+                            TouchArea { clicked => { root.dashboard-select-option(item.name); } }
+                        }
+                    }
+                }
+                if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
+                    Text { text: "Choose at most four items"; color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
+                    PillButton { label: "Apply"; selected: true; width: 90px; clicked => { root.dashboard-apply-picker(); } }
+                }
+            }
+        }
+    }
+
+    // Md3Keyboard: automatic on search focus, in-process, German QWERTZ.
+    if root.dashboard-picker-open && root.touch-keyboard-open : Rectangle {
+        width: parent.width;
+        height: root.touch-keyboard-symbols ? min(300px, parent.height * 0.50) : min(250px, parent.height * 0.42);
+        y: parent.height - self.height;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.elevated;
+        // Keyboard surface eats touches so nav controls cannot fire underneath.
+        TouchArea { }
+        VerticalLayout {
+            padding: 6px;
+            spacing: 5px;
+            HorizontalLayout {
+                spacing: 4px;
+                for key in (root.touch-keyboard-symbols ? ["1","2","3","4","5","6","7","8","9","0"] : ["q","w","e","r","t","z","u","i","o","p"]) : TouchKey {
+                    horizontal-stretch: 1;
+                    label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
+                    clicked => {
+                        root.keyboard-input(self.label);
+                        root.touch-keyboard-shift = false;
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 4px;
+                Rectangle { width: 18px; background: transparent; }
+                for key in (root.touch-keyboard-symbols ? ["@","#","$","%","&","-","+","(",")","/"] : ["a","s","d","f","g","h","j","k","l","ö"]) : TouchKey {
+                    horizontal-stretch: 1;
+                    label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
+                    clicked => { root.keyboard-input(self.label); root.touch-keyboard-shift = false; }
+                }
+                Rectangle { width: 18px; background: transparent; }
+            }
+            HorizontalLayout {
+                spacing: 4px;
+                TouchKey { width: 58px; accent: true; label: "⇧"; clicked => { root.touch-keyboard-shift = !root.touch-keyboard-shift; } }
+                for key in (root.touch-keyboard-symbols ? ["*","\"","'",";",":","!","?","=","_","\\"] : ["y","x","c","v","b","n","m","ä","ü"]) : TouchKey {
+                    horizontal-stretch: 1;
+                    label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
+                    clicked => { root.keyboard-input(self.label); root.touch-keyboard-shift = false; }
+                }
+                TouchKey { width: 58px; accent: true; label: "⌫"; clicked => { root.keyboard-input("backspace"); } }
+            }
+            if root.touch-keyboard-symbols : HorizontalLayout {
+                spacing: 4px;
+                for key in ["{", "}", "<", ">", "^", "~", "`", "|"] : TouchKey {
+                    horizontal-stretch: 1;
+                    label: key;
+                    clicked => { root.keyboard-input(key); }
+                }
+            }
+            HorizontalLayout {
+                spacing: 4px;
+                TouchKey { width: 64px; accent: true; label: root.touch-keyboard-symbols ? "ABC" : "?123"; clicked => { root.touch-keyboard-symbols = !root.touch-keyboard-symbols; } }
+                TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "[" : ","; clicked => { root.keyboard-input(self.label); } }
+                TouchKey { horizontal-stretch: 1; label: root.touch-keyboard-symbols ? "Symbols" : "Deutsch"; clicked => { root.keyboard-input(" "); } }
+                TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "]" : "."; clicked => { root.keyboard-input(self.label); } }
+                TouchKey { width: 58px; accent: true; label: "⌄"; clicked => { root.touch-keyboard-open = false; } }
+            }
+        }
+    }
+
+    // Modal is on the root layer, above navigation and the drawer.
+    if root.power-menu-open : Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #cc000000;
+        TouchArea { clicked => { root.power-menu-open = false; } }
+        Rectangle {
+            width: min(parent.width - 40px, 440px);
+            height: 378px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: 22px;
+            background: Theme.surface;
+            VerticalLayout {
+                padding: 18px;
+                spacing: 9px;
+                Text { text: "Power menu"; font-size: 22px; font-weight: 600; color: Theme.text; }
+                Rectangle {
+                    height: 74px; background: Theme.elevated; border-radius: 14px;
+                    HorizontalLayout { padding: 12px; spacing: 12px;
+                        Image { source: @image-url("icons/mdi/power-standby.svg"); width: 36px; height: 36px; }
+                        VerticalLayout { Text { text: "Shutdown device"; color: Theme.text; font-size: 15px; } Text { text: "Turn off the Raspberry Pi"; color: Theme.muted; font-size: 11px; } }
+                    }
+                    TouchArea { clicked => { root.power-action("poweroff"); } }
+                }
+                Rectangle {
+                    height: 74px; background: Theme.elevated; border-radius: 14px;
+                    HorizontalLayout { padding: 12px; spacing: 12px;
+                        Image { source: @image-url("icons/mdi/restart.svg"); width: 36px; height: 36px; }
+                        VerticalLayout { Text { text: "Restart device"; color: Theme.text; font-size: 15px; } Text { text: "Reboot the Raspberry Pi"; color: Theme.muted; font-size: 11px; } }
+                    }
+                    TouchArea { clicked => { root.power-action("reboot"); } }
+                }
+                Rectangle {
+                    height: 74px; background: Theme.elevated; border-radius: 14px;
+                    HorizontalLayout { padding: 12px; spacing: 12px;
+                        Image { source: @image-url("icons/mdi/server.svg"); width: 36px; height: 36px; }
+                        VerticalLayout { Text { text: "Restart backend"; color: Theme.text; font-size: 15px; } Text { text: "Restart stream-overlord.service"; color: Theme.muted; font-size: 11px; } }
+                    }
+                    TouchArea { clicked => { root.power-action("restart-backend"); } }
+                }
+                HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { width: 108px; label: "Cancel"; clicked => { root.power-menu-open = false; } } }
+            }
+        }
+    }
+}

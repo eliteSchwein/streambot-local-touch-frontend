@@ -1,0 +1,18 @@
+[package]
+name = "streambot-touch"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+build = "build.rs"
+
+[dependencies]
+slint = { version = "=1.18.1", features = ["image-default-formats"] }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+tokio-tungstenite = "0.28"
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+
+[build-dependencies]
+slint-build = "=1.18.1"
