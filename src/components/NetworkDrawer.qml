@@ -14,10 +14,10 @@ Item {
     required property var i18n
     required property var config
     required property var network
+    required property var bluetooth
 
     property bool open: false
 
-    anchors.fill: parent
     z: 1000
 
     readonly property string runtimeDir:
@@ -27,9 +27,9 @@ Item {
         runtimeDir + "/streambot-touch-commander.png"
 
     readonly property string commanderUrl:
-        network.primaryIp !== ""
+            network.primaryIp !== ""
         ? "http://" + network.primaryIp + ":"
-            + config.restPort + "/commander"
+        + config.restPort + "/commander"
         : ""
 
     function openPowerMenu() {
@@ -56,6 +56,7 @@ Item {
 
     onOpenChanged: {
         network.setWifiScanning(open)
+        bluetooth.setAutoRefresh(open)
 
         if (open) {
             network.refreshPrimaryIp()
@@ -70,49 +71,66 @@ Item {
         }
     }
 
-    // Android-like top pull-down gesture.
+    function settleDrawer(openState) {
+        root.open = openState
+        settleAnimation.stop()
+        settleAnimation.to = openState ? 0 : -drawer.height
+        settleAnimation.restart()
+    }
+
+    // Android-style edge pull: the drawer itself follows the finger 1:1.
     Item {
+        id: openGestureArea
+
         anchors {
             top: parent.top
             left: parent.left
             right: parent.right
         }
 
-        height: root.open ? 0 : 8
-        z: 20
+        height: root.open ? 0 : 20
+        z: 30
 
         DragHandler {
-            enabled: !KeyboardController.visible
-            target: null
-            property real startY: 0
+            id: openDrag
+
+            enabled: !root.open && !KeyboardController.visible
+            target: drawer
+            dragThreshold: 0
+            snapMode: DragHandler.NoSnap
+
+            xAxis.enabled: false
+            yAxis.minimum: -drawer.height
+            yAxis.maximum: 0
+
+            property real lastVelocityY: 0
 
             onActiveChanged: {
                 if (active) {
-                    startY = centroid.position.y
-                } else if (
-                    centroid.position.y - startY > 28
-                ) {
-                    root.open = true
+                    settleAnimation.stop()
+                    lastVelocityY = 0
+                } else {
+                    const fastDown = lastVelocityY > 850
+                    const farEnough = drawer.y > -drawer.height * 0.72
+                    root.settleDrawer(fastDown || farEnough)
                 }
             }
-        }
 
+            onActiveTranslationChanged:
+                lastVelocityY = centroid.velocity.y
+        }
     }
 
     Rectangle {
+        id: drawer
+
         width: parent.width
         height: parent.height
 
-        y: root.open ? 0 : -height
+        y: -height
+        z: 10
 
         color: Md3Theme.background
-
-        Behavior on y {
-            NumberAnimation {
-                duration: 210
-                easing.type: Easing.OutCubic
-            }
-        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -175,13 +193,13 @@ Item {
 
                                             text:
                                                 modelData.connected
-                                                ? root.i18n.text("connected")
-                                                : root.i18n.text("disconnected")
+                                                    ? root.i18n.text("connected")
+                                                    : root.i18n.text("disconnected")
 
                                             color:
                                                 modelData.connected
-                                                ? Md3Theme.success
-                                                : Md3Theme.surfaceVariantContent
+                                                    ? Md3Theme.success
+                                                    : Md3Theme.surfaceVariantContent
 
                                             font.pixelSize: 10
                                         }
@@ -229,9 +247,9 @@ Item {
 
                             Md3Button {
                                 text: root.i18n.text("saved_wifi")
-                        implicitHeight: 34
-                        leftPadding: 10
-                        rightPadding: 10
+                                implicitHeight: 34
+                                leftPadding: 10
+                                rightPadding: 10
                                 outlined: true
 
                                 onClicked: {
@@ -303,8 +321,8 @@ Item {
 
                                     color:
                                         modelData.connected
-                                        ? Md3Theme.surfaceContainerHigh
-                                        : Md3Theme.surfaceContainerHighest
+                                            ? Md3Theme.primaryContainer
+                                            : Md3Theme.surfaceContainerHighest
 
                                     RowLayout {
                                         anchors.fill: parent
@@ -324,8 +342,8 @@ Item {
                                                 font.pixelSize: 12
                                                 font.weight:
                                                     modelData.connected
-                                                    ? Font.DemiBold
-                                                    : Font.Normal
+                                                        ? Font.DemiBold
+                                                        : Font.Normal
 
                                                 elide: Text.ElideRight
                                             }
@@ -334,16 +352,24 @@ Item {
                                                 Layout.fillWidth: true
 
                                                 text:
-                                                    modelData.known
-                                                    ? root.i18n.text("saved")
-                                                    : ""
+                                                    modelData.connected
+                                                        ? root.i18n.text("connected")
+                                                        : modelData.known
+                                                            ? root.i18n.text("saved")
+                                                            : ""
 
                                                 visible: text !== ""
 
                                                 color:
-                                                    Md3Theme.surfaceVariantContent
+                                                    modelData.connected
+                                                        ? Md3Theme.primary
+                                                        : Md3Theme.surfaceVariantContent
 
                                                 font.pixelSize: 9
+                                                font.weight:
+                                                    modelData.connected
+                                                        ? Font.DemiBold
+                                                        : Font.Normal
                                             }
                                         }
 
@@ -399,27 +425,550 @@ Item {
 
                     Md3Card {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 118
+                        Layout.preferredHeight: 244
 
-                        title: root.i18n.text("language")
+                        title: ""
 
-                        Md3Select {
+                        ColumnLayout {
                             Layout.fillWidth: true
+                            spacing: 7
 
-                            model: [
-                                root.i18n.text("english"),
-                                root.i18n.text("german")
-                            ]
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
 
-                            currentIndex:
-                                root.config.language === "de"
-                                ? 1
-                                : 0
+                                Text {
+                                    Layout.fillWidth: true
 
-                            onActivated: index => {
-                                root.config.setLanguage(
-                                    index === 1 ? "de" : "en"
-                                )
+                                    text: root.i18n.text("bluetooth")
+                                    color: Md3Theme.surfaceContent
+
+                                    font.pixelSize: 16
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Md3Button {
+                                    text:
+                                        root.bluetooth.scanning
+                                        ? root.i18n.text("bluetooth_stop_scan")
+                                        : root.i18n.text("bluetooth_scan")
+
+                                    implicitHeight: 34
+                                    leftPadding: 10
+                                    rightPadding: 10
+                                    outlined: true
+
+                                    enabled:
+                                        root.bluetooth.available
+                                        && root.bluetooth.powered
+                                        && !root.bluetooth.busy
+
+                                    onClicked:
+                                        root.bluetooth.setScanning(
+                                            !root.bluetooth.scanning
+                                        )
+                                }
+
+                                Md3Switch {
+                                    checked:
+                                        root.bluetooth.powered
+
+                                    enabled:
+                                        root.bluetooth.available
+                                        && !root.bluetooth.busy
+
+                                    onClicked:
+                                        root.bluetooth.setPowered(
+                                            !root.bluetooth.powered
+                                        )
+                                }
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+
+                                text:
+                                    !root.bluetooth.available
+                                    ? root.i18n.text("bluetooth_unavailable")
+                                    : !root.bluetooth.powered
+                                        ? root.i18n.text("bluetooth_disabled")
+                                        : root.bluetooth.scanning
+                                            ? (
+                                                root.bluetooth.scanTransport === "bredr"
+                                                ? root.i18n.text("bluetooth_scanning_classic")
+                                                : root.i18n.text("bluetooth_scanning_le")
+                                            )
+                                            : root.i18n
+                                                .text("bluetooth_device_counts")
+                                                .replace(
+                                                    "{paired}",
+                                                    root.bluetooth.pairedDevices.length
+                                                )
+                                                .replace(
+                                                    "{connected}",
+                                                    root.bluetooth.pairedDevices.filter(
+                                                        device => device.connected === true
+                                                    ).length
+                                                )
+
+                                color:
+                                    root.bluetooth.scanning
+                                    ? Md3Theme.primary
+                                    : Md3Theme.surfaceVariantContent
+
+                                font.pixelSize: 10
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight:
+                                    bluetoothErrorColumn.implicitHeight + 14
+
+                                visible:
+                                    root.bluetooth.lastErrorCode !== ""
+
+                                radius: Md3Theme.radiusMedium
+                                color: Md3Theme.errorContainer
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    spacing: 8
+
+                                    ColumnLayout {
+                                        id: bluetoothErrorColumn
+
+                                        Layout.fillWidth: true
+                                        spacing: 2
+
+                                        Text {
+                                            Layout.fillWidth: true
+
+                                            text:
+                                                root.i18n.text(
+                                                    "bluetooth_error_title"
+                                                )
+
+                                            color: Md3Theme.errorContent
+                                            font.pixelSize: 10
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+
+                                            text: {
+                                                switch (
+                                                    root.bluetooth.lastErrorCode
+                                                ) {
+                                                    case "authentication_failed":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_authentication_failed"
+                                                        )
+                                                    case "authentication_rejected":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_authentication_rejected"
+                                                        )
+                                                    case "authentication_canceled":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_authentication_canceled"
+                                                        )
+                                                    case "connection_failed":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_connection_failed"
+                                                        )
+                                                    case "not_available":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_not_available"
+                                                        )
+                                                    case "timeout":
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_timeout"
+                                                        )
+                                                    default:
+                                                        return root.i18n.text(
+                                                            "bluetooth_error_generic"
+                                                        )
+                                                }
+                                            }
+
+                                            color: Md3Theme.errorContent
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 28
+                                        height: 28
+                                        radius: 14
+                                        color:
+                                            bluetoothErrorDismiss.pressed
+                                            ? Md3Theme.surfaceContainerHighest
+                                            : "transparent"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "×"
+                                            color: Md3Theme.errorContent
+                                            font.pixelSize: 19
+                                        }
+
+                                        TapHandler {
+                                            id: bluetoothErrorDismiss
+
+                                            onTapped:
+                                                root.bluetooth.clearError()
+                                        }
+                                    }
+                                }
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    spacing: 5
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length > 0
+
+                                        text:
+                                            root.i18n.text("bluetooth_paired")
+
+                                        color:
+                                            Md3Theme.surfaceVariantContent
+
+                                        font.pixelSize: 9
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    ListView {
+                                        id: pairedBluetoothList
+
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight:
+                                            visible
+                                            ? Math.min(
+                                                150,
+                                                contentHeight
+                                            )
+                                            : 0
+                                        Layout.maximumHeight:
+                                            visible
+                                            ? Math.min(
+                                                150,
+                                                contentHeight
+                                            )
+                                            : 0
+
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length > 0
+
+                                        clip: true
+                                        spacing: 6
+                                        model:
+                                            root.bluetooth.pairedDevices
+
+                                        delegate: Rectangle {
+                                            required property var modelData
+
+                                            width:
+                                                pairedBluetoothList.width
+                                            height: 60
+
+                                            radius:
+                                                Md3Theme.radiusLarge
+
+                                            color:
+                                                modelData.connected
+                                                ? Md3Theme.primaryContainer
+                                                : Md3Theme.surfaceContainerHighest
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 10
+                                                spacing: 10
+
+                                                Item {
+                                                    width: 28
+                                                    height: 28
+
+                                                    MdiIcon {
+                                                        anchors.centerIn: parent
+                                                        visible:
+                                                            modelData.kind === "audio"
+                                                        name: "speaker"
+                                                        size: 22
+                                                    }
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        visible:
+                                                            modelData.kind !== "audio"
+                                                        text:
+                                                            modelData.kindLabel
+                                                        color:
+                                                            modelData.connected
+                                                            ? Md3Theme.primaryContent
+                                                            : Md3Theme.surfaceContent
+                                                        font.pixelSize: 9
+                                                        font.weight: Font.Bold
+                                                    }
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 0
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text:
+                                                            modelData.name
+                                                        color:
+                                                            Md3Theme.surfaceContent
+                                                        font.pixelSize: 13
+                                                        font.weight: Font.DemiBold
+                                                        elide:
+                                                            Text.ElideRight
+                                                    }
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text:
+                                                            modelData.connected
+                                                            ? root.i18n.text("connected")
+                                                            : root.i18n.text("disconnected")
+                                                        color:
+                                                            modelData.connected
+                                                            ? Md3Theme.surfaceContent
+                                                            : Md3Theme.surfaceVariantContent
+                                                        font.pixelSize: 10
+                                                        elide:
+                                                            Text.ElideRight
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 28
+                                                    height: 28
+                                                    radius: 14
+                                                    color:
+                                                        forgetBtTap.pressed
+                                                        ? Md3Theme.errorContainer
+                                                        : "transparent"
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "×"
+                                                        color: Md3Theme.error
+                                                        font.pixelSize: 20
+                                                    }
+
+                                                    TapHandler {
+                                                        id: forgetBtTap
+                                                        enabled:
+                                                            !root.bluetooth.busy
+                                                        onTapped:
+                                                            root.bluetooth.forgetDevice(
+                                                                modelData
+                                                            )
+                                                    }
+                                                }
+                                            }
+
+                                            // Keep the connect/disconnect hit area away from
+                                            // the remove button so one tap can never trigger both.
+                                            Item {
+                                                anchors {
+                                                    left: parent.left
+                                                    top: parent.top
+                                                    bottom: parent.bottom
+                                                    right: parent.right
+                                                    rightMargin: 48
+                                                }
+
+                                                TapHandler {
+                                                    enabled:
+                                                        !root.bluetooth.busy
+                                                    onTapped: {
+                                                        if (modelData.connected) {
+                                                            root.bluetooth.disconnectDevice(
+                                                                modelData
+                                                            )
+                                                        } else {
+                                                            root.bluetooth.connectDevice(
+                                                                modelData
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.scanning
+
+                                        text:
+                                            root.i18n.text("bluetooth_discovered")
+
+                                        color:
+                                            Md3Theme.surfaceVariantContent
+
+                                        font.pixelSize: 9
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    ListView {
+                                        id: discoveredBluetoothList
+
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: visible
+                                        Layout.preferredHeight:
+                                            visible
+                                            ? Math.min(
+                                                120,
+                                                contentHeight
+                                            )
+                                            : 0
+
+                                        visible:
+                                            root.bluetooth.powered
+                                            && (
+                                                root.bluetooth.scanning
+                                                || root.bluetooth.discoveredDevices.length > 0
+                                            )
+
+                                        clip: true
+                                        spacing: 6
+                                        model:
+                                            root.bluetooth.discoveredDevices
+
+                                        delegate: Rectangle {
+                                            required property var modelData
+
+                                            width:
+                                                discoveredBluetoothList.width
+                                            height: 54
+
+                                            radius:
+                                                Md3Theme.radiusLarge
+                                            color:
+                                                Md3Theme.surfaceContainerHighest
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 10
+                                                spacing: 10
+
+                                                Item {
+                                                    width: 28
+                                                    height: 28
+
+                                                    MdiIcon {
+                                                        anchors.centerIn: parent
+                                                        visible:
+                                                            modelData.kind === "audio"
+                                                        name: "speaker"
+                                                        size: 22
+                                                    }
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        visible:
+                                                            modelData.kind !== "audio"
+                                                        text:
+                                                            modelData.kindLabel
+                                                        color:
+                                                            Md3Theme.surfaceContent
+                                                        font.pixelSize: 9
+                                                        font.weight: Font.Bold
+                                                    }
+                                                }
+
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: modelData.name
+                                                    color:
+                                                        Md3Theme.surfaceContent
+                                                    font.pixelSize: 12
+                                                    elide:
+                                                        Text.ElideRight
+                                                }
+
+                                                Text {
+                                                    text:
+                                                        root.bluetooth.busy
+                                                        && root.bluetooth.busyAddress === modelData.address
+                                                        ? root.i18n.text("bluetooth_pairing")
+                                                        : root.i18n.text("bluetooth_pair")
+                                                    color:
+                                                        Md3Theme.primary
+                                                    font.pixelSize: 9
+                                                    font.weight:
+                                                        Font.DemiBold
+                                                }
+                                            }
+
+                                            TapHandler {
+                                                enabled:
+                                                    !root.bluetooth.busy
+                                                onTapped:
+                                                    root.bluetooth.pairDevice(
+                                                        modelData
+                                                    )
+                                            }
+                                        }
+                                    }
+
+                                    Item {
+                                        Layout.fillHeight: true
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length > 0
+                                            && !root.bluetooth.scanning
+                                            && root.bluetooth.discoveredDevices.length === 0
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+
+                                        visible:
+                                            root.bluetooth.powered
+                                            && root.bluetooth.pairedDevices.length === 0
+                                            && root.bluetooth.discoveredDevices.length === 0
+
+                                        text:
+                                            root.bluetooth.scanning
+                                            ? (
+                                                root.bluetooth.scanTransport === "bredr"
+                                                ? root.i18n.text("bluetooth_scanning_classic")
+                                                : root.i18n.text("bluetooth_scanning_le")
+                                            )
+                                            : root.i18n.text("bluetooth_no_paired")
+
+                                        color:
+                                            Md3Theme.surfaceVariantContent
+
+                                        font.pixelSize: 11
+
+                                        horizontalAlignment:
+                                            Text.AlignHCenter
+                                        verticalAlignment:
+                                            Text.AlignVCenter
+                                    }
+                                }
                             }
                         }
                     }
@@ -433,7 +982,7 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            spacing: 8
+                            spacing: 4
 
                             Item {
                                 Layout.fillWidth: true
@@ -447,9 +996,9 @@ Item {
                                     anchors.centerIn: parent
 
                                     width: Math.min(
-                                        165,
-                                        parent.width - 20,
-                                        parent.height - 20
+                                        260,
+                                        parent.width - 8,
+                                        parent.height - 4
                                     )
 
                                     height: width
@@ -476,7 +1025,7 @@ Item {
                                 color:
                                     Md3Theme.surfaceVariantContent
 
-                                font.pixelSize: 14
+                                font.pixelSize: 13
 
                                 horizontalAlignment:
                                     Text.AlignHCenter
@@ -488,47 +1037,83 @@ Item {
                             }
                         }
                     }
+
+
                 }
             }
 
-            // Upward gesture / tap to close.
+            // Space reserved for the external drag handle below.
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 18
-
-                Rectangle {
-                    width: 48
-                    height: 5
-                    radius: 3
-
-                    anchors.centerIn: parent
-
-                    color: Md3Theme.surfaceVariantContent
-                }
-
-                DragHandler {
-                    enabled: !KeyboardController.visible
-                    target: null
-
-                    property real startY: 0
-
-                    onActiveChanged: {
-                        if (active) {
-                            startY = centroid.position.y
-                        } else if (
-                            centroid.position.y - startY < -28
-                        ) {
-                            root.open = false
-                        }
-                    }
-                }
-
-                TapHandler {
-                    enabled: !KeyboardController.visible
-                    onTapped: root.open = false
-                }
+                Layout.preferredHeight: 28
             }
         }
+    }
+
+    // The close handle is a sibling of the moving drawer. This avoids
+    // coordinate/grab weirdness from dragging an ancestor of the handler.
+    Item {
+        id: closeGestureArea
+
+        x: 0
+        y: drawer.y + drawer.height - height
+        width: root.width
+        height: 28
+        z: 40
+
+        visible: root.open || closeDrag.active
+
+        Rectangle {
+            width: 48
+            height: 5
+            radius: 3
+            anchors.centerIn: parent
+            color: Md3Theme.surfaceVariantContent
+        }
+
+        DragHandler {
+            id: closeDrag
+
+            enabled: root.open && !KeyboardController.visible
+            target: drawer
+            dragThreshold: 0
+            snapMode: DragHandler.NoSnap
+
+            xAxis.enabled: false
+            yAxis.minimum: -drawer.height
+            yAxis.maximum: 0
+
+            property real lastVelocityY: 0
+
+            onActiveChanged: {
+                if (active) {
+                    settleAnimation.stop()
+                    lastVelocityY = 0
+                } else {
+                    const fastUp = lastVelocityY < -850
+                    const farEnough = drawer.y < -drawer.height * 0.28
+                    root.settleDrawer(!(fastUp || farEnough))
+                }
+            }
+
+            onActiveTranslationChanged:
+                lastVelocityY = centroid.velocity.y
+        }
+
+        TapHandler {
+            enabled: root.open && !KeyboardController.visible
+            gesturePolicy: TapHandler.DragThreshold
+            onTapped: root.settleDrawer(false)
+        }
+    }
+
+    NumberAnimation {
+        id: settleAnimation
+
+        target: drawer
+        property: "y"
+        duration: 190
+        easing.type: Easing.OutCubic
     }
 
     PowerMenuDialog {

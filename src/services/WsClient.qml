@@ -9,22 +9,32 @@ QtObject {
     property int reconnectInterval: 2000
     property bool enabled: true
 
+    // Backend 2.0/3.0: subscriptions are explicit per connection.
+    // Never use ["all"]; on every reconnect the complete required set is
+    // registered again. The backend sends the current state once for every
+    // registered state endpoint, then only sends that endpoint again when its
+    // state changes.
     property var endpoints: [
-        "notify_alert",
-        "notify_alert_query",
+        "notify_interaction",
+        "notify_interaction_queue",
         "notify_music_update",
         "notify_playlist_update",
-        "notify_music_cava",
         "notify_audio_update",
         "notify_audio_outputs_update",
         "notify_auto_macros_update",
         "notify_macro_update",
         "notify_channel_point_update",
         "notify_update_manager",
-        "notify_storage_update"
+        "notify_storage_update",
+        "notify_system_info",
+        "notify_settings_update",
+        "notify_speedtest_update"
     ]
 
     property int nextRequestId: 1
+
+    // id -> { method, expectedMethod }
+    property var pendingRequests: ({})
 
     readonly property bool connected:
         socket.status === WebSocket.Open
@@ -36,8 +46,14 @@ QtObject {
 
     signal connectionChanged(bool connected)
     signal messageReceived(string message)
+
+    // notify_* packets only.
     signal jsonReceived(var data)
+    signal notificationReceived(string method, var params, var data)
+
+    // result_* / JSON-RPC response packets only.
     signal rpcResponse(int id, var data)
+
     signal socketError(string error)
 
     function send(message) {
@@ -51,7 +67,6 @@ QtObject {
             console.warn(
                 "[websocket] cannot send while disconnected"
             )
-
             return false
         }
 
@@ -67,12 +82,15 @@ QtObject {
                 "[websocket] failed to serialize JSON:",
                 error
             )
-
             return false
         }
     }
 
-    function sendRpc(method, params) {
+    function resultMethodFor(method) {
+        return "result_" + String(method ?? "")
+    }
+
+    function sendRpc(method, params, expectedResultMethod) {
         const id = nextRequestId++
 
         const request = {
@@ -87,72 +105,274 @@ QtObject {
         if (!sendJson(request))
             return -1
 
+        const pending = Object.assign({}, pendingRequests)
+        pending[String(id)] = {
+            method: String(method),
+            expectedMethod:
+                expectedResultMethod !== undefined
+                ? String(expectedResultMethod)
+                : resultMethodFor(method)
+        }
+        pendingRequests = pending
+
         return id
     }
 
-    function registerEndpoints() {
-        if (socket.status !== WebSocket.Open)
+    function forgetRequest(id) {
+        const key = String(id)
+        if (pendingRequests[key] === undefined)
             return
+
+        const pending = Object.assign({}, pendingRequests)
+        delete pending[key]
+        pendingRequests = pending
+    }
+
+    function cancelAllPendingRequests() {
+        pendingRequests = ({})
+    }
+
+    function normalizedEndpoints(values) {
+        const out = []
+
+        for (const raw of (values ?? [])) {
+            const endpoint = String(raw ?? "").trim()
+
+            if (
+                endpoint === ""
+                || endpoint === "all"
+                || !endpoint.startsWith("notify_")
+                || out.includes(endpoint)
+            ) {
+                continue
+            }
+
+            out.push(endpoint)
+        }
+
+        return out
+    }
+
+    function registerEndpoints(values) {
+        if (socket.status !== WebSocket.Open)
+            return -1
+
+        const list = normalizedEndpoints(
+            values !== undefined
+            ? values
+            : endpoints
+        )
+
+        if (list.length === 0)
+            return -1
 
         console.log(
             "[websocket] registering endpoints:",
-            JSON.stringify(endpoints)
+            JSON.stringify(list)
         )
 
-        sendRpc(
+        return sendRpc(
             "register_endpoints",
-            endpoints
+            list,
+            "result_register_endpoints"
         )
+    }
+
+    // Optional incremental subscription helper for future Touch cards.
+    // Registration is idempotent on the backend.
+    function subscribeEndpoint(endpoint) {
+        const name = String(endpoint ?? "").trim()
+
+        if (
+            name === ""
+            || name === "all"
+            || !name.startsWith("notify_")
+        ) {
+            return false
+        }
+
+        const next = normalizedEndpoints(
+            (endpoints ?? []).concat([name])
+        )
+        endpoints = next
+
+        if (socket.status === WebSocket.Open)
+            registerEndpoints([name])
+
+        return true
+    }
+
+    function connectNow() {
+        reconnectTimer.stop()
+
+        if (!enabled) {
+            socket.active = false
+            return
+        }
+
+        if (
+            socket.status === WebSocket.Open
+            || socket.status === WebSocket.Connecting
+        ) {
+            return
+        }
+
+        socket.active = false
+
+        Qt.callLater(function() {
+            if (root.enabled)
+                root.socket.active = true
+        })
     }
 
     function reconnect() {
         reconnectTimer.stop()
+        cancelAllPendingRequests()
+
+        if (!enabled) {
+            socket.active = false
+            return
+        }
+
         socket.active = false
         reconnectTimer.restart()
     }
 
+    function handleIncomingPacket(data) {
+        if (!data || typeof data !== "object")
+            return
+
+        const method =
+            typeof data.method === "string"
+            ? data.method
+            : ""
+
+        // Notifications are state/event traffic and never satisfy RPC calls.
+        if (method.startsWith("notify_")) {
+            root.notificationReceived(
+                method,
+                data.params,
+                data
+            )
+            root.jsonReceived(data)
+            return
+        }
+
+        const hasId =
+            data.id !== undefined
+            && data.id !== null
+
+        if (!hasId)
+            return
+
+        const id = Number(data.id)
+        const pending =
+            root.pendingRequests[String(id)]
+
+        if (pending === undefined) {
+            // Late response from a request that was cancelled by reconnect.
+            return
+        }
+
+        // Backend 3.0 uses result_* response methods. Keep support for the
+        // classic JSON-RPC {result}/{error} envelope during migration.
+        const classicResponse =
+            data.result !== undefined
+            || data.error !== undefined
+
+        const resultResponse =
+            method.startsWith("result_")
+
+        if (!classicResponse && !resultResponse)
+            return
+
+        if (
+            resultResponse
+            && pending.expectedMethod !== ""
+            && method !== pending.expectedMethod
+        ) {
+            console.warn(
+                "[websocket] response method mismatch:",
+                "id=" + id,
+                "expected=" + pending.expectedMethod,
+                "received=" + method
+            )
+            return
+        }
+
+        root.forgetRequest(id)
+        root.rpcResponse(id, data)
+    }
+
+    onEnabledChanged: {
+        if (!enabled) {
+            reconnectTimer.stop()
+            cancelAllPendingRequests()
+            socket.active = false
+            return
+        }
+
+        Qt.callLater(connectNow)
+    }
+
+    onUrlChanged: {
+        if (enabled)
+            reconnect()
+    }
+
+    Component.onCompleted: {
+        if (enabled)
+            Qt.callLater(connectNow)
+    }
+
     property WebSocket socket: WebSocket {
         url: root.url
-        active: root.enabled
+        active: false
 
         onStatusChanged: function(status) {
             switch (status) {
-            case WebSocket.Open:
-                console.log(
-                    "[websocket] connected:",
-                    root.url
-                )
+                case WebSocket.Open:
+                    console.log(
+                        "[websocket] connected:",
+                        root.url
+                    )
 
-                root.everConnected = true
-                root.reconnectTimer.stop()
-                root.connectionChanged(true)
-                Qt.callLater(root.registerEndpoints)
-                break
+                    root.everConnected = true
+                    root.reconnectTimer.stop()
+                    root.connectionChanged(true)
 
-            case WebSocket.Closed:
-                root.connectionChanged(false)
+                    // Register only after Qt reports the socket as truly open.
+                    // The backend immediately sends the initial state for all
+                    // registered state endpoints.
+                    Qt.callLater(function() {
+                        root.registerEndpoints()
+                    })
+                    break
 
-                if (
-                    root.autoReconnect
-                    && root.enabled
-                ) {
-                    root.reconnectTimer.restart()
-                }
+                case WebSocket.Closed:
+                    root.cancelAllPendingRequests()
+                    root.connectionChanged(false)
 
-                break
+                    if (
+                        root.autoReconnect
+                        && root.enabled
+                    ) {
+                        root.reconnectTimer.restart()
+                    }
+                    break
 
-            case WebSocket.Error:
-                root.socketError(errorString)
-                root.connectionChanged(false)
+                case WebSocket.Error:
+                    root.cancelAllPendingRequests()
+                    root.socketError(errorString)
+                    root.connectionChanged(false)
 
-                if (
-                    root.autoReconnect
-                    && root.enabled
-                ) {
-                    root.reconnectTimer.restart()
-                }
-
-                break
+                    if (
+                        root.autoReconnect
+                        && root.enabled
+                    ) {
+                        root.reconnectTimer.restart()
+                    }
+                    break
             }
         }
 
@@ -161,25 +381,12 @@ QtObject {
 
             try {
                 const data = JSON.parse(message)
-
-                // JSON-RPC response: do not treat it like a notification.
-                if (
-                    data
-                    && data.id !== undefined
-                    && (
-                        data.result !== undefined
-                        || data.error !== undefined
-                        || data.params !== undefined
-                    )
-                ) {
-                    root.rpcResponse(
-                        Number(data.id),
-                        data
-                    )
-                }
-
-                root.jsonReceived(data)
+                root.handleIncomingPacket(data)
             } catch (error) {
+                console.warn(
+                    "[websocket] invalid JSON:",
+                    error
+                )
             }
         }
     }
@@ -196,8 +403,7 @@ QtObject {
                 return
             }
 
-            root.socket.active = false
-            root.socket.active = true
+            root.connectNow()
         }
     }
 }

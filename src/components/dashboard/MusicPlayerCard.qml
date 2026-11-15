@@ -11,10 +11,15 @@ Rectangle {
     required property var store
 
     radius: Md3Theme.radiusLarge
-    color: Md3Theme.surfaceContainer
+    color: "transparent"
+    border.width: 0
 
-    border.width: 1
-    border.color: Md3Theme.outlineVariant
+    Md3GlassSurface {
+        anchors.fill: parent
+        tintColor: Md3Theme.surfaceContainer
+        tintOpacity: 0.88
+        radius: root.radius
+    }
 
     readonly property var music:
         store.music ?? ({})
@@ -277,7 +282,7 @@ Rectangle {
 
                 Md3Switch {
                     checked:
-                        root.music.songrequest
+                        !!root.music.songrequest
                         && root.music.songrequest.enabled === true
 
                     onClicked:

@@ -27,6 +27,252 @@ QtObject {
     property int websocketPort: 8100
     property int restPort: 8105
     property string language: "en"
+    property string touchWallpaper: ""
+    property var wallpaperFiles: []
+    property var touchDashboard: defaultTouchDashboard()
+    property bool sharedSettingsLoaded: false
+
+    function defaultTouchDashboard() {
+        // Exact legacy dashboard:
+        // left = Interactions above Auto Macros, right = Music full column.
+        return {
+            version: 1,
+            columns: {
+                left: [
+                    "interactions",
+                    "auto_macros"
+                ],
+                right: [
+                    "music"
+                ]
+            },
+            macro_names: [],
+            auto_macro_names: []
+        }
+    }
+
+    function normalizeTouchDashboard(value) {
+        const fallback = defaultTouchDashboard()
+
+        if (!value || typeof value !== "object")
+            return fallback
+
+        const allowed = [
+            "interactions",
+            "auto_macros",
+            "macros",
+            "music"
+        ]
+
+        function cleanColumn(column) {
+            if (!Array.isArray(column))
+                return []
+
+            const result = []
+
+            for (const raw of column) {
+                const name = String(raw ?? "")
+
+                if (
+                    allowed.includes(name)
+                    && !result.includes(name)
+                ) {
+                    result.push(name)
+                }
+            }
+
+            // Music always owns the complete column.
+            if (result.includes("music"))
+                return ["music"]
+
+            // A 7-inch screen has room for at most two compact cards
+            // in one non-music column.
+            return result.slice(0, 2)
+        }
+
+        const columns =
+            value.columns
+            && typeof value.columns === "object"
+            ? value.columns
+            : ({})
+
+        let left = cleanColumn(columns.left)
+        let right = cleanColumn(columns.right)
+
+        // Do not render the same card twice.
+        right = right.filter(card => !left.includes(card))
+
+        const macros = []
+        const configuredMacros =
+            Array.isArray(value.macro_names)
+            ? value.macro_names
+            : []
+
+        for (const raw of configuredMacros) {
+            const name = String(raw ?? "").trim()
+
+            if (
+                name !== ""
+                && !macros.includes(name)
+            ) {
+                macros.push(name)
+            }
+
+            if (macros.length >= 4)
+                break
+        }
+
+        const autoMacros = []
+        const configuredAutoMacros =
+            Array.isArray(value.auto_macro_names)
+            ? value.auto_macro_names
+            : []
+
+        for (const raw of configuredAutoMacros) {
+            const name = String(raw ?? "").trim()
+
+            if (
+                name !== ""
+                && !autoMacros.includes(name)
+            ) {
+                autoMacros.push(name)
+            }
+
+            if (autoMacros.length >= 4)
+                break
+        }
+
+        return {
+            version: 1,
+            columns: {
+                left: left,
+                right: right
+            },
+            macro_names: macros,
+            auto_macro_names: autoMacros
+        }
+    }
+
+
+    readonly property string assetRootPath:
+        homePath + "/.config/streambot/assets"
+
+    readonly property string touchWallpaperPath: {
+        const value = String(touchWallpaper ?? "").trim().replace(/\\/g, "/")
+        if (value === "")
+            return ""
+
+        const normalized = value.replace(/^\/+/, "")
+        if (normalized === "" || normalized.split("/").includes(".."))
+            return ""
+
+        return assetRootPath + "/" + normalized
+    }
+
+    readonly property string touchWallpaperUrl:
+        touchWallpaperPath === "" ? "" : "file://" + touchWallpaperPath
+
+    function refreshWallpapers() {
+        if (wallpaperScanProcess.running)
+            wallpaperScanProcess.running = false
+
+        Qt.callLater(function() {
+            wallpaperScanProcess.exec([
+                "sh",
+                "-c",
+                "cd \"$1\" 2>/dev/null || exit 0; "
+                + "find . -type f \\( "
+                + "-iname '*.png' -o "
+                + "-iname '*.jpg' -o "
+                + "-iname '*.jpeg' -o "
+                + "-iname '*.webp' "
+                + "\\) -print "
+                + "| sed 's#^./##' "
+                + "| awk -F/ '{ "
+                + "for (i = 1; i <= NF; i++) "
+                + "if (tolower($i) == \"category_library\") next; "
+                + "print "
+                + "}' "
+                + "| sort",
+                "sh",
+                assetRootPath
+            ])
+        })
+    }
+
+    function setTouchWallpaper(value) {
+        const normalized =
+            String(value ?? "")
+                .trim()
+                .replace(/\\/g, "/")
+                .replace(/^\/+/, "")
+
+        if (normalized.split("/").includes(".."))
+            return false
+
+        if (!updateSettingsFile("touch_wallpaper", data => {
+            data.touch_wallpaper = normalized
+        })) {
+            return false
+        }
+
+        touchWallpaper = normalized
+        console.log("[config] saved touch_wallpaper:", normalized)
+        return true
+    }
+
+    property Process wallpaperScanProcess: Process {
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const files =
+                    text
+                        .split(/\r?\n/)
+                        .map(value => value.trim())
+                        .filter(value => value !== "")
+
+                function isCategoryAsset(path) {
+                    const parts =
+                        String(path ?? "")
+                            .replace(/\\/g, "/")
+                            .split("/")
+                            .filter(part => part !== "")
+
+                    return parts.some(
+                        part =>
+                            part.toLowerCase() === "category_library"
+                    )
+                }
+
+                const filtered =
+                    files.filter(
+                        path => !isCategoryAsset(path)
+                    )
+
+                const current =
+                    String(root.touchWallpaper ?? "").trim()
+
+                if (
+                    current !== ""
+                    && !isCategoryAsset(current)
+                    && !filtered.includes(current)
+                ) {
+                    filtered.unshift(current)
+                }
+
+                root.wallpaperFiles = filtered
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() !== "")
+                    console.warn("[config] wallpaper scan:", text.trim())
+            }
+        }
+    }
+
+    Component.onCompleted:
+        Qt.callLater(refreshWallpapers)
 
     readonly property string websocketUrl:
         "ws://" + host + ":" + websocketPort
@@ -55,7 +301,10 @@ QtObject {
         watchChanges: true
         printErrors: false
 
-        onLoaded: root.loadSharedSettings()
+        onLoaded: {
+            root.pendingSettingsText = ""
+            root.loadSharedSettings()
+        }
         onFileChanged: reload()
 
         onTextChanged: {
@@ -130,54 +379,98 @@ QtObject {
         }
     }
 
+    // Text of our last settings write. FileView.text() still returns the old
+    // file contents for a moment after setText(); building the next change on
+    // top of it would silently undo the previous one (e.g. saving the
+    // dashboard and then the wallpaper lost the dashboard layout).
+    property string pendingSettingsText: ""
+
+    // Declared as a property: this object has no default property, so child
+    // objects are not allowed (same as the FileViews below).
+    property Timer pendingSettingsTimer: Timer {
+        interval: 3000
+        repeat: false
+        // Never keep the pending copy for long, so later changes made by the
+        // backend to the same file are not overwritten.
+        onTriggered: root.pendingSettingsText = ""
+    }
+
+    function currentSettingsText() {
+        if (pendingSettingsText !== "")
+            return pendingSettingsText
+
+        return settingsFile.loaded ? settingsFile.text() : ""
+    }
+
+    /**
+     * Reads streambot-settings.json (including not yet reloaded own writes),
+     * lets mutate() change it and writes it back. Returns false on errors.
+     */
+    function updateSettingsFile(label, mutate) {
+        let data = {}
+        const currentText = currentSettingsText()
+
+        if (currentText && currentText.trim() !== "") {
+            try {
+                data = JSON.parse(currentText)
+            } catch (error) {
+                console.warn(
+                    "[config] cannot save " + label + " because streambot-settings.json is invalid:",
+                    error
+                )
+                return false
+            }
+        }
+
+        mutate(data)
+
+        try {
+            const text = JSON.stringify(data, null, 2) + "\n"
+            pendingSettingsText = text
+            root.pendingSettingsTimer.restart()
+            settingsFile.setText(text)
+            return true
+        } catch (error) {
+            console.warn("[config] failed to save " + label + ":", error)
+            return false
+        }
+    }
+
+    function setTouchDashboard(value) {
+        const normalized = normalizeTouchDashboard(value)
+
+        if (!updateSettingsFile("touch_dashboard", data => {
+            data.touch_dashboard = normalized
+        })) {
+            return false
+        }
+
+        touchDashboard = normalized
+        console.log("[config] saved touch_dashboard:", JSON.stringify(normalized))
+        return true
+    }
+
     function setLanguage(newLanguage) {
         if (newLanguage !== "en" && newLanguage !== "de")
             return
 
-        let data = {}
-
-        if (settingsFile.loaded) {
-            const currentText = settingsFile.text()
-
-            if (currentText && currentText.trim() !== "") {
-                try {
-                    data = JSON.parse(currentText)
-                } catch (error) {
-                    console.warn(
-                        "[config] cannot save language because streambot-settings.json is invalid:",
-                        error
-                    )
-                    return
-                }
-            }
+        if (!updateSettingsFile("language", data => {
+            data.language = newLanguage
+        })) {
+            return
         }
 
-        data.language = newLanguage
-
-        try {
-            settingsFile.setText(
-                JSON.stringify(data, null, 2) + "\n"
-            )
-
-            language = newLanguage
-
-            console.log(
-                "[config] saved language:",
-                newLanguage
-            )
-        } catch (error) {
-            console.warn(
-                "[config] failed to save language:",
-                error
-            )
-        }
+        language = newLanguage
+        console.log("[config] saved language:", newLanguage)
     }
 
     function loadSharedSettings() {
-        language = "en"
-
         if (!settingsFile.loaded)
             return
+
+        language = "en"
+        touchWallpaper = ""
+        touchDashboard = defaultTouchDashboard()
 
         try {
             const data = JSON.parse(settingsFile.text())
@@ -188,11 +481,57 @@ QtObject {
             ) {
                 language = data.language
             }
+
+            if (typeof data.touch_wallpaper === "string")
+                touchWallpaper = data.touch_wallpaper.trim()
+
+            if (
+                data.touch_dashboard
+                && typeof data.touch_dashboard === "object"
+            ) {
+                touchDashboard =
+                    normalizeTouchDashboard(
+                        data.touch_dashboard
+                    )
+            } else {
+                // Backwards-compatible fallback for existing installations:
+                // no touch_dashboard key means use the original dashboard.
+                touchDashboard = defaultTouchDashboard()
+            }
         } catch (error) {
             console.warn(
                 "[config] failed to parse streambot-settings.json:",
                 error
             )
         }
+
+        sharedSettingsLoaded = true
     }
+
+    function handleMessage(data) {
+        if (!data || data.method !== "notify_settings_update")
+            return
+
+        const params = data.params
+        if (!params || typeof params !== "object")
+            return
+
+        const settings =
+            params.system_config
+            && typeof params.system_config === "object"
+            ? params.system_config
+            : params
+
+        if (typeof settings.language === "string" && settings.language.trim() !== "")
+            language = settings.language.trim()
+
+        if (typeof settings.touch_wallpaper === "string")
+            touchWallpaper = settings.touch_wallpaper.trim()
+
+        // touch_dashboard is intentionally NOT consumed from
+        // notify_settings_update. It is local Touch configuration and is
+        // loaded directly from streambot-settings.json by settingsFile,
+        // exactly like the persisted local settings path.
+    }
+
 }

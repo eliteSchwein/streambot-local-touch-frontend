@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 
 import "components"
+import "components/audio"
 import "components/md3"
 import "dialogs"
 import "pages"
@@ -37,24 +38,58 @@ ShellRoot {
         enabled: backendStatus.ready
     }
 
+    CavaClient {
+        id: cavaMusicPreview
+
+        baseUrl: config.websocketUrl
+        target: "music_preview"
+
+        // CAVA has a dedicated, registration-free websocket in Backend 2.0.
+        // Keep it separate from the normal dashboard/state traffic.
+        enabled: backendStatus.ready
+    }
+
     NetworkManager {
         id: network
+    }
+
+    BluetoothManager {
+        id: bluetooth
     }
 
     DashboardStore {
         id: dashboardStore
     }
 
+    ThemeManager {
+        id: themeManager
+        wallpaperPath: config.touchWallpaperPath
+    }
+
     IpcHandler {
         target: "streambot-touch"
 
         function openPowerMenu(): void {
-            settingsDrawer.openPowerMenu()
+            powerMenu.open()
         }
     }
 
     Connections {
         target: websocket
+
+        function onJsonReceived(data) {
+            config.handleMessage(data)
+            dashboardStore.handleMessage(data)
+        }
+
+        function onConnectionChanged(connected) {
+            if (!connected)
+                dashboardStore.resetEndpointSnapshots()
+        }
+    }
+
+    Connections {
+        target: cavaMusicPreview
 
         function onJsonReceived(data) {
             dashboardStore.handleMessage(data)
@@ -74,18 +109,306 @@ ShellRoot {
         exclusionMode: ExclusionMode.Ignore
         color: Md3Theme.background
 
+        Image {
+            id: touchWallpaper
+            anchors.fill: parent
+            visible: config.touchWallpaperUrl !== ""
+            source: config.touchWallpaperUrl
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            cache: false
+
+            onStatusChanged: {
+                if (status === Image.Error) {
+                    console.warn(
+                        "[wallpaper] failed to decode:",
+                        source
+                    )
+                }
+            }
+
+            Component.onCompleted:
+                Md3Theme.wallpaperItem = touchWallpaper
+        }
+
+        Rectangle {
+            id: wallpaperTint
+            anchors.fill: parent
+            visible: touchWallpaper.visible
+            color: Qt.rgba(
+                Md3Theme.background.r,
+                Md3Theme.background.g,
+                Md3Theme.background.b,
+                0.40
+            )
+        }
+
         Rectangle {
             id: appRoot
 
             property int currentPage: 0
+            property int previousPage: 0
+            property int pageTransitionDirection: 1
+            property bool bootAnimationStarted: false
+
+            onCurrentPageChanged: {
+                pageTransitionDirection =
+                        currentPage >= previousPage ? 1 : -1
+
+                previousPage = currentPage
+
+                if (currentPage !== 0)
+                    dashboardPage.editing = false
+            }
+
+            Component.onCompleted:
+                Qt.callLater(function() {
+                    appRoot.bootAnimationStarted = true
+                })
+
+            readonly property bool backendStatusActive:
+                !backendStatus.ready || !websocket.connected
+
+            component PageTransition: Item {
+                id: transitionRoot
+
+                required property bool active
+                property int direction: 1
+                property bool animating: false
+                property real transitionX: 0
+
+                // Material-style shared-axis transition:
+                // directional motion is subtle enough to stay smooth on the Pi,
+                // but still makes forward/back navigation feel spatial.
+                visible:
+                    active || animating
+
+                enabled:
+                    active
+
+                z:
+                    active ? 2 : 1
+
+                x:
+                    transitionX
+
+                opacity:
+                    active ? 1.0 : 0.0
+
+                onActiveChanged: {
+                    enterAnimation.stop()
+                    exitAnimation.stop()
+
+                    animating = true
+
+                    if (active) {
+                        // New page comes in from the navigation direction.
+                        transitionX = direction * 28
+                        opacity = 0.0
+                        enterAnimation.start()
+                    } else {
+                        // Old page moves only half as far, creating a layered
+                        // shared-axis feel rather than a full swipe.
+                        transitionX = 0
+                        opacity = 1.0
+                        exitAnimation.start()
+                    }
+                }
+
+                Component.onCompleted: {
+                    transitionX = 0
+                    opacity = active ? 1.0 : 0.0
+                    animating = false
+                }
+
+                ParallelAnimation {
+                    id: enterAnimation
+
+                    NumberAnimation {
+                        target: transitionRoot
+                        property: "transitionX"
+                        to: 0
+                        duration: 210
+                        easing.type: Easing.OutCubic
+                    }
+
+                    NumberAnimation {
+                        target: transitionRoot
+                        property: "opacity"
+                        to: 1.0
+                        duration: 150
+                        easing.type: Easing.OutQuad
+                    }
+
+                    onStopped:
+                        transitionRoot.animating = false
+                }
+
+                ParallelAnimation {
+                    id: exitAnimation
+
+                    NumberAnimation {
+                        target: transitionRoot
+                        property: "transitionX"
+                        to:
+                            -transitionRoot.direction * 14
+                        duration: 180
+                        easing.type: Easing.InOutCubic
+                    }
+
+                    NumberAnimation {
+                        target: transitionRoot
+                        property: "opacity"
+                        to: 0.0
+                        duration: 135
+                        easing.type: Easing.InQuad
+                    }
+
+                    onStopped:
+                        transitionRoot.animating = false
+                }
+            }
 
             anchors.fill: parent
-            color: Md3Theme.background
+            color: touchWallpaper.visible ? "transparent" : Md3Theme.background
 
-            DashboardPage {
-                id: dashboardPage
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 0
 
-                visible: appRoot.currentPage === 0
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                DashboardPage {
+                    id: dashboardPage
+
+                    anchors.fill: parent
+
+                    z:
+                        dashboardPage.editing
+                            ? 100000
+                            : 0
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                    config: config
+                }
+            }
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 1
+
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                AudioPage {
+                    id: audioPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                }
+            }
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 2
+
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                MacrosPage {
+                    id: macrosPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    store: dashboardStore
+                    websocket: websocket
+                }
+            }
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 3
+
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                SystemPage {
+                    id: systemPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                    config: config
+                }
+            }
+
+            PageTransition {
+                active:
+                    !appRoot.backendStatusActive
+                    && appRoot.currentPage === 4
+
+                direction:
+                    appRoot.pageTransitionDirection
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    bottom: navigation.top
+                }
+
+                SpeedtestPage {
+                    id: speedtestPage
+                    anchors.fill: parent
+
+                    i18n: i18n
+                    websocket: websocket
+                    store: dashboardStore
+                }
+            }
+
+            BackendStatusView {
+                id: backendStatusView
+
+                visible: appRoot.backendStatusActive
 
                 anchors {
                     top: parent.top
@@ -96,69 +419,7 @@ ShellRoot {
 
                 i18n: i18n
                 websocket: websocket
-                store: dashboardStore
-            }
-
-            AudioPage {
-                id: audioPage
-
-                visible: appRoot.currentPage === 1
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
-            }
-
-            MacrosPage {
-                id: macrosPage
-
-                visible:
-                    appRoot.currentPage === 2
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                i18n: i18n
-                store: dashboardStore
-                websocket: websocket
-            }
-
-            ChannelPointsPage {
-                id: channelPointsPage
-
-                visible:
-                    appRoot.currentPage === 3
-
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                    bottom: navigation.top
-                }
-
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
-            }
-
-            SystemPage {
-                id: systemPage
-                visible: appRoot.currentPage === 4
-                anchors { top: parent.top; left: parent.left; right: parent.right; bottom: navigation.top }
-                i18n: i18n
-                websocket: websocket
-                store: dashboardStore
+                backendStatus: backendStatus
             }
 
             Rectangle {
@@ -172,6 +433,54 @@ ShellRoot {
 
                 height: 52
                 color: Md3Theme.surfaceContainer
+
+                opacity:
+                    appRoot.bootAnimationStarted
+                        ? 1
+                        : 0
+
+                transform: Translate {
+                    id: navigationBootTranslate
+
+                    y:
+                        appRoot.bootAnimationStarted
+                            ? 0
+                            : 24
+
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: 420
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 360
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                property real bootOffset:
+                    appRoot.bootAnimationStarted
+                        ? 0
+                        : 24
+
+                Behavior on bootOffset {
+                    NumberAnimation {
+                        duration: 420
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                // While the drawer is open, its bottom gesture area overlaps
+                // the nav visually. Disable the whole nav subtree so taps
+                // cannot leak through and steal the drag gesture.
+                enabled:
+                    appRoot.bootAnimationStarted
+                    && !settingsDrawer.open
+                    && !KeyboardController.visible
 
                 // Keep actual page navigation centered regardless of
                 // the power button on the far right.
@@ -196,7 +505,7 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "dialpad"
+                        icon: "tune"
                         selected: appRoot.currentPage === 2
 
                         onClicked:
@@ -204,20 +513,70 @@ ShellRoot {
                     }
 
                     Md3NavButton {
-                        icon: "motion-play-outline"
+                        icon: "server"
                         selected: appRoot.currentPage === 3
+                        badgeCount: dashboardStore.updatesAvailableCount
 
                         onClicked:
                             appRoot.currentPage = 3
                     }
 
                     Md3NavButton {
-                        icon: "server"
+                        icon: "speedometer"
                         selected: appRoot.currentPage === 4
-                        badge: dashboardStore.updatesAvailable
 
                         onClicked:
                             appRoot.currentPage = 4
+                    }
+                }
+
+                // Dashboard editor action. Only exists visually while the
+                // Dashboard page is active.
+                Rectangle {
+                    id: navDashboardEditButton
+
+                    anchors {
+                        left: parent.left
+                        leftMargin: 10
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    width: 40
+                    height: 40
+                    radius: 20
+
+                    visible:
+                        !appRoot.backendStatusActive
+                        && appRoot.currentPage === 0
+
+                    color:
+                        dashboardPage.editing
+                            ? Md3Theme.primaryContainer
+                            : (
+                                navDashboardEditTap.pressed
+                                    ? Md3Theme.surfaceContainerHigh
+                                    : "transparent"
+                            )
+
+                    Text {
+                        anchors.centerIn: parent
+
+                        text: "✎"
+                        color:
+                            dashboardPage.editing
+                                ? Md3Theme.surfaceContent
+                                : Md3Theme.surfaceVariantContent
+
+                        font.pixelSize: 20
+                        font.weight: Font.DemiBold
+                    }
+
+                    TapHandler {
+                        id: navDashboardEditTap
+
+                        onTapped:
+                            dashboardPage.editing =
+                                !dashboardPage.editing
                     }
                 }
 
@@ -238,8 +597,8 @@ ShellRoot {
 
                     color:
                         navPowerTap.pressed
-                        ? Md3Theme.surfaceContainerHigh
-                        : "transparent"
+                            ? Md3Theme.surfaceContainerHigh
+                            : "transparent"
 
                     MdiIcon {
                         anchors.centerIn: parent
@@ -252,7 +611,7 @@ ShellRoot {
                         id: navPowerTap
 
                         onTapped:
-                            settingsDrawer.openPowerMenu()
+                            powerMenu.open()
                     }
                 }
             }
@@ -265,17 +624,29 @@ ShellRoot {
                 i18n: i18n
                 config: config
                 network: network
+                bluetooth: bluetooth
             }
 
-            ConnectDialog {
-                id: connectDialog
+            AudioVolumeOsd {
+                id: audioVolumeOsd
 
                 anchors.fill: parent
-                z: 8000000
+
+                websocket: websocket
+
+                // The controls already show the live value on the Audio page.
+                suppressed: appRoot.currentPage === 1
+            }
+
+            // Global top-most dialog. Keep this outside NetworkDrawer so its z
+            // is compared directly with Md3Keyboard.
+            PowerMenuDialog {
+                id: powerMenu
+
+                anchors.fill: parent
+                z: 20000000
 
                 i18n: i18n
-                websocket: websocket
-                backendStatus: backendStatus
             }
 
             Md3Keyboard {
@@ -291,6 +662,6 @@ ShellRoot {
                 language: config.language
             }
 
-}
+        }
     }
 }

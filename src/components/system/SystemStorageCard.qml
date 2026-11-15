@@ -8,9 +8,15 @@ Rectangle {
     required property var storage
 
     radius: Md3Theme.radiusLarge
-    color: Md3Theme.surfaceContainer
-    border.width: 1
-    border.color: Md3Theme.outlineVariant
+    color: "transparent"
+    border.width: 0
+
+    Md3GlassSurface {
+        anchors.fill: parent
+        tintColor: Md3Theme.surfaceContainer
+        tintOpacity: 0.94
+        radius: root.radius
+    }
 
     function fmt(v) {
         let n = Number(v ?? 0)
@@ -143,12 +149,28 @@ Rectangle {
                 "#CDDC39"
             ],
             [
+                "system_tts_used",
+                firstNumber([
+                    f.tts,
+                    s.ttsUsed
+                ]),
+                "#673AB7"
+            ],
+            [
                 "system_ollama_used",
                 firstNumber([
                     f.ollama,
                     s.ollamaUsed
                 ]),
                 "#3F51B5"
+            ],
+            [
+                // Webcam privacy blur: Python env, detection models, GPU/Coral runtimes.
+                "system_webcam_used",
+                firstNumber([
+                    f.webcam
+                ]),
+                "#26C6DA"
             ]
         ].filter(row => Number(row[1]) > 0)
     }
@@ -162,7 +184,7 @@ Rectangle {
             Layout.fillWidth: true
             text: root.i18n.text("system_storage")
             color: Md3Theme.surfaceContent
-            font.pixelSize: 13
+            font.pixelSize: 12
             font.weight: Font.DemiBold
         }
 
@@ -172,7 +194,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 10
 
-            radius: 5
+            radius: 0
             color: Md3Theme.surfaceContainerHighest
             clip: true
 
@@ -212,40 +234,27 @@ Rectangle {
                         required property int index
 
                         width:
-                            usageBar.totalBytes > 0
+                                usageBar.totalBytes > 0
                             ? usageBar.width
-                                * Math.min(
-                                    1,
-                                    Number(modelData[1] ?? 0)
-                                    / usageBar.totalBytes
-                                )
+                            * Math.min(
+                                1,
+                                Number(modelData[1] ?? 0)
+                                / usageBar.totalBytes
+                            )
                             : 0
 
                         height: usageBar.height
                         clip: true
 
-                        // Only the very first segment gets a rounded left edge.
-                        // The child is intentionally at least one bar-height
-                        // wide and then clipped by this rectangular delegate,
-                        // which keeps its right edge square.
                         Rectangle {
                             visible: parent.width > 0
 
                             x: 0
                             y: 0
 
-                            width:
-                                index === 0
-                                ? Math.max(parent.width, usageBar.height)
-                                : parent.width
-
+                            width: parent.width
                             height: parent.height
-
-                            radius:
-                                index === 0
-                                ? usageBar.radius
-                                : 0
-
+                            radius: 0
                             color: modelData[2]
                         }
 
@@ -259,13 +268,13 @@ Rectangle {
 
                 Item {
                     width:
-                        usageBar.totalBytes > 0
+                            usageBar.totalBytes > 0
                         ? usageBar.width
-                            * Math.min(
-                                1,
-                                usageBar.uncategorizedUsedBytes
-                                / usageBar.totalBytes
-                            )
+                        * Math.min(
+                            1,
+                            usageBar.uncategorizedUsedBytes
+                            / usageBar.totalBytes
+                        )
                         : 0
 
                     height: usageBar.height
@@ -277,17 +286,9 @@ Rectangle {
                         x: 0
                         y: 0
 
-                        width:
-                            usageBar.segments.length === 0
-                            ? Math.max(parent.width, usageBar.height)
-                            : parent.width
-
+                        width: parent.width
                         height: parent.height
-
-                        radius:
-                            usageBar.segments.length === 0
-                            ? usageBar.radius
-                            : 0
+                        radius: 0
 
                         // Normal filesystem usage that is not one of the
                         // StreamDing-managed folders is intentionally gray,
@@ -312,15 +313,15 @@ Rectangle {
             Repeater {
                 model:[
                     [root.i18n.text("system_storage_used"),root.storage?.used],
-                    [root.i18n.text("system_storage_free"),root.storage?.free],
-                    [root.i18n.text("system_storage_total"),root.storage?.total]
+                [root.i18n.text("system_storage_free"),root.storage?.free],
+                [root.i18n.text("system_storage_total"),root.storage?.total]
                 ]
                 delegate: RowLayout {
                     required property var modelData
                     Layout.columnSpan:2
                     Layout.fillWidth:true
-                    Text { Layout.fillWidth:true; text:modelData[0]; color:Md3Theme.surfaceVariantContent; font.pixelSize:9 }
-                    Text { text:root.fmt(modelData[1]); color:Md3Theme.surfaceContent; font.pixelSize:9; font.weight:Font.Medium }
+                    Text { Layout.fillWidth:true; text:modelData[0]; color:Md3Theme.surfaceVariantContent; font.pixelSize:12 }
+                    Text { text:root.fmt(modelData[1]); color:Md3Theme.surfaceContent; font.pixelSize:12; font.weight:Font.Medium }
                 }
             }
         }

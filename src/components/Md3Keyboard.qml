@@ -21,7 +21,7 @@ Item {
 
     readonly property var row2:
         symbols
-        ? ["@","#","€","_","&","-","+","(",")"]
+        ? ["@","#","$","%","&","-","+","(",")","/"]
         : (
             language === "de"
             ? ["a","s","d","f","g","h","j","k","l","ö"]
@@ -30,26 +30,117 @@ Item {
 
     readonly property var row3:
         symbols
-        ? ["*","\"","'",";",":","!","?","="]
+        ? ["*","\"","'",";",":","!","?","=","_","\\"]
         : (
             language === "de"
             ? ["y","x","c","v","b","n","m","ä","ü"]
             : ["z","x","c","v","b","n","m"]
         )
 
-    visible: KeyboardController.visible
+    readonly property bool keyboardShown:
+        KeyboardController.visible
+
+    property bool renderVisible:
+        keyboardShown
+
+    readonly property real keyboardFullHeight:
+        Math.min(
+            root.symbols ? 300 : 250,
+            parent.height * (root.symbols ? 0.50 : 0.42)
+        )
+
+    visible: renderVisible
     z: 1000000
-    height: visible
-        ? Math.min(250, parent.height * 0.42)
-        : 0
+    height: keyboardFullHeight
+
+    transform: Translate {
+        id: keyboardSlide
+
+        y:
+            root.keyboardShown
+            ? 0
+            : root.height
+
+        Behavior on y {
+            NumberAnimation {
+                duration: 220
+                easing.type:
+                    root.keyboardShown
+                    ? Easing.OutCubic
+                    : Easing.InCubic
+            }
+        }
+    }
+
+    onKeyboardShownChanged: {
+        if (keyboardShown) {
+            hideAfterSlide.stop()
+            renderVisible = true
+        } else {
+            // Keep the keyboard rendered until the slide-out finishes.
+            renderVisible = true
+            hideAfterSlide.restart()
+        }
+
+        KeyboardController.keyboardHeight =
+            keyboardShown ? height : 0
+    }
+
+    onHeightChanged:
+        KeyboardController.keyboardHeight =
+            keyboardShown ? height : 0
+
+    Component.onCompleted: {
+        renderVisible = keyboardShown
+
+        KeyboardController.keyboardHeight =
+            keyboardShown ? height : 0
+    }
+
+    Timer {
+        id: hideAfterSlide
+
+        interval: 230
+        repeat: false
+
+        onTriggered: {
+            if (!root.keyboardShown)
+                root.renderVisible = false
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
         color: Md3Theme.surfaceContainer
+        z: 0
+    }
+
+    // Consume pointer input anywhere inside the keyboard surface so taps can
+    // never fall through to navigation/power controls underneath it.
+    MouseArea {
+        anchors.fill: parent
+        z: 1
+
+        acceptedButtons: Qt.AllButtons
+        hoverEnabled: false
+        preventStealing: true
+
+        onPressed: mouse => {
+            mouse.accepted = true
+        }
+
+        onReleased: mouse => {
+            mouse.accepted = true
+        }
+
+        onClicked: mouse => {
+            mouse.accepted = true
+        }
     }
 
     ColumnLayout {
         anchors.fill: parent
+        z: 2
         anchors.margins: 6
         spacing: 5
 
@@ -253,6 +344,46 @@ Item {
             }
         }
 
+        // Extra Wi-Fi/password symbols. Keep them on their own row so
+        // common punctuation is reachable without long-press gestures.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: root.symbols
+            spacing: 4
+
+            Repeater {
+                model: ["{", "}", "<", ">", "^", "~", "`", "|"]
+
+                Rectangle {
+                    required property string modelData
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 8
+
+                    color: extraSymbolTap.pressed
+                        ? Md3Theme.primary
+                        : Md3Theme.surfaceContainerHighest
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData
+                        color: extraSymbolTap.pressed
+                            ? Md3Theme.primaryContent
+                            : Md3Theme.surfaceContent
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+
+                    TapHandler {
+                        id: extraSymbolTap
+                        onTapped: KeyboardController.insert(modelData)
+                    }
+                }
+            }
+        }
+
         // Bottom row: Android/Gboard-ish.
         RowLayout {
             Layout.fillWidth: true
@@ -292,14 +423,14 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: root.language === "de" ? "," : ","
+                    text: root.symbols ? "[" : ","
                     color: Md3Theme.surfaceContent
                     font.pixelSize: 18
                 }
 
                 TapHandler {
                     id: commaTap
-                    onTapped: KeyboardController.insert(",")
+                    onTapped: KeyboardController.insert(root.symbols ? "[" : ",")
                 }
             }
 
@@ -314,7 +445,9 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: root.language === "de" ? "Deutsch" : "English"
+                    text: root.symbols
+                        ? "{ }  < >  ^ ~ ` |"
+                        : (root.language === "de" ? "Deutsch" : "English")
                     color: Md3Theme.surfaceVariantContent
                     font.pixelSize: 11
                 }
@@ -335,14 +468,14 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "."
+                    text: root.symbols ? "]" : "."
                     color: Md3Theme.surfaceContent
                     font.pixelSize: 18
                 }
 
                 TapHandler {
                     id: periodTap
-                    onTapped: KeyboardController.insert(".")
+                    onTapped: KeyboardController.insert(root.symbols ? "]" : ".")
                 }
             }
 
@@ -364,7 +497,14 @@ Item {
 
                 TapHandler {
                     id: hideTap
-                    onTapped: KeyboardController.hide()
+
+                    onTapped: {
+                        // Do not remove the keyboard from the scene while the
+                        // current pointer event is still being dispatched.
+                        Qt.callLater(function() {
+                            KeyboardController.hide()
+                        })
+                    }
                 }
             }
         }

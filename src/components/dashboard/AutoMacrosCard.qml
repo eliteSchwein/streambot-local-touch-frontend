@@ -9,8 +9,45 @@ Md3Card {
     required property var i18n
     required property var store
     required property var websocket
+    property var autoMacroNames: []
+    backgroundOpacity: 0.88
 
     title: ""
+
+    // Hard cap for the 7-inch Touch dashboard.
+    readonly property var visibleAutoMacros: {
+        const all =
+            Array.isArray(root.store.autoMacros)
+            ? root.store.autoMacros
+            : []
+
+        const selected =
+            Array.isArray(root.autoMacroNames)
+            ? root.autoMacroNames.slice(0, 4)
+            : []
+
+        // Backwards-compatible default: with no explicit selection, show the
+        // first four entries exactly like the old dashboard did.
+        if (selected.length === 0)
+            return all.slice(0, 4)
+
+        const result = []
+
+        for (const name of selected) {
+            const entry =
+                all.find(item =>
+                    String(item?.name ?? "") === String(name)
+                )
+
+            if (entry)
+                result.push(entry)
+
+            if (result.length >= 4)
+                break
+        }
+
+        return result
+    }
 
     Item {
         Layout.fillWidth: true
@@ -19,7 +56,7 @@ Md3Card {
         Text {
             anchors.centerIn: parent
 
-            visible: root.store.autoMacros.length === 0
+            visible: root.visibleAutoMacros.length === 0
 
             text: root.i18n.text("no_auto_macros")
             color: Md3Theme.surfaceVariantContent
@@ -30,11 +67,20 @@ Md3Card {
             id: macroList
 
             anchors.fill: parent
-            visible: root.store.autoMacros.length > 0
+            visible: root.visibleAutoMacros.length > 0
 
             clip: true
-            spacing: 6
-            model: root.store.autoMacros
+            spacing: 4
+            interactive: false
+            model: root.visibleAutoMacros
+
+            // Rows shrink so all (up to 4) auto macros fit into the card.
+            // 32px minimum: the switch itself is 32px high.
+            readonly property real rowHeight: {
+                const rows = Math.max(1, macroList.count)
+                const available = (macroList.height - macroList.spacing * (rows - 1)) / rows
+                return Math.max(32, Math.min(42, Math.floor(available)))
+            }
 
             delegate: Item {
                 id: macroRow
@@ -42,16 +88,21 @@ Md3Card {
                 required property var modelData
 
                 width: macroList.width
-                height: 48
+                height: macroList.rowHeight
 
                 readonly property real progress: {
                     if (!modelData.enabled)
                         return 0
 
+                    // While a temporary interval is active the backend
+                    // counts down from it instead of the configured one.
+                    const temporary = Number(modelData.temporary_interval_ms)
                     const interval =
                         Math.max(
-                            1,
-                            Number(modelData.interval ?? 1)
+                            0.05,
+                            temporary > 0
+                                ? temporary / 1000
+                                : Number(modelData.interval ?? 1)
                         )
 
                     const remaining =
@@ -74,7 +125,12 @@ Md3Card {
                     anchors.fill: parent
 
                     radius: Md3Theme.radiusMedium
-                    color: Md3Theme.surfaceContainerHighest
+                    color: Qt.rgba(
+                        Md3Theme.surfaceContainerHighest.r,
+                        Md3Theme.surfaceContainerHighest.g,
+                        Md3Theme.surfaceContainerHighest.b,
+                        0.88
+                    )
                 }
 
                 // Whole-row progress background.
@@ -92,11 +148,16 @@ Md3Card {
                     radius: Md3Theme.radiusMedium
 
                     // Keep it subtle so text/switch remain readable.
-                    color: Md3Theme.surfaceContainerHigh
+                    color: Qt.rgba(
+                        Md3Theme.surfaceContainerHigh.r,
+                        Md3Theme.surfaceContainerHigh.g,
+                        Md3Theme.surfaceContainerHigh.b,
+                        0.72
+                    )
 
                     opacity:
                         modelData.enabled
-                        ? 0.95
+                        ? 1
                         : 0
 
                     Behavior on width {
@@ -150,9 +211,9 @@ Md3Card {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 9
-                    spacing: 8
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 6
+                    spacing: 6
 
                     Text {
                         Layout.fillWidth: true

@@ -1,0 +1,348 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+import "../components/md3"
+
+Item {
+    id: root
+
+    required property var i18n
+    required property var websocket
+    required property var store
+
+    property bool starting: false
+    property string errorText: ""
+    property int startRequestId: -1
+    property int statusRequestId: -1
+
+    readonly property var speedtest:
+        store?.speedtest ?? ({})
+
+    readonly property bool running:
+        speedtest.running === true
+
+    readonly property string stage:
+        String(speedtest.stage || "idle")
+
+    readonly property real pingMs:
+        speedtest.ping_ms === null || speedtest.ping_ms === undefined
+        ? -1
+        : Number(speedtest.ping_ms)
+
+    readonly property real downloadMbps:
+        speedtest.download_mbps === null || speedtest.download_mbps === undefined
+        ? -1
+        : Number(speedtest.download_mbps)
+
+    readonly property real uploadMbps:
+        speedtest.upload_mbps === null || speedtest.upload_mbps === undefined
+        ? -1
+        : Number(speedtest.upload_mbps)
+
+    function tr(key, fallback) {
+        const value = root.i18n.text(key)
+        return value === key ? fallback : value
+    }
+
+    function resetStartGuard() {
+        starting = false
+        startGuard.stop()
+    }
+
+    function startSpeedtest() {
+        if (
+            running
+            || starting
+            || !websocket.connected
+        ) {
+            return
+        }
+
+        starting = true
+        startGuard.restart()
+
+        startRequestId = websocket.sendRpc("speedtest", {
+            action: "start"
+        })
+
+        if (startRequestId < 0)
+            resetStartGuard()
+    }
+
+    function applySpeedtestState(state) {
+        if (!state || !root.store)
+            return
+
+        const merged = ({})
+
+        const current =
+            root.store.speedtest && typeof root.store.speedtest === "object"
+            ? root.store.speedtest
+            : ({})
+
+        for (const key in current)
+            merged[key] = current[key]
+
+        for (const key in state)
+            merged[key] = state[key]
+
+        root.store.speedtest = root.store.normalizeSpeedtest(merged)
+
+        if (
+            root.store.speedtest.running === true
+            || root.store.speedtest.stage === "finished"
+            || root.store.speedtest.stage === "error"
+        ) {
+            resetStartGuard()
+        }
+    }
+
+
+    function requestStatus() {
+        if (!websocket.connected)
+            return
+
+        statusRequestId = websocket.sendRpc("speedtest", {
+            action: "status"
+        })
+    }
+
+    function formatPing(value) {
+        if (!Number.isFinite(value) || value < 0)
+            return "—"
+
+        return Math.round(value) + " ms"
+    }
+
+    function formatMbps(value) {
+        if (!Number.isFinite(value) || value < 0)
+            return "—"
+
+        return value.toFixed(1) + " Mbit/s"
+    }
+
+    function stageText() {
+        return tr(
+            "speedtest_stage_" + stage,
+            stage
+        )
+    }
+
+    Component.onCompleted:
+        Qt.callLater(requestStatus)
+
+    Connections {
+        target: websocket
+
+        function onConnectionChanged(connected) {
+            if (connected)
+                Qt.callLater(root.requestStatus)
+            else {
+                root.startRequestId = -1
+                root.statusRequestId = -1
+                root.resetStartGuard()
+            }
+        }
+
+        function onJsonReceived(message) {
+            if (
+                message?.method === "notify_speedtest_update"
+                && message.params
+            ) {
+                root.applySpeedtestState(message.params)
+            }
+        }
+
+        function onRpcResponse(id, message) {
+            if (
+                id !== root.startRequestId
+                && id !== root.statusRequestId
+            ) {
+                return
+            }
+
+            if (id === root.startRequestId)
+                root.startRequestId = -1
+
+            if (id === root.statusRequestId)
+                root.statusRequestId = -1
+
+            const payload =
+                message?.result?.speedtest
+                ?? message?.result
+                ?? message?.params?.speedtest
+                ?? message?.params
+                ?? message?.data?.speedtest
+                ?? message?.data
+                ?? null
+
+            if (
+                payload
+                && typeof payload === "object"
+            ) {
+                root.applySpeedtestState(payload)
+            }
+        }
+    }
+
+    Timer {
+        id: startGuard
+        interval: 3000
+        repeat: false
+
+        onTriggered:
+            root.starting = false
+    }
+
+    ColumnLayout {
+        anchors {
+            fill: parent
+            margins: 12
+        }
+
+        spacing: 8
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 8
+
+            MetricCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                iconName: "timer-outline"
+                title: root.tr("speedtest_ping", "Ping")
+                value: root.formatPing(root.pingMs)
+                active: root.stage === "ping"
+            }
+
+            MetricCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                iconName: "download"
+                title: root.tr(
+                    "speedtest_download",
+                    "Download"
+                )
+                value: root.formatMbps(root.downloadMbps)
+                active: root.stage === "download"
+            }
+
+            MetricCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                iconName: "upload"
+                title: root.tr(
+                    "speedtest_upload",
+                    "Upload"
+                )
+                value: root.formatMbps(root.uploadMbps)
+                active: root.stage === "upload"
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 44
+            radius: 22
+
+            readonly property bool canStart:
+                !root.running
+                && !root.starting
+                && root.websocket.connected
+
+            // Same colors as the Update button.
+            color:
+                canStart
+                    ? Md3Theme.primary
+                    : Md3Theme.surfaceContainerHighest
+
+            opacity:
+                canStart
+                    ? 1
+                    : 0.55
+
+            Text {
+                anchors.centerIn: parent
+
+                text:
+                    root.running
+                        ? root.i18n.text("speedtest_running")
+                        : (
+                            root.starting
+                                ? root.i18n.text("speedtest_starting")
+                                : root.i18n.text("speedtest_run")
+                        )
+
+                color:
+                    parent.canStart
+                        ? Md3Theme.primaryContent
+                        : Md3Theme.surfaceVariantContent
+
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+            }
+
+            TapHandler {
+                enabled: parent.canStart
+                onTapped: root.startSpeedtest()
+            }
+        }
+    }
+
+    component MetricCard: Item {
+        id: metric
+
+        required property string iconName
+        required property string title
+        required property string value
+        property bool active: false
+
+        Md3GlassSurface {
+            anchors.fill: parent
+            radius: Md3Theme.radiusLarge
+            tintColor:
+                metric.active
+                    ? Md3Theme.surfaceContainerHigh
+                    : Md3Theme.surfaceContainer
+            tintOpacity: metric.active ? 0.92 : 0.88
+            borderColor:
+                metric.active
+                    ? Md3Theme.primary
+                    : Md3Theme.outlineVariant
+        }
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 8
+
+            MdiIcon {
+                anchors.horizontalCenter: parent.horizontalCenter
+                name: metric.iconName
+                size: 26
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                text: metric.title
+                color: Md3Theme.surfaceVariantContent
+                font.pixelSize: 14
+                font.weight: Font.Medium
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                text: metric.value
+                color: Md3Theme.surfaceContent
+                font.pixelSize: 24
+                font.weight: Font.Bold
+            }
+        }
+    }
+}

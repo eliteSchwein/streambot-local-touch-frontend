@@ -66,9 +66,6 @@ Item {
                             linkDialog.interfaceName =
                                 interfaceName
 
-                            linkDialog.device =
-                                device
-
                             linkDialog.outputs =
                                 root.store.audioOutputs
 
@@ -127,9 +124,14 @@ Item {
         i18n: root.i18n
         websocket: root.websocket
 
+        // Bound to the store so link/per-link changes show up live.
+        device:
+            interfaceName !== ""
+            ? (root.store.audio?.[interfaceName] ?? ({}))
+            : ({})
+
         onClosed: {
             interfaceName = ""
-            device = ({})
             outputs = []
         }
     }

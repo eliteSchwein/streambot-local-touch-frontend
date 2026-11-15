@@ -3,23 +3,27 @@ import QtQuick.Layouts
 
 import "../md3"
 
-Rectangle {
+Item {
     id: root
 
     required property string name
     required property var macro
     required property var websocket
 
+    // Smaller text/icon for tight places like the dashboard card.
+    property bool compact: false
+
     property string runState: "idle"
     property int requestId: -1
 
     implicitHeight: 54
 
-    radius: Md3Theme.radiusMedium
-    color: Md3Theme.surfaceContainer
-
-    border.width: 1
-    border.color: Md3Theme.outlineVariant
+    Md3GlassSurface {
+        anchors.fill: parent
+        radius: Md3Theme.radiusMedium
+        tintColor: Md3Theme.surfaceContainer
+        tintOpacity: 0.94
+    }
 
     function triggerMacro() {
         if (
@@ -118,12 +122,28 @@ Rectangle {
             root.runState = "idle"
     }
 
+    Rectangle {
+        anchors.fill: parent
+        radius: Md3Theme.radiusMedium
+
+        color:
+            rowTap.pressed
+            ? Md3Theme.surfaceContainerHigh
+            : "transparent"
+
+        Behavior on color {
+            ColorAnimation {
+                duration: 100
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 14
-        anchors.rightMargin: 8
+        anchors.leftMargin: root.compact ? 10 : 14
+        anchors.rightMargin: root.compact ? 8 : 14
 
-        spacing: 10
+        spacing: root.compact ? 6 : 10
 
         Text {
             Layout.fillWidth: true
@@ -132,36 +152,21 @@ Rectangle {
             text: root.name
             color: Md3Theme.surfaceContent
 
-            font.pixelSize: 13
+            font.pixelSize: root.compact ? 11 : 12
             font.weight: Font.DemiBold
 
             elide: Text.ElideRight
             verticalAlignment: Text.AlignVCenter
         }
 
-        Rectangle {
+        Item {
+            Layout.preferredWidth: root.compact ? 26 : 34
+            Layout.preferredHeight: root.compact ? 26 : 34
             Layout.alignment: Qt.AlignVCenter
-
-            implicitWidth: 44
-            implicitHeight: 44
-
-            radius: 22
-
-            color: {
-                if (root.runState === "success")
-                    return Md3Theme.success
-
-                if (root.runState === "error")
-                    return Md3Theme.error
-
-                if (root.runState === "loading")
-                    return Md3Theme.surfaceContainerHigh
-
-                return Md3Theme.primary
-            }
 
             MdiIcon {
                 anchors.centerIn: parent
+                visible: root.runState !== "loading"
 
                 name: {
                     if (root.runState === "success")
@@ -173,18 +178,33 @@ Rectangle {
                     return "play"
                 }
 
-                size: 21
-                selected:
-                    root.runState !== "loading"
+                // Always the light icon variant (same color as play and the
+                // spinner); the "selected" variant is dark and barely visible
+                // on the row.
+                size: root.compact ? 16 : 20
             }
 
-            TapHandler {
-                enabled:
-                    root.runState !== "loading"
+            // Running macro: spinner in the color of the play icon
+            // (fixed fill of icons/mdi/play.svg).
+            Md3Spinner {
+                anchors.centerIn: parent
+                visible: root.runState === "loading"
 
-                onTapped:
-                    root.triggerMacro()
+                color: "#E6E1E5"
+                size: root.compact ? 16 : 20
+                strokeWidth: root.compact ? 2 : 2.5
             }
         }
+    }
+
+    TapHandler {
+        id: rowTap
+
+        enabled:
+            root.runState !== "loading"
+            && root.websocket.connected
+
+        onTapped:
+            root.triggerMacro()
     }
 }
