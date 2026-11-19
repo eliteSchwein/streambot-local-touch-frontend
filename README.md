@@ -18,6 +18,8 @@ cargo run --locked --release -- --app-config /path/to/streambot-touch.cfg
 
 The default configuration directory is `~/.config/streambot` or `$XDG_CONFIG_HOME/streambot`. The kiosk reads `streambot-touch.cfg` and shares dashboard, wallpaper and language settings in `streambot-settings.json`. Wallpaper paths are relative to the `assets` directory.
 
+Slint tries Vulkan first, then OpenGL, and falls back to software rendering when accelerated rendering is unavailable. To force the software renderer, set `SLINT_BACKEND=winit-software` when launching the app.
+
 ## Kiosk controls
 
 Use the bottom navigation to switch between the dashboard, audio, macros, system and speedtest pages. The dashboard editor saves card placement and selected macros. The audio page controls virtual and physical outputs, mute, routing and per-output volume. The system page shows resource usage, folder storage and updates. Update all runs the backend update last.

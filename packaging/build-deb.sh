@@ -47,7 +47,7 @@ Section: utils
 Priority: optional
 Architecture: ${ARCH}
 Depends: ${SHLIBS}, libwayland-client0, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libxcursor1, libxi6, libxrandr2, fonts-dejavu-core, network-manager, bluez, pulseaudio-utils, procps, python3, iproute2
-Suggests: matugen
+Suggests: matugen, libvulkan1, mesa-vulkan-drivers, libgl1, libegl1, libgl1-mesa-dri
 Maintainer: Thomas Ludwig
 Description: Streambot Touch native kiosk
  Touch interface for Streambot using Rust and Slint.
