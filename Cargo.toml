@@ -6,15 +6,15 @@ license = "GPL-3.0-only"
 build = "build.rs"
 
 [dependencies]
-slint = { version = "=1.18.1", default-features = false, features = ["std", "backend-winit", "renderer-skia-vulkan", "renderer-skia-opengl", "renderer-software", "compat-1-18", "image-default-formats"] }
+slint = { version = "=1.19.0", default-features = false, features = ["std", "backend-winit", "renderer-skia-vulkan", "renderer-skia-opengl", "renderer-software", "compat-1-18", "image-default-formats"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "signal"] }
-tokio-tungstenite = "0.28"
+tokio-tungstenite = "0.30.0"
 futures-util = "0.3"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
-qrcode = { version = "0.14.1", default-features = false }
-zbus = "=5.19.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
+qrcode = { version = "0.15.0", default-features = false }
+zbus = "=6.3.0"
 
 [build-dependencies]
-slint-build = "=1.18.1"
+slint-build = "=1.19.0"

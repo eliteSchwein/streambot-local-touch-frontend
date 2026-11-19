@@ -2112,6 +2112,10 @@ export component App inherits Window {
                                         : root.loc("wifi_unavailable");
                             }
                             if root.wifi-enabled && root.wifi.length > 0 : ScrollView {
+                                vertical-stretch: 1;
+                                min-height: 0px;
+                                vertical-scrollbar-policy: always-off;
+                                horizontal-scrollbar-policy: always-off;
                                 VerticalLayout {
                                     spacing: 5px;
                                     for row in root.wifi : Md3Card {
@@ -2182,6 +2186,7 @@ export component App inherits Window {
                                         : root.fill-text(root.fill-text(root.loc("bluetooth_device_counts"), "{paired}", root.paired-devices.length + ""), "{connected}", root.bluetooth-connected-count + "");
                                 color: root.bluetooth-scanning ? Theme.primary : Theme.muted;
                                 font-size: 10px;
+                                max-height: 12px;
                                 overflow: elide;
                             }
                             if root.bluetooth-error != "" : HorizontalLayout {
@@ -2203,7 +2208,12 @@ export component App inherits Window {
                             }
                             if root.bluetooth-powered && (root.paired-devices.length > 0 ||
                                 (root.bluetooth-scanning && root.discovered-devices.length > 0)) : ScrollView {
+                                vertical-stretch: 1;
+                                min-height: 0px;
+                                vertical-scrollbar-policy: always-off;
+                                horizontal-scrollbar-policy: always-off;
                                 VerticalLayout {
+                                    alignment: start;
                                     spacing: 6px;
                                     if root.paired-devices.length > 0 : Text {
                                         text: root.loc("bluetooth_paired"); color: Theme.muted; font-size: 10px;
@@ -2219,7 +2229,7 @@ export component App inherits Window {
                                     if root.bluetooth-scanning && root.discovered-devices.length > 0 : Text {
                                         text: root.loc("bluetooth_discovered"); color: Theme.muted; font-size: 10px;
                                     }
-                                    if root.bluetooth-scanning : VerticalLayout {
+                                    if root.bluetooth-scanning && root.discovered-devices.length > 0 : VerticalLayout {
                                         spacing: 6px;
                                         for row in root.discovered-devices : DrawerBluetoothDevice {
                                             device: row;
@@ -2339,6 +2349,10 @@ export component App inherits Window {
                     text: root.loc("no_saved_wifi");
                 }
                 if root.saved-wifi.length > 0 : ScrollView {
+                    vertical-stretch: 1;
+                    min-height: 0px;
+                    vertical-scrollbar-policy: always-off;
+                    horizontal-scrollbar-policy: always-off;
                     VerticalLayout {
                         spacing: 8px;
                         for row in root.saved-wifi : Md3Card {

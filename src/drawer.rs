@@ -1,8 +1,7 @@
-use crate::{ui_bridge::ui_event, App, EthernetRow, SavedWifiRow, WifiRow};
+use crate::{network::NetworkManager, ui_bridge::ui_event, App};
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::{
-    io::Write,
-    process::{Command, Output, Stdio},
+    process::{Command, Output},
     sync::mpsc,
     time::{Duration, Instant},
 };
@@ -47,119 +46,11 @@ fn clean_output(bytes: &[u8]) -> String {
     result.trim_end_matches('\n').into()
 }
 
-pub(crate) fn output(bin: &str, args: &[&str]) -> Result<String, String> {
+fn output(bin: &str, args: &[&str]) -> Result<String, String> {
     let result = command(bin, args)
         .output()
         .map_err(|e| format!("{bin}: {e}"))?;
     command_output(result)
-}
-
-fn nm(args: &[&str]) -> Result<String, String> {
-    let mut argv = vec!["--wait", "20"];
-    argv.extend_from_slice(args);
-    output("nmcli", &argv)
-}
-
-// nmcli escapes colons and backslashes in terse output.
-fn fields(line: &str) -> Vec<String> {
-    let mut parts = vec![String::new()];
-    let mut escaped = false;
-    for c in line.chars() {
-        if c == ':' && !escaped {
-            parts.push(String::new());
-        } else if c == '\\' && !escaped {
-            escaped = true;
-        } else {
-            parts.last_mut().unwrap().push(c);
-            escaped = false;
-        }
-    }
-    parts
-}
-
-fn ethernet_rows(list: &str) -> Vec<EthernetRow> {
-    list.lines()
-        .filter_map(|line| {
-            let f = fields(line);
-            let [id, kind, state] = f.as_slice() else {
-                return None;
-            };
-            if kind != "ethernet" {
-                return None;
-            }
-            let connected = state == "connected" || state == "connected (externally)";
-            let autoconnect = nm(&["-g", "GENERAL.AUTOCONNECT", "device", "show", id])
-                .is_ok_and(|value| value == "yes");
-            Some(EthernetRow {
-                id: id.as_str().into(),
-                connected,
-                enabled: connected || autoconnect,
-            })
-        })
-        .collect()
-}
-
-fn saved_wifi_rows() -> Result<Vec<SavedWifiRow>, String> {
-    Ok(
-        nm(&["-t", "-f", "UUID,NAME,TYPE,DEVICE", "connection", "show"])?
-            .lines()
-            .filter_map(|line| {
-                let f = fields(line);
-                let [id, name, kind, device] = f.as_slice() else {
-                    return None;
-                };
-                if kind != "802-11-wireless" && kind != "wifi" {
-                    return None;
-                }
-                let ssid = nm(&[
-                    "-e",
-                    "no",
-                    "-g",
-                    "802-11-wireless.ssid",
-                    "connection",
-                    "show",
-                    "uuid",
-                    id,
-                ])
-                .unwrap_or_default();
-                Some(SavedWifiRow {
-                    id: id.as_str().into(),
-                    name: name.as_str().into(),
-                    ssid: ssid.into(),
-                    connected: !device.is_empty() && device != "--",
-                })
-            })
-            .collect(),
-    )
-}
-
-fn wifi_rows(list: &str, saved: &[SavedWifiRow]) -> Vec<WifiRow> {
-    let mut rows: Vec<_> = list
-        .lines()
-        .filter_map(|line| {
-            let f = fields(line);
-            let [id, name, security, active, signal, device] = f.as_slice() else {
-                return None;
-            };
-            if name.is_empty() {
-                return None;
-            }
-            let profile = saved.iter().find(|profile| profile.ssid.as_str() == name);
-            Some(WifiRow {
-                id: id.as_str().into(),
-                name: name.as_str().into(),
-                device: device.as_str().into(),
-                secured: !security.is_empty() && security != "--",
-                connected: active == "*",
-                signal: signal.parse::<i32>().unwrap_or_default().clamp(0, 100),
-                profile: profile.map(|p| p.id.clone()).unwrap_or_default(),
-            })
-        })
-        .collect();
-    rows.sort_by_key(|row| (!row.connected, std::cmp::Reverse(row.signal)));
-    let mut seen = std::collections::HashSet::new();
-    rows.retain(|row| seen.insert((row.name.clone(), row.secured)));
-    rows
 }
 
 fn route_address(route: &str) -> Option<std::net::Ipv4Addr> {
@@ -218,26 +109,6 @@ pub(crate) fn commander_qr(url: &str) -> Option<image::RgbImage> {
     }))
 }
 
-fn connect_wifi(id: &str, password: &str) -> Result<String, String> {
-    if password.is_empty() {
-        return nm(&["device", "wifi", "connect", id]);
-    }
-    // Feed the nmcli password prompt through stdin so the key stays out of argv.
-    let mut child = command(
-        "nmcli",
-        &["--ask", "--wait", "20", "device", "wifi", "connect", id],
-    )
-    .stdin(Stdio::piped())
-    .stdout(Stdio::null())
-    .stderr(Stdio::piped())
-    .spawn()
-    .map_err(|e| e.to_string())?;
-    if let Some(mut input) = child.stdin.take() {
-        let _ = writeln!(input, "{password}");
-    }
-    command_output(child.wait_with_output().map_err(|e| e.to_string())?)
-}
-
 enum Request {
     Refresh,
     Close,
@@ -248,33 +119,22 @@ enum Request {
 struct Drawer {
     commander_url: Option<String>,
     last_wifi_scan: Option<Instant>,
+    network: NetworkManager,
 }
 
 impl Drawer {
-    fn action(&mut self, action: &str, id: &str, password: &str) -> Result<String, String> {
-        match action {
-            "ethernet-on" => nm(&["device", "set", id, "autoconnect", "yes"])
-                .and_then(|_| nm(&["device", "connect", id])),
-            "ethernet-off" => nm(&["device", "set", id, "autoconnect", "no"])
-                .and_then(|_| nm(&["device", "disconnect", id])),
-            "wifi-on" => {
-                self.last_wifi_scan = None;
-                nm(&["radio", "wifi", "on"])
-            }
-            "wifi-off" => nm(&["radio", "wifi", "off"]),
-            "wifi-connect" => connect_wifi(id, password),
-            "wifi-disconnect" => nm(&["device", "disconnect", id]),
-            "wifi-saved" => nm(&["connection", "up", "uuid", id]),
-            "wifi-forget" => nm(&["connection", "delete", "uuid", id]),
-            _ => Err("Unknown device action".into()),
+    fn action(&mut self, action: &str, id: &str, password: &str) -> Result<(), String> {
+        if matches!(action, "wifi-on" | "wifi-off") {
+            self.last_wifi_scan = None;
         }
+        zbus::block_on(self.network.action(action, id, password))
     }
 
     fn refresh(
         &mut self,
         ui: &slint::Weak<App>,
         port: u16,
-        action_result: Option<Result<String, String>>,
+        action_result: Option<Result<(), String>>,
     ) {
         self.refresh_web(ui, port);
         self.refresh_network(ui);
@@ -315,66 +175,34 @@ impl Drawer {
     }
 
     fn refresh_network(&mut self, ui: &slint::Weak<App>) {
-        let devices = nm(&["-t", "-f", "DEVICE,TYPE,STATE", "device", "status"]);
-        let radio = nm(&["-t", "-f", "WIFI-HW,WIFI", "radio"]);
-        let wifi_available = devices.as_ref().is_ok_and(|list| {
-            list.lines().map(fields).any(|fields| {
-                matches!(fields.as_slice(), [_, kind, state] if kind == "wifi" && state != "unmanaged")
-            })
-        }) && radio.as_ref().is_ok_and(|s| s.starts_with("enabled:"));
-        let ethernet = devices.map(|list| ethernet_rows(&list));
-        let wifi_enabled = wifi_available && radio.as_ref().is_ok_and(|s| s == "enabled:enabled");
-        let saved = saved_wifi_rows();
-        let wifi = if wifi_enabled {
-            if self
-                .last_wifi_scan
-                .is_none_or(|last| last.elapsed() >= Duration::from_secs(20))
-            {
-                self.last_wifi_scan = Some(Instant::now());
-                // Request a scan without waiting for it. Read the cached results below.
-                let _ = output("nmcli", &["--wait", "0", "device", "wifi", "rescan"]);
+        let request_scan = self
+            .last_wifi_scan
+            .is_none_or(|last| last.elapsed() >= Duration::from_secs(20));
+        if request_scan {
+            self.last_wifi_scan = Some(Instant::now());
+        }
+        match zbus::block_on(self.network.snapshot(request_scan)) {
+            Ok(snapshot) => {
+                if !snapshot.wifi_enabled {
+                    self.last_wifi_scan = None;
+                }
+                ui_event(ui, move |app| {
+                    app.set_drawer_network_error("".into());
+                    app.set_wifi_available(snapshot.wifi_available);
+                    app.set_wifi_enabled(snapshot.wifi_enabled);
+                    update_rows(app.get_ethernet(), snapshot.ethernet, |rows| {
+                        app.set_ethernet(rows)
+                    });
+                    update_rows(app.get_wifi(), snapshot.wifi, |rows| app.set_wifi(rows));
+                    update_rows(app.get_saved_wifi(), snapshot.saved, |rows| {
+                        app.set_saved_wifi(rows)
+                    });
+                });
             }
-            nm(&[
-                "-t",
-                "-f",
-                "BSSID,SSID,SECURITY,IN-USE,SIGNAL,DEVICE",
-                "device",
-                "wifi",
-                "list",
-                "--rescan",
-                "no",
-            ])
-            .and_then(|list| {
-                saved
-                    .as_ref()
-                    .map(|saved| wifi_rows(&list, saved))
-                    .map_err(Clone::clone)
-            })
-        } else {
-            Ok(Vec::new())
-        };
-        ui_event(ui, move |app| {
-            let network_error = ethernet
-                .as_ref()
-                .err()
-                .or(radio.as_ref().err())
-                .or(wifi.as_ref().err())
-                .or(saved.as_ref().err());
-            app.set_drawer_network_error(network_error.map_or("", String::as_str).into());
-            if radio.is_ok() && ethernet.is_ok() {
-                app.set_wifi_available(wifi_available);
-                app.set_wifi_enabled(wifi_enabled);
-            }
-            if let Ok(ethernet) = ethernet {
-                update_rows(app.get_ethernet(), ethernet, |rows| app.set_ethernet(rows));
-            }
-            if let Ok(wifi) = wifi {
-                update_rows(app.get_wifi(), wifi, |rows| app.set_wifi(rows));
-            }
-            if let Ok(saved) = saved {
-                update_rows(app.get_saved_wifi(), saved, |rows| app.set_saved_wifi(rows));
-            }
-        });
+            Err(error) => ui_event(ui, move |app| {
+                app.set_drawer_network_error(error.into());
+            }),
+        }
     }
 }
 
@@ -474,24 +302,5 @@ mod tests {
         assert_eq!(qr.width(), qr.height());
         assert_eq!(qr.get_pixel(0, 0).0, [255; 3]);
         assert_eq!(qr.get_pixel(32, 32).0, [0; 3]);
-    }
-
-    #[test]
-    fn wifi_rows_keep_active_access_point_and_match_saved_ssid() {
-        let saved = [SavedWifiRow {
-            id: "profile".into(),
-            ssid: "studio:east".into(),
-            ..Default::default()
-        }];
-        let rows = wifi_rows(
-            "AA\\:BB:studio\\:east:WPA2::98:wlan0\nCC\\:DD:studio\\:east:WPA2:*:61:wlan0\nEE\\:FF:Guest:--::28:wlan0",
-            &saved,
-        );
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].id, "CC:DD");
-        assert_eq!(rows[0].profile, "profile");
-        assert_eq!(rows[0].signal, 61);
-        assert!(rows[0].connected);
-        assert!(!rows[1].secured);
     }
 }

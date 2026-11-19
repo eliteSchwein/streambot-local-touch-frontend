@@ -10,6 +10,7 @@ mod drawer;
 mod i18n;
 #[cfg(test)]
 mod native_ui_test;
+mod network;
 mod notifications;
 mod state;
 mod theme;

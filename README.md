@@ -24,7 +24,7 @@ Slint tries Vulkan first, then OpenGL, and falls back to software rendering when
 
 Use the bottom navigation to switch between the dashboard, audio, macros, system and speedtest pages. The dashboard editor saves card placement and selected macros. The audio page controls virtual and physical outputs, mute, routing and per-output volume. The system page shows resource usage, folder storage and updates. Update all runs the backend update last.
 
-Tap or pull down the top grip to manage Ethernet, Wi-Fi and Bluetooth or scan the Commander QR code. The power menu is accessible from the bottom bar and from the kiosk's hardware power key. Physical audio controls use `pactl`. The connection drawer uses NetworkManager and BlueZ.
+Tap or pull down the top grip to manage Ethernet, Wi-Fi and Bluetooth or scan the Commander QR code. The power menu is accessible from the bottom bar and from the kiosk's hardware power key. Physical audio controls use `pactl`. The connection drawer talks directly to NetworkManager and BlueZ over system D-Bus; it does not invoke `nmcli` or `bluetoothctl`. Those daemons must be running, and the kiosk user must have system-bus access under the host's D-Bus policy. Bluetooth pairing registers a temporary `NoInputNoOutput` agent for the device selected in the drawer.
 
 ## Debian package
 

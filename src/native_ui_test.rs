@@ -164,6 +164,12 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     app.set_wifi_enabled(true);
     app.set_bluetooth_available(true);
     app.set_bluetooth_powered(true);
+    app.set_paired_devices(ModelRc::new(VecModel::from(vec![BluetoothRow {
+        id: "paired-0".into(),
+        name: "Paired device 0".into(),
+        kind: "SPK".into(),
+        connected: true,
+    }])));
     app.set_saved_wifi(ModelRc::new(VecModel::from(vec![SavedWifiRow {
         id: "profile".into(),
         name: "Saved office".into(),
@@ -362,6 +368,70 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     press(686., 44.);
     release(686., 44.);
     assert_eq!(drawer_rx.try_recv().unwrap().0, "bt-scan");
+    press(550., 130.);
+    release(550., 130.);
+    assert_eq!(
+        drawer_rx.try_recv().unwrap(),
+        ("bt-disconnect".into(), "paired-0".into(), "".into())
+    );
+    app.set_bluetooth_scanning(true);
+    window.draw_if_needed(|renderer| {
+        renderer.render(&mut buffer, 800);
+    });
+    press(550., 130.);
+    release(550., 130.);
+    assert_eq!(
+        drawer_rx.try_recv().unwrap(),
+        ("bt-disconnect".into(), "paired-0".into(), "".into())
+    );
+    app.set_paired_devices(ModelRc::new(VecModel::from(
+        (0..8)
+            .map(|index| BluetoothRow {
+                id: format!("paired-{index}").into(),
+                name: format!("Paired device {index}").into(),
+                kind: "SPK".into(),
+                connected: index == 0,
+            })
+            .collect::<Vec<_>>(),
+    )));
+    window.draw_if_needed(|renderer| {
+        renderer.render(&mut buffer, 800);
+    });
+    press(550., 130.);
+    release(550., 130.);
+    assert_eq!(
+        drawer_rx.try_recv().unwrap(),
+        ("bt-disconnect".into(), "paired-0".into(), "".into())
+    );
+    press(746., 130.);
+    release(746., 130.);
+    assert_eq!(
+        drawer_rx.try_recv().unwrap(),
+        ("bt-remove".into(), "paired-0".into(), "".into())
+    );
+    app.set_bluetooth_scanning(true);
+    app.set_discovered_devices(ModelRc::new(VecModel::from(vec![BluetoothRow {
+        id: "discovered-1".into(),
+        name: "Discovered device".into(),
+        kind: "SPK".into(),
+        connected: false,
+    }])));
+    window.draw_if_needed(|renderer| {
+        renderer.render(&mut buffer, 800);
+    });
+    for _ in 0..4 {
+        app.window().dispatch_event(WindowEvent::PointerScrolled {
+            position: LogicalPosition::new(550., 225.),
+            delta_x: 0.,
+            delta_y: -120.,
+        });
+    }
+    press(550., 225.);
+    release(550., 225.);
+    assert_eq!(
+        drawer_rx.try_recv().unwrap(),
+        ("bt-pair".into(), "discovered-1".into(), "".into())
+    );
 
     press(278., 44.);
     release(278., 44.);
