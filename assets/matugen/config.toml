@@ -1,0 +1,7 @@
+[config]
+reload_apps = false
+
+
+[templates.streambot_touch]
+input_path = "/usr/share/streambot-touch/matugen/theme.json"
+output_path = "~/.cache/streambot-touch/theme.json"

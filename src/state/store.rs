@@ -21,7 +21,8 @@ pub(crate) struct Store {
     pub(crate) macros: Vec<String>,
     pub(crate) auto_macros: Vec<Value>,
     pub(crate) points: Vec<Value>,
-    pub(crate) audio: Vec<String>,
+    pub(crate) audio: Value,
+    pub(crate) outputs: Value,
     pub(crate) interactions: Vec<Value>,
 }
 
@@ -31,7 +32,8 @@ impl Store {
         self.macros.clear();
         self.auto_macros.clear();
         self.points.clear();
-        self.audio.clear();
+        self.audio = Value::Null;
+        self.outputs = Value::Null;
         self.interactions.clear();
     }
     pub(crate) fn accept(&mut self, method: &str, params: &Value) -> Value {
@@ -91,13 +93,8 @@ impl Store {
                     .cloned()
                     .unwrap_or_default();
             }
-            "notify_audio_update" => {
-                let obj = state.get("interfaces").unwrap_or(&state);
-                self.audio = obj
-                    .as_object()
-                    .map(|m| m.keys().cloned().collect())
-                    .unwrap_or_default();
-            }
+            "notify_audio_update" => self.audio = state.clone(),
+            "notify_audio_outputs_update" => self.outputs = state.clone(),
             _ => {}
         }
         state

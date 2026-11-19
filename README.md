@@ -1,26 +1,51 @@
-# Streambot Touch Native (Rust + Slint)
+# Streambot Touch
 
-A native Rust/Slint migration of the original Quickshell Streambot Touch kiosk.
+Streambot Touch is a native Rust and Slint touchscreen kiosk for the Streambot backend. It opens fullscreen on Wayland or X11 and renders its controls and keyboard in-process. The kiosk installer uses labwc on Debian Trixie.
 
-**UI parity is in progress.** This revision restores the original page
-layout, 52 px bottom navigation, default two-column dashboard, and Material 3
-fallback colors. See [UI_PORT_STATUS.md](UI_PORT_STATUS.md) for a precise
-feature-by-feature list of incomplete elements.
+## Build and run
 
-Build:
+With a current stable Rust toolchain, run the following from the repository root.
 
 ```sh
-cargo build
-cargo run
+cargo run --locked --release
 ```
 
-Settings are read from `~/.config/streambot/streambot-touch.cfg`, or a file
-supplied using `--app-config /path/to/file` or `STREAMBOT_TOUCH_CONFIG`.
-The existing backend must be available on the configured REST and WebSocket
-ports (defaults: 8105 and 8100).
+The default connection is localhost, with REST on port 8105 and WebSocket on port 8100. Supply an existing configuration file with `--app-config` or `STREAMBOT_TOUCH_CONFIG`.
 
-The Rust entrypoint is `src/main.rs`; the native UI is `ui/app.slint`.
+```sh
+cargo run --locked --release -- --app-config /path/to/streambot-touch.cfg
+```
 
-## Source organization
+The default configuration directory is `~/.config/streambot` or `$XDG_CONFIG_HOME/streambot`. The kiosk reads `streambot-touch.cfg` and shares dashboard, wallpaper and language settings in `streambot-settings.json`. Wallpaper paths are relative to the `assets` directory.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for a map of the Rust modules after the application was refactored out of `main.rs`.
+## Kiosk controls
+
+Use the bottom navigation to switch between the dashboard, audio, macros, system and speedtest pages. The dashboard editor saves card placement and selected macros. The audio page controls virtual and physical outputs, mute, routing and per-output volume. The system page shows resource usage, folder storage and updates. Update all runs the backend update last.
+
+Tap or pull down the top grip to manage Ethernet, Wi-Fi and Bluetooth or scan the Commander QR code. The power menu is accessible from the bottom bar and from the kiosk's hardware power key. Physical audio controls use `pactl`. The connection drawer uses NetworkManager and BlueZ.
+
+## Debian package
+
+Build on the Debian release and architecture that will run the kiosk. Install the native build dependencies and build the package.
+
+```sh
+sudo apt-get install build-essential dpkg-dev pkg-config python3 libfontconfig1-dev libwayland-dev libxkbcommon-dev
+./packaging/build-deb.sh
+```
+
+The script writes the architecture-specific package to `dist-artifacts/`. To install on an existing desktop, use `sudo apt install ./dist-artifacts/*.deb` with the matching package. To provision a dedicated Trixie kiosk, pass its absolute path to the installer.
+
+```sh
+STREAMBOT_TOUCH_DEB=/absolute/path/to/streambot-touch_VERSION.trixie_arm64.deb ./scripts/install.sh
+```
+
+The kiosk installer configures labwc autostart, systemd, audio, network permissions and power-key handling. Release workflows build amd64 and arm64 packages for Bookworm and Trixie.
+
+## Verification
+
+`cargo test --locked` includes an 800×480 software-rendering test for all five pages. On Linux with Xvfb and Python aiohttp available, the following test starts the release executable on a virtual display and exercises readiness, WebSocket registration, reconnect, CAVA and the power-menu signal using a local test backend.
+
+```sh
+cargo build --release --locked
+python3 packaging/smoke-test.py target/release/streambot-touch
+```

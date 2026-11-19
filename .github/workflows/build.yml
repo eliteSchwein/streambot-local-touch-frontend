@@ -9,10 +9,12 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    container: rust:${{ matrix.distro }}
 
     strategy:
       matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
         distro:
           - bookworm
           - trixie
@@ -21,27 +23,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate scripts
+      - name: Install native build tools
         run: |
-          bash -n packaging/streambot-touch
-          bash -n packaging/build-deb.sh
-
-      - name: Read version
-        id: version
-        run: |
-          VERSION="$(node -p "require('./package.json').version")"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          apt-get update
+          apt-get install -y --no-install-recommends dpkg-dev pkg-config libfontconfig1-dev libxkbcommon-dev libwayland-dev python3
 
       - name: Build Debian package
         env:
-          VERSION: ${{ steps.version.outputs.version }}
           DISTRO: ${{ matrix.distro }}
-          ARCH: all
         run: |
           ./packaging/build-deb.sh
+
+      - name: Verify packaged kiosk
+        run: |
+          apt-get install -y --no-install-recommends ./dist-artifacts/*.deb xvfb python3-aiohttp
+          cargo test --locked --release
+          python3 packaging/smoke-test.py /usr/bin/streambot-touch
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: streambot-touch-${{ matrix.distro }}
+          name: streambot-touch-${{ matrix.distro }}-${{ matrix.runner }}
           path: dist-artifacts/*.deb

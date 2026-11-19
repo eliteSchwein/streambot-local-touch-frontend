@@ -85,25 +85,6 @@ setup_apt_dependencies() {
     gpg
 }
 
-setup_backports_repo() {
-  status_msg "Enable Debian Trixie Backports"
-
-  sudo tee /etc/apt/sources.list.d/debian-backports.sources >/dev/null <<'EOF'
-Types: deb
-URIs: http://deb.debian.org/debian
-Suites: trixie-backports
-Components: main
-Enabled: yes
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-EOF
-
-  sudo apt update
-
-  ok_msg "Trixie Backports enabled"
-}
-
-
-
 setup_custom_apt_repo() {
   status_msg "Enable tludwig dev repo"
 
@@ -119,12 +100,6 @@ install_packages() {
     labwc \
     dbus-user-session \
     seatd \
-    qt6-wayland \
-    qml6-module-qtquick \
-    qml6-module-qtquick-controls \
-    qml6-module-qtquick-layouts \
-    qml6-module-qtwebsockets \
-    qt6-image-formats-plugins \
     network-manager \
     bluez \
     pipewire \
@@ -140,15 +115,17 @@ install_packages() {
     wtype \
     python3
 
-  status_msg "Install Quickshell from Trixie Backports"
-
-  sudo apt-get -y install \
-    quickshell/trixie-backports
-
   status_msg "Install Streambot Touch"
 
-  sudo apt-get -y install \
-    streambot-touch
+  local package="${STREAMBOT_TOUCH_DEB:-streambot-touch}"
+  if [[ "$package" != streambot-touch ]]; then
+    package="$(realpath "$package")"
+  fi
+  sudo apt-get -y install "$package"
+  if [[ "$(dpkg-query -W -f='${Architecture}' streambot-touch)" == all ]]; then
+    warn_msg "The configured APT repository supplied the Quickshell package. Set STREAMBOT_TOUCH_DEB to the native .deb for this device."
+    exit 1
+  fi
 
   status_msg "Enable seatd service"
 
@@ -245,7 +222,6 @@ install_wireplumber_bluetooth_config() {
 check_distribution
 questions
 setup_apt_dependencies
-setup_backports_repo
 setup_custom_apt_repo
 install_matugen
 install_packages

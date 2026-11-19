@@ -76,10 +76,10 @@ fn load_asset(path: &std::path::Path) -> slint::Image {
     slint::Image::from_rgb8(pixels)
 }
 
-fn set_wallpaper_image(ui: &App, wallpaper: &str) {
-    let img = dashboard::wallpaper_path(wallpaper)
-        .and_then(|p| Some(load_asset(&p)))
-        .unwrap_or_default();
+pub(crate) fn set_wallpaper_image(ui: &App, wallpaper: &str) {
+    let path = dashboard::wallpaper_path(wallpaper);
+    crate::theme::wallpaper(ui, path.clone());
+    let img = path.map(|p| load_asset(&p)).unwrap_or_default();
     ui.set_wallpaper_image(img);
 }
 
@@ -141,7 +141,7 @@ fn display(ui: &App, editor: &Editor, store: &Arc<Mutex<Store>>) {
             };
             let thumbnail = if editor.kind == "wallpaper" {
                 dashboard::wallpaper_path(name)
-                    .and_then(|path| Some(load_asset(&path)))
+                    .map(|path| load_asset(&path))
                     .unwrap_or_default()
             } else {
                 slint::Image::default()
@@ -271,6 +271,26 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
             let Some(ui) = weak.upgrade() else {
                 return;
             };
+            if !ui.get_dashboard_picker_open() {
+                let wifi = !ui.get_wifi_target().is_empty();
+                let mut text = if wifi {
+                    ui.get_wifi_password()
+                } else {
+                    ui.get_search()
+                }
+                .to_string();
+                if key == "backspace" {
+                    text.pop();
+                } else {
+                    text.push_str(&key);
+                }
+                if wifi {
+                    ui.set_wifi_password(text.into());
+                } else {
+                    ui.set_search(text.into());
+                }
+                return;
+            }
             let mut state = draft.borrow_mut();
             if key.as_str() == "backspace" {
                 state.search.pop();

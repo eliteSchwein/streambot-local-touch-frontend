@@ -59,7 +59,6 @@ elif [ -x "$HOME/.local/bin/streambot-touch-power-key-listener" ]; then
   "$HOME/.local/bin/streambot-touch-power-key-listener" &
 fi
 
-# Qt Virtual Keyboard is configured by /usr/bin/streambot-touch.
 exec /usr/bin/streambot-touch --app-config "$MCCONFIGFILE"
 EOF_AUTOSTART
 

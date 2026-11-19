@@ -1,18 +1,25 @@
-import { LineEdit, ScrollView } from "std-widgets.slint";
+import { LineEdit, ScrollView, Slider } from "std-widgets.slint";
 
 // Original Quickshell Material 3 fallback palette (Md3Theme.qml).
 export global Theme {
-    out property <color> background: #111318;
-    out property <color> surface: #1d2024;
-    out property <color> elevated: #282a2f;
-    out property <color> raised: #33353a;
-    out property <color> primary: #a8c7fa;
-    out property <color> on-primary: #062e6f;
-    out property <color> text: #e2e2e9;
-    out property <color> muted: #c4c6d0;
-    out property <color> success: #a8d5a2;
+    in-out property <color> background: #111318;
+    in-out property <color> surface: #1d2024;
+    in-out property <color> elevated: #282a2f;
+    in-out property <color> raised: #33353a;
+    in-out property <color> primary: #a8c7fa;
+    in-out property <color> on-primary: #062e6f;
+    in-out property <color> text: #e2e2e9;
+    in-out property <color> muted: #c4c6d0;
+    in-out property <color> success: #a8d5a2;
 }
 
+export struct ActionRow { label: string, id: string, active: bool }
+export struct UpdateEntry { label: string, id: string, active: bool, busy: bool }
+export struct AudioLink { id: string, label: string, linked: bool, volume: float }
+export struct AudioEntry {
+    id: string, label: string, physical: bool, volume: float, minimum: float, maximum: float,
+    step: float, muted: bool, restore: float, routable: bool, per-link: bool, links: [AudioLink],
+}
 export struct InteractionEntry {
     name: string,
     meta: string,
@@ -179,9 +186,9 @@ export component App inherits Window {
     in-out property <string> speedtest-summary: "Not run";
     in-out property <string> update-summary: "No update information yet";
     in-out property <[string]> macros: [];
-    in-out property <[string]> auto-macros: [];
-    in-out property <[string]> channel-points: [];
-    in-out property <[string]> audio-interfaces: [];
+    in-out property <[ActionRow]> auto-macros: [];
+    in-out property <[ActionRow]> channel-points: [];
+    in-out property <[AudioEntry]> audio-interfaces: [];
     in-out property <string> search: "";
     in-out property <int> macro-tab: 0;
     in-out property <string> feedback: "";
@@ -203,7 +210,21 @@ export component App inherits Window {
     in-out property <bool> touch-keyboard-shift: false;
     in-out property <bool> touch-keyboard-symbols: false;
     callback refresh-drawer();
-    callback drawer-command(string);
+    callback drawer-command(string,string,string);
+    in-out property <bool> drawer-busy;
+    in-out property <[ActionRow]> wifi;
+    in-out property <[ActionRow]> ethernet;
+    in-out property <[ActionRow]> saved-wifi;
+    in-out property <[ActionRow]> devices;
+    in-out property <string> commander-url;
+    in-out property <image> commander-qr;
+    in-out property <string> wifi-target;
+    in-out property <string> wifi-password;
+    in-out property <string> confirm-forget;
+    in-out property <string> language: "en";
+    callback choose-language(string);
+    pure function tr(en:string,de:string)->string { return root.language == "de" ? de : en; }
+
     callback keyboard-input(string);
     callback dashboard-save(string, string, string, string);
     callback dashboard-cancel();
@@ -240,15 +261,29 @@ export component App inherits Window {
     in-out property <[float]> cava-bars: [0, 0, 0, 0, 0];
 
     callback remove-interaction(string);
-    callback trigger-macro(int);
-    callback trigger-dashboard-macro(string);
-    callback toggle-dashboard-auto-macro(string);
-    callback toggle-auto-macro(int);
-    callback toggle-channel-point(int);
+    callback trigger-macro(string);
+    callback toggle-auto-macro(string,bool);
+    callback toggle-channel-point(string);
     callback music-action(string);
     callback speedtest-start();
     callback update-refresh();
-    callback change-volume(int, float);
+    callback change-volume(AudioEntry,float,bool);
+    callback link-output(string,string,bool);
+    callback per-link-control(string,bool);
+    callback link-volume(string,string,float);
+    callback run-update(string);
+    callback update-all();
+    callback advance-updates();
+    callback cancel-updates();
+    in-out property <string> updating-manager;
+    in-out property <bool> osd-visible;
+    in-out property <int> osd-revision;
+    in-out property <AudioEntry> osd-item;
+    in-out property <[UpdateEntry]> updates;
+    in-out property <string> routing;
+    in-out property <string> theme-wallpaper;
+    in-out property <bool> speedtest-running;
+    pure callback matches(string,string) -> bool;
 
     Image {
         width: parent.width;
@@ -280,7 +315,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No interactions";
+                                                        text: root.tr("No interactions","Keine Interaktionen");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -339,7 +374,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No auto macros";
+                                                        text: root.tr("No auto macros","Keine Auto-Makros");
                                                         color: Theme.muted;
                                                         font-size: 10px;
                                                         horizontal-alignment: center;
@@ -370,7 +405,7 @@ export component App inherits Window {
                                                             overflow: elide;
                                                             vertical-alignment: center;
                                                         }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
                                                     }
                                                 }
                                             }
@@ -382,13 +417,13 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
                             for item[i] in root.dashboard-macro-list : Rectangle {
                                 vertical-stretch: 1;
                                 background: Theme.raised;
                                 border-radius: 12px;
                                 Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                                TouchArea { clicked => { root.trigger-macro(item); } }
                             }
                         }
                     }
@@ -450,7 +485,7 @@ export component App inherits Window {
                                             HorizontalLayout {
                                                 alignment: center;
                                                 spacing: 8px;
-                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
                                                 DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
                                             }
                                         }
@@ -466,7 +501,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No interactions";
+                                                        text: root.tr("No interactions","Keine Interaktionen");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -525,7 +560,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No auto macros";
+                                                        text: root.tr("No auto macros","Keine Auto-Makros");
                                                         color: Theme.muted;
                                                         font-size: 10px;
                                                         horizontal-alignment: center;
@@ -556,7 +591,7 @@ export component App inherits Window {
                                                             overflow: elide;
                                                             vertical-alignment: center;
                                                         }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
                                                     }
                                                 }
                                             }
@@ -568,13 +603,13 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
                             for item[i] in root.dashboard-macro-list : Rectangle {
                                 vertical-stretch: 1;
                                 background: Theme.raised;
                                 border-radius: 12px;
                                 Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                                TouchArea { clicked => { root.trigger-macro(item); } }
                             }
                         }
                     }
@@ -636,7 +671,7 @@ export component App inherits Window {
                                             HorizontalLayout {
                                                 alignment: center;
                                                 spacing: 8px;
-                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
                                                 DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
                                             }
                                         }
@@ -656,7 +691,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No interactions";
+                                                        text: root.tr("No interactions","Keine Interaktionen");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -715,7 +750,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No auto macros";
+                                                        text: root.tr("No auto macros","Keine Auto-Makros");
                                                         color: Theme.muted;
                                                         font-size: 10px;
                                                         horizontal-alignment: center;
@@ -746,7 +781,7 @@ export component App inherits Window {
                                                             overflow: elide;
                                                             vertical-alignment: center;
                                                         }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
                                                     }
                                                 }
                                             }
@@ -758,13 +793,13 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
                             for item[i] in root.dashboard-macro-list : Rectangle {
                                 vertical-stretch: 1;
                                 background: Theme.raised;
                                 border-radius: 12px;
                                 Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                                TouchArea { clicked => { root.trigger-macro(item); } }
                             }
                         }
                     }
@@ -826,7 +861,7 @@ export component App inherits Window {
                                             HorizontalLayout {
                                                 alignment: center;
                                                 spacing: 8px;
-                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
                                                 DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
                                             }
                                         }
@@ -842,7 +877,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No interactions";
+                                                        text: root.tr("No interactions","Keine Interaktionen");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -901,7 +936,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: "No auto macros";
+                                                        text: root.tr("No auto macros","Keine Auto-Makros");
                                                         color: Theme.muted;
                                                         font-size: 10px;
                                                         horizontal-alignment: center;
@@ -932,7 +967,7 @@ export component App inherits Window {
                                                             overflow: elide;
                                                             vertical-alignment: center;
                                                         }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-dashboard-auto-macro(item.name); } }
+                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
                                                     }
                                                 }
                                             }
@@ -944,13 +979,13 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: "No macros"; color: Theme.muted; font-size: 12px; }
+                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
                             for item[i] in root.dashboard-macro-list : Rectangle {
                                 vertical-stretch: 1;
                                 background: Theme.raised;
                                 border-radius: 12px;
                                 Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-dashboard-macro(item); } }
+                                TouchArea { clicked => { root.trigger-macro(item); } }
                             }
                         }
                     }
@@ -1012,7 +1047,7 @@ export component App inherits Window {
                                             HorizontalLayout {
                                                 alignment: center;
                                                 spacing: 8px;
-                                                Text { text: "Song requests"; font-size: 10px; color: Theme.muted; vertical-alignment: center; }
+                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
                                                 DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
                                             }
                                         }
@@ -1024,11 +1059,11 @@ export component App inherits Window {
                 spacing: 10px;
                 HorizontalLayout {
                     spacing: 8px;
-                    Text { text: "Edit dashboard"; color: Theme.text; font-size: 17px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
+                    Text { text: root.tr("Edit dashboard","Dashboard bearbeiten"); color: Theme.text; font-size: 17px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
                     PillButton { width: 170px; label: root.wallpaper-label; clicked => { root.dashboard-open-picker("wallpaper"); } }
-                    PillButton { width: 82px; label: "Reset"; clicked => { root.dashboard-editor-reset(); } }
-                    PillButton { width: 82px; label: "Cancel"; clicked => { root.dashboard-cancel(); root.dashboard-editing = false; } }
-                    PillButton { width: 82px; label: "Save"; selected: true; clicked => { root.dashboard-save(root.edit-left-0, root.edit-left-1, root.edit-right-0, root.edit-right-1); } }
+                    PillButton { width: 82px; label: root.tr("Reset","Zurücksetzen"); clicked => { root.dashboard-editor-reset(); } }
+                    PillButton { width: 82px; label: root.tr("Cancel","Abbrechen"); clicked => { root.dashboard-cancel(); root.dashboard-editing = false; } }
+                    PillButton { width: 82px; label: root.tr("Save","Speichern"); selected: true; clicked => { root.dashboard-save(root.edit-left-0, root.edit-left-1, root.edit-right-0, root.edit-right-1); } }
                 }
                 Text { text: root.feedback; color: Theme.muted; font-size: 11px; }
                 HorizontalLayout {
@@ -1040,19 +1075,19 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
-                            Text { text: "Left column"; color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: "Slot 1"; color: Theme.muted; font-size: 10px; }
+                            Text { text: root.tr("Left column","Linke Spalte"); color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.tr("Slot 1","Platz 1"); color: Theme.muted; font-size: 10px; }
                             CardSelector { value: root.edit-left-0; changed(card) => { root.dashboard-open-picker("slot:left-0"); } }
-                            Text { text: "Slot 2"; color: Theme.muted; font-size: 10px; }
+                            Text { text: root.tr("Slot 2","Platz 2"); color: Theme.muted; font-size: 10px; }
                             CardSelector { value: root.edit-left-1; changed(card) => { root.dashboard-open-picker("slot:left-1"); } }
                             if root.edit-left-0 == "macros" || root.edit-left-1 == "macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: "Dashboard macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                Text { text: root.tr("Dashboard macros (max 4)","Dashboard-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
                                 PillButton { label: root.dashboard-selected-macros; clicked => { root.dashboard-open-picker("macros"); } }
                             }
                             if root.edit-left-0 == "auto_macros" || root.edit-left-1 == "auto_macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: "Auto macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                Text { text: root.tr("Auto macros (max 4)","Auto-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
                                 PillButton { label: root.dashboard-selected-auto-macros; clicked => { root.dashboard-open-picker("auto_macros"); } }
                             }
 
@@ -1066,19 +1101,19 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
-                            Text { text: "Right column"; color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: "Slot 1"; color: Theme.muted; font-size: 10px; }
+                            Text { text: root.tr("Right column","Rechte Spalte"); color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.tr("Slot 1","Platz 1"); color: Theme.muted; font-size: 10px; }
                             CardSelector { value: root.edit-right-0; changed(card) => { root.dashboard-open-picker("slot:right-0"); } }
-                            Text { text: "Slot 2"; color: Theme.muted; font-size: 10px; }
+                            Text { text: root.tr("Slot 2","Platz 2"); color: Theme.muted; font-size: 10px; }
                             CardSelector { value: root.edit-right-1; changed(card) => { root.dashboard-open-picker("slot:right-1"); } }
                             if root.edit-right-0 == "macros" || root.edit-right-1 == "macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: "Dashboard macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                Text { text: root.tr("Dashboard macros (max 4)","Dashboard-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
                                 PillButton { label: root.dashboard-selected-macros; clicked => { root.dashboard-open-picker("macros"); } }
                             }
                             if root.edit-right-0 == "auto_macros" || root.edit-right-1 == "auto_macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: "Auto macros (max 4)"; font-size: 11px; color: Theme.muted; }
+                                Text { text: root.tr("Auto macros (max 4)","Auto-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
                                 PillButton { label: root.dashboard-selected-auto-macros; clicked => { root.dashboard-open-picker("auto_macros"); } }
                             }
 
@@ -1094,18 +1129,24 @@ export component App inherits Window {
                     vertical-stretch: 1;
                     VerticalLayout {
                         spacing: 8px;
-                        for item[i] in root.audio-interfaces : Rectangle {
-                            height: 78px;
-                            background: Theme.surface;
-                            border-radius: 16px;
+                        for item in root.audio-interfaces : VerticalLayout {
+                            spacing: 5px;
                             HorizontalLayout {
-                                padding: 12px;
-                                spacing: 10px;
-                                Text { text: item; color: Theme.text; font-size: 15px; horizontal-stretch: 1; vertical-alignment: center; }
-                                PillButton { width: 64px; label: "25%"; clicked => { root.change-volume(i, 0.25); } }
-                                PillButton { width: 64px; label: "50%"; clicked => { root.change-volume(i, 0.5); } }
-                                PillButton { width: 64px; label: "75%"; clicked => { root.change-volume(i, 0.75); } }
-                                PillButton { width: 64px; label: "100%"; clicked => { root.change-volume(i, 1.0); } }
+                                height: 58px;
+                                spacing: 6px;
+                                Text { text: item.label; width: 145px; overflow: elide; color: Theme.text; vertical-alignment: center; }
+                                PillButton { width: 70px; label: item.muted ? root.tr("Unmute","Ton an") : root.tr("Mute","Stumm"); clicked => { root.change-volume(item,item.muted ? item.restore : 0,true); } }
+                                Slider { minimum: item.minimum; maximum: item.maximum; value: item.volume; enabled: !item.per-link; released(v) => { root.change-volume(item,v,false); } }
+                                Text { text: round(item.volume * 100) + "%"; color: Theme.text; vertical-alignment: center; }
+                                if item.routable : PillButton { width: 76px; label: root.tr("Outputs","Ausgänge"); clicked => { root.routing = root.routing == item.id ? "" : item.id; } }
+                            }
+                            if item.routable && root.routing == item.id : VerticalLayout {
+                                PillButton { label: root.tr("Per-output volume","Lautstärke pro Ausgang"); selected: item.per-link; clicked => { root.per-link-control(item.id,!item.per-link); } }
+                                for link in item.links : HorizontalLayout {
+                                    height: 44px;
+                                    PillButton { horizontal-stretch: 1; label: link.label; selected: link.linked; clicked => { root.link-output(item.id,link.id,!link.linked); } }
+                                    if item.per-link && link.linked : Slider { minimum: item.minimum; maximum: item.maximum; value: link.volume; released(v) => { root.link-volume(item.id,link.id,v); } }
+                                }
                             }
                         }
                     }
@@ -1116,43 +1157,46 @@ export component App inherits Window {
                 spacing: 8px;
                 HorizontalLayout {
                     spacing: 8px;
-                    PillButton { width: 132px; label: "Macros"; selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
-                    PillButton { width: 132px; label: "Auto Macros"; selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
-                    PillButton { width: 160px; label: "Channel Points"; selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
+                    PillButton { width: 132px; label: root.tr("Macros","Makros"); selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
+                    PillButton { width: 132px; label: root.tr("Auto Macros","Auto-Makros"); selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
+                    PillButton { width: 160px; label: root.tr("Channel Points","Kanalpunkte"); selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
                 }
-                LineEdit { placeholder-text: "Search"; text <=> root.search; }
+                HorizontalLayout { LineEdit { horizontal-stretch: 1; placeholder-text: root.tr("Search","Suchen"); text <=> root.search; } PillButton { width: 70px; label: "⌨"; clicked => { root.touch-keyboard-open = !root.touch-keyboard-open; } } }
                 ScrollView {
                     vertical-stretch: 1;
                     VerticalLayout {
                         spacing: 6px;
                         if root.macro-tab == 0 : VerticalLayout {
                             spacing: 6px;
-                            for item[i] in root.macros : Rectangle {
-                                height: 48px;
+                            for item in root.macros : Rectangle {
+                                visible: root.matches(item,root.search);
+                                height: self.visible ? 48px : 0px;
                                 background: Theme.surface;
                                 border-radius: 12px;
                                 Text { x: 14px; text: item; color: Theme.text; vertical-alignment: center; font-size: 14px; }
-                                TouchArea { clicked => { root.trigger-macro(i); } }
+                                TouchArea { clicked => { root.trigger-macro(item); } }
                             }
                         }
                         if root.macro-tab == 1 : VerticalLayout {
                             spacing: 6px;
-                            for item[i] in root.auto-macros : Rectangle {
-                                height: 48px;
+                            for item in root.auto-macros : Rectangle {
+                                visible: root.matches(item.label,root.search);
+                                height: self.visible ? 48px : 0px;
                                 background: Theme.surface;
                                 border-radius: 12px;
-                                Text { x: 14px; text: item; color: Theme.text; vertical-alignment: center; font-size: 14px; }
-                                TouchArea { clicked => { root.toggle-auto-macro(i); } }
+                                Text { x: 14px; text: item.label + (item.active ? "  ✓" : ""); color: Theme.text; vertical-alignment: center; font-size: 14px; }
+                                TouchArea { clicked => { root.toggle-auto-macro(item.id,!item.active); } }
                             }
                         }
                         if root.macro-tab == 2 : VerticalLayout {
                             spacing: 6px;
-                            for item[i] in root.channel-points : Rectangle {
-                                height: 48px;
+                            for item in root.channel-points : Rectangle {
+                                visible: root.matches(item.label,root.search);
+                                height: self.visible ? 48px : 0px;
                                 background: Theme.surface;
                                 border-radius: 12px;
-                                Text { x: 14px; text: item; color: Theme.text; vertical-alignment: center; font-size: 14px; }
-                                TouchArea { clicked => { root.toggle-channel-point(i); } }
+                                Text { x: 14px; text: item.label + (item.active ? "  ✓" : ""); color: Theme.text; vertical-alignment: center; font-size: 14px; }
+                                TouchArea { clicked => { root.toggle-channel-point(item.id); } }
                             }
                         }
                     }
@@ -1171,7 +1215,7 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 12px;
-                            Text { text: "System statistics"; color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.tr("System statistics","Systemstatistik"); color: Theme.text; font-size: 16px; font-weight: 600; }
                             Text { text: root.system-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                         }
                     }
@@ -1182,8 +1226,8 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 10px;
-                            Text { text: "Storage"; color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: root.storage-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                            Text { text: root.tr("Storage","Speicher"); color: Theme.text; font-size: 16px; font-weight: 600; }
+                            ScrollView { Text { text: root.storage-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; } }
                         }
                     }
                 }
@@ -1198,8 +1242,13 @@ export component App inherits Window {
                             padding: 14px;
                             spacing: 10px;
                             Text { text: "Updates"; color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: root.update-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
-                            PillButton { width: 150px; label: "Refresh updates"; clicked => { root.update-refresh(); } }
+                            ScrollView { VerticalLayout { for item in root.updates : PillButton {
+                                label: item.label; selected: item.active; clicked => { if item.active && root.updating-manager == "" { root.run-update(item.id); } }
+                            } } }
+                            HorizontalLayout {
+                                PillButton { label: root.tr("Refresh","Aktualisieren"); clicked => { root.update-refresh(); } }
+                                PillButton { label: root.tr("Update all","Alle aktualisieren"); clicked => { root.update-all(); } }
+                            }
                         }
                     }
                     Rectangle {
@@ -1208,8 +1257,11 @@ export component App inherits Window {
                         border-radius: 16px;
                         VerticalLayout {
                             padding: 14px;
-                            Text { text: "Language"; color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: "English"; color: Theme.muted; font-size: 14px; }
+                            Text { text: root.tr("Language","Sprache"); color: Theme.text; font-size: 16px; font-weight: 600; }
+                            HorizontalLayout {
+                                PillButton { label: root.tr("English","Englisch"); selected: root.language=="en"; clicked => { root.choose-language("en"); } }
+                                PillButton { label: "Deutsch"; selected: root.language=="de"; clicked => { root.choose-language("de"); } }
+                            }
                         }
                     }
                 }
@@ -1226,17 +1278,18 @@ export component App inherits Window {
                         spacing: 16px;
                         Text { text: "Speedtest"; color: Theme.text; font-size: 20px; font-weight: 600; }
                         Text { text: root.speedtest-summary; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
-                        PillButton { width: 180px; label: "Start speedtest"; selected: true; clicked => { root.speedtest-start(); } }
+                        PillButton { width: 180px; label: root.speedtest-running ? root.tr("Running…","Läuft …") : root.tr("Start speedtest","Speedtest starten"); selected: true; clicked => { if !root.speedtest-running { root.speedtest-start(); } } }
                         Rectangle { vertical-stretch: 1; background: transparent; }
                     }
                 }
             }
             if root.connection != "Connected" : Rectangle {
                 background: Theme.background;
+                TouchArea {}
                 VerticalLayout {
                     alignment: center;
                     spacing: 14px;
-                    Text { text: "Connecting to Streambot"; color: Theme.text; font-size: 22px; font-weight: 600; horizontal-alignment: center; }
+                    Text { text: root.tr("Connecting to Streambot","Verbindung zu Streambot wird aufgebaut"); color: Theme.text; font-size: 22px; font-weight: 600; horizontal-alignment: center; }
                     Text { text: root.connection; color: Theme.muted; font-size: 14px; horizontal-alignment: center; }
                     Text { text: root.backend-stage; color: Theme.primary; font-size: 12px; horizontal-alignment: center; }
                 }
@@ -1276,7 +1329,7 @@ export component App inherits Window {
                 NavItem { icon: @image-url("icons/mdi/home.svg"); active-icon: @image-url("icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.page = 0; } }
                 NavItem { icon: @image-url("icons/mdi/volume-high.svg"); active-icon: @image-url("icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.page = 1; root.dashboard-editing = false; } }
                 NavItem { icon: @image-url("icons/mdi/tune.svg"); active-icon: @image-url("icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.page = 2; root.dashboard-editing = false; } }
-                NavItem { icon: @image-url("icons/mdi/server.svg"); active-icon: @image-url("icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.page = 3; root.dashboard-editing = false; } }
+                NavItem { icon: @image-url("icons/mdi/server.svg"); active-icon: @image-url("icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.page = 3; if root.connection=="Connected" {root.update-refresh();} root.dashboard-editing = false; } }
                 NavItem { icon: @image-url("icons/mdi/speedometer.svg"); active-icon: @image-url("icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.page = 4; root.dashboard-editing = false; } }
                 Rectangle { horizontal-stretch: 1; background: transparent; }
                 Rectangle {
@@ -1326,8 +1379,8 @@ export component App inherits Window {
                 padding: 14px;
                 spacing: 12px;
                 HorizontalLayout {
-                    Text { text: "Connection & devices"; color: Theme.text; font-size: 22px; font-weight: 600; horizontal-stretch: 1; }
-                    PillButton { label: "Refresh"; width: 90px; clicked => { root.refresh-drawer(); } }
+                    Text { text: root.tr("Connection & devices","Verbindungen und Geräte"); color: Theme.text; font-size: 22px; font-weight: 600; horizontal-stretch: 1; }
+                    PillButton { label: root.tr("Refresh","Aktualisieren"); width: 90px; clicked => { root.refresh-drawer(); } }
                     PillButton { label: "Close"; width: 90px; clicked => { root.network-drawer-open = false; } }
                 }
                 HorizontalLayout {
@@ -1339,13 +1392,22 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 12px;
-                            Text { text: "Network / Wi-Fi"; font-size: 18px; font-weight: 600; color: Theme.text; }
+                            Text { text: root.tr("Network / Wi-Fi","Netzwerk / WLAN"); font-size: 18px; font-weight: 600; color: Theme.text; }
                             Text { text: root.drawer-network; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                             HorizontalLayout {
-                                PillButton { horizontal-stretch: 1; label: "Wi-Fi on"; clicked => { root.drawer-command("wifi-on"); } }
-                                PillButton { horizontal-stretch: 1; label: "Wi-Fi off"; clicked => { root.drawer-command("wifi-off"); } }
+                                PillButton { horizontal-stretch: 1; label: root.tr("Wi-Fi on","WLAN ein"); clicked => { root.drawer-command("wifi-on","",""); } }
+                                PillButton { horizontal-stretch: 1; label: root.tr("Wi-Fi off","WLAN aus"); clicked => { root.drawer-command("wifi-off","",""); } }
                             }
-                            Rectangle { vertical-stretch: 1; background: transparent; }
+                            ScrollView { VerticalLayout {
+                                for row in root.ethernet : PillButton { label: row.label; selected: row.active; clicked => {root.drawer-command(row.active ? "ethernet-off" : "ethernet-on",row.id,"");} }
+                                PillButton { label: root.tr("Scan Wi-Fi","WLAN suchen"); clicked => {root.drawer-command("wifi-rescan","","");} }
+                                for row in root.wifi : PillButton { label: row.label; selected: row.active; clicked => { root.wifi-target=row.id; root.wifi-password=""; root.touch-keyboard-open=true; } }
+                                for row in root.saved-wifi : HorizontalLayout {
+                                    PillButton { label: row.label; horizontal-stretch: 1; clicked => { root.drawer-command("wifi-saved",row.id,""); } }
+                                    PillButton { width: 75px; label: root.confirm-forget==row.id ? root.tr("Confirm","Bestätigen") : root.tr("Forget","Entfernen"); clicked => { if root.confirm-forget==row.id { root.drawer-command("wifi-forget",row.id,""); root.confirm-forget=""; } else { root.confirm-forget=row.id; } } }
+                                }
+                            } }
+
                         }
                     }
                     Rectangle {
@@ -1358,14 +1420,29 @@ export component App inherits Window {
                             Text { text: "Bluetooth"; font-size: 18px; font-weight: 600; color: Theme.text; }
                             Text { text: root.drawer-bluetooth; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                             HorizontalLayout {
-                                PillButton { horizontal-stretch: 1; label: "Bluetooth on"; clicked => { root.drawer-command("bluetooth-on"); } }
-                                PillButton { horizontal-stretch: 1; label: "Bluetooth off"; clicked => { root.drawer-command("bluetooth-off"); } }
+                                PillButton { horizontal-stretch: 1; label: root.tr("Bluetooth on","Bluetooth ein"); clicked => { root.drawer-command("bluetooth-on","",""); } }
+                                PillButton { horizontal-stretch: 1; label: root.tr("Bluetooth off","Bluetooth aus"); clicked => { root.drawer-command("bluetooth-off","",""); } }
                             }
-                            Rectangle { vertical-stretch: 1; background: transparent; }
+                            PillButton { label: root.tr("Scan","Suchen"); clicked => { root.drawer-command("bt-scan","",""); } }
+                            ScrollView { VerticalLayout {
+                                for row in root.devices : HorizontalLayout {
+                                    PillButton { horizontal-stretch: 1; label: row.label; selected: row.active; clicked => { root.drawer-command(row.active ? "bt-disconnect" : "bt-connect",row.id,""); } }
+                                    PillButton { width: 60px; label: root.tr("Pair","Koppeln"); clicked => { root.drawer-command("bt-pair",row.id,""); } }
+                                    PillButton { width: 66px; label: root.confirm-forget==row.id ? root.tr("Confirm","Bestätigen") : root.tr("Forget","Entfernen"); clicked => { if root.confirm-forget==row.id { root.drawer-command("bt-remove",row.id,""); root.confirm-forget=""; } else { root.confirm-forget=row.id; } } }
+                                }
+                            } }
+
                         }
                     }
                 }
-                PillButton { width: 240px; label: "Power options"; clicked => { root.network-drawer-open = false; root.power-menu-open = true; } }
+                HorizontalLayout {
+                    if root.commander-url != "" : Image { width: 92px; height: 92px; source: root.commander-qr; }
+                    VerticalLayout {
+                        Text { text: root.commander-url; color: Theme.text; }
+                        Text { text: root.drawer-busy ? root.tr("Working…","In Arbeit …") : root.feedback; color: Theme.muted; wrap: word-wrap; }
+                    }
+                }
+
             }
         }
     }
@@ -1401,7 +1478,7 @@ export component App inherits Window {
                     spacing: 8px;
                     search-entry := LineEdit {
                         horizontal-stretch: 1;
-                        placeholder-text: "Search...";
+                        placeholder-text: root.tr("Search...","Suchen …");
                         text <=> root.dashboard-picker-search;
                         edited(search) => { root.dashboard-filter(search); }
                         changed has-focus => {
@@ -1442,15 +1519,27 @@ export component App inherits Window {
                     }
                 }
                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
-                    Text { text: "Choose at most four items"; color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
-                    PillButton { label: "Apply"; selected: true; width: 90px; clicked => { root.dashboard-apply-picker(); } }
+                    Text { text: root.tr("Choose at most four items","Höchstens vier Einträge wählen"); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
+                    PillButton { label: root.tr("Apply","Übernehmen"); selected: true; width: 90px; clicked => { root.dashboard-apply-picker(); } }
                 }
             }
         }
     }
 
+    if root.network-drawer-open && root.wifi-target != "" : Rectangle {
+        background: #cc000000; TouchArea { }
+        VerticalLayout {
+            padding: 18px; alignment: start; spacing: 8px;
+            Text { text: root.tr("Wi-Fi password","WLAN-Passwort"); color: Theme.text; }
+            LineEdit { text <=> root.wifi-password; input-type: password; }
+            HorizontalLayout {
+                PillButton { label: root.tr("Connect","Verbinden"); clicked => { root.drawer-command("wifi-connect",root.wifi-target,root.wifi-password); root.wifi-target=""; root.wifi-password=""; root.touch-keyboard-open=false; } }
+                PillButton { label: root.tr("Cancel","Abbrechen"); clicked => { root.wifi-target=""; root.wifi-password=""; root.touch-keyboard-open=false; } }
+            }
+        }
+    }
     // Md3Keyboard: automatic on search focus, in-process, German QWERTZ.
-    if root.dashboard-picker-open && root.touch-keyboard-open : Rectangle {
+    if (root.dashboard-picker-open || root.wifi-target != "" || root.page == 2) && root.touch-keyboard-open : Rectangle {
         width: parent.width;
         height: root.touch-keyboard-symbols ? min(300px, parent.height * 0.50) : min(250px, parent.height * 0.42);
         y: parent.height - self.height;
@@ -1512,6 +1601,16 @@ export component App inherits Window {
         }
     }
 
+    if root.osd-visible && root.page != 1 && !root.network-drawer-open && !root.dashboard-editing : Rectangle {
+        y: parent.height - self.height - 60px; x: (parent.width - self.width)/2;
+        width: min(520px,parent.width); height: 58px; border-radius: 16px; background: Theme.raised;
+        HorizontalLayout { padding: 6px; spacing: 8px;
+            Text { text: root.osd-item.label; color: Theme.text; vertical-alignment: center; }
+            PillButton { width: 74px; label: root.osd-item.muted ? root.tr("Unmute","Ton ein") : root.tr("Mute","Stumm"); clicked => {root.change-volume(root.osd-item,root.osd-item.muted ? root.osd-item.restore : 0,true);} }
+            Slider { minimum: root.osd-item.minimum; maximum: root.osd-item.maximum; value: root.osd-item.volume; released(v) => {root.change-volume(root.osd-item,v,false);} }
+            PillButton { width: 40px; label: "×"; clicked => {root.osd-visible=false;} }
+        }
+    }
     // Modal is on the root layer, above navigation and the drawer.
     if root.power-menu-open : Rectangle {
         width: parent.width;
@@ -1528,12 +1627,12 @@ export component App inherits Window {
             VerticalLayout {
                 padding: 18px;
                 spacing: 9px;
-                Text { text: "Power menu"; font-size: 22px; font-weight: 600; color: Theme.text; }
+                Text { text: root.tr("Power menu","Ein/Aus"); font-size: 22px; font-weight: 600; color: Theme.text; }
                 Rectangle {
                     height: 74px; background: Theme.elevated; border-radius: 14px;
                     HorizontalLayout { padding: 12px; spacing: 12px;
                         Image { source: @image-url("icons/mdi/power-standby.svg"); width: 36px; height: 36px; }
-                        VerticalLayout { Text { text: "Shutdown device"; color: Theme.text; font-size: 15px; } Text { text: "Turn off the Raspberry Pi"; color: Theme.muted; font-size: 11px; } }
+                        VerticalLayout { Text { text: root.tr("Shutdown device","Gerät ausschalten"); color: Theme.text; font-size: 15px; } Text { text: root.tr("Turn off the Raspberry Pi","Raspberry Pi ausschalten"); color: Theme.muted; font-size: 11px; } }
                     }
                     TouchArea { clicked => { root.power-action("poweroff"); } }
                 }
@@ -1541,7 +1640,7 @@ export component App inherits Window {
                     height: 74px; background: Theme.elevated; border-radius: 14px;
                     HorizontalLayout { padding: 12px; spacing: 12px;
                         Image { source: @image-url("icons/mdi/restart.svg"); width: 36px; height: 36px; }
-                        VerticalLayout { Text { text: "Restart device"; color: Theme.text; font-size: 15px; } Text { text: "Reboot the Raspberry Pi"; color: Theme.muted; font-size: 11px; } }
+                        VerticalLayout { Text { text: root.tr("Restart device","Gerät neu starten"); color: Theme.text; font-size: 15px; } Text { text: root.tr("Reboot the Raspberry Pi","Raspberry Pi neu starten"); color: Theme.muted; font-size: 11px; } }
                     }
                     TouchArea { clicked => { root.power-action("reboot"); } }
                 }
@@ -1549,11 +1648,11 @@ export component App inherits Window {
                     height: 74px; background: Theme.elevated; border-radius: 14px;
                     HorizontalLayout { padding: 12px; spacing: 12px;
                         Image { source: @image-url("icons/mdi/server.svg"); width: 36px; height: 36px; }
-                        VerticalLayout { Text { text: "Restart backend"; color: Theme.text; font-size: 15px; } Text { text: "Restart stream-overlord.service"; color: Theme.muted; font-size: 11px; } }
+                        VerticalLayout { Text { text: root.tr("Restart backend","Backend neu starten"); color: Theme.text; font-size: 15px; } Text { text: root.tr("Restart stream-overlord.service","stream-overlord.service neu starten"); color: Theme.muted; font-size: 11px; } }
                     }
                     TouchArea { clicked => { root.power-action("restart-backend"); } }
                 }
-                HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { width: 108px; label: "Cancel"; clicked => { root.power-menu-open = false; } } }
+                HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { width: 108px; label: root.tr("Cancel","Abbrechen"); clicked => { root.power-menu-open = false; } } }
             }
         }
     }

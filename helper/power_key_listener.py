@@ -52,22 +52,11 @@ def supports_key_power(path):
 
 
 def open_power_menu():
-    env = os.environ.copy()
-
-    command = [
-        "/usr/bin/qs",
-        "--path",
-        "/usr/share/streambot-touch",
-        "ipc",
-        "call",
-        "streambot-touch",
-        "openPowerMenu",
-    ]
+    command = ["pkill", "-USR1", "-u", str(os.getuid()), "-x", "streambot-touch"]
 
     try:
         result = subprocess.run(
             command,
-            env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,

@@ -10,10 +10,12 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    container: rust:${{ matrix.distro }}
 
     strategy:
       matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
         distro:
           - bookworm
           - trixie
@@ -22,17 +24,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Read version
-        id: version
+      - name: Install native build tools
         run: |
-          VERSION="$(node -p "require('./package.json').version")"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          apt-get update
+          apt-get install -y --no-install-recommends dpkg-dev pkg-config libfontconfig1-dev libxkbcommon-dev libwayland-dev python3
 
       - name: Build Debian package
         env:
-          VERSION: ${{ steps.version.outputs.version }}
           DISTRO: ${{ matrix.distro }}
-          ARCH: all
         run: |
           ./packaging/build-deb.sh
 

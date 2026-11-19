@@ -7,6 +7,7 @@ use crate::{
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::{
+    collections::HashMap,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -30,9 +31,65 @@ pub(crate) const ENDPOINTS: &[&str] = &[
     "notify_speedtest_update",
 ];
 
+type Pending = HashMap<u64, (String, time::Instant)>;
+
+fn handle_packet(
+    packet: Value,
+    pending: &mut Pending,
+    ui: &slint::Weak<App>,
+    store: &Arc<Mutex<Store>>,
+) {
+    let method = packet["method"].as_str().unwrap_or("");
+    let (endpoint, params) = if method.starts_with("notify_") {
+        (method.to_owned(), packet["params"].clone())
+    } else {
+        let Some(id) = packet["id"].as_u64() else {
+            return;
+        };
+        let Some((request, _)) = pending.get(&id) else {
+            return;
+        };
+        if !method.is_empty() && method != format!("result_{request}") {
+            return;
+        }
+        let (request, _) = pending.remove(&id).unwrap();
+        if let Some(error) = packet.get("error").filter(|e| !e.is_null()) {
+            let detail = error["message"]
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| error.to_string());
+            ui_event(ui, move |app| {
+                app.set_feedback(format!("{request}: {detail}").into());
+                if request == "update" {
+                    app.invoke_cancel_updates();
+                }
+            });
+            return;
+        }
+        if request != "speedtest" {
+            return;
+        }
+        let Some(body) = ["result", "params", "data"]
+            .iter()
+            .find_map(|key| packet.get(*key))
+        else {
+            return;
+        };
+        (
+            "notify_speedtest_update".into(),
+            body.get("speedtest").unwrap_or(body).clone(),
+        )
+    };
+    let store = store.clone();
+    ui_event(ui, move |app| {
+        if let Ok(mut state) = store.lock() {
+            crate::notifications::apply(&app, &mut state, &endpoint, &params);
+        }
+    });
+}
+
 pub(crate) async fn run(
     config: Settings,
-    tx: mpsc::UnboundedSender<Value>,
     ui: slint::Weak<App>,
     store: Arc<Mutex<Store>>,
     mut command_rx: mpsc::UnboundedReceiver<(String, Value)>,
@@ -67,7 +124,9 @@ pub(crate) async fn run(
         if !ready {
             ui_event(&ui, move |app| {
                 app.set_connection("Backend not ready".into());
-                app.set_backend_stage(stage.into());
+                if !stage.is_empty() {
+                    app.set_backend_stage(stage.into());
+                }
             });
             time::sleep(Duration::from_millis(500)).await;
             continue;
@@ -75,10 +134,9 @@ pub(crate) async fn run(
         ui_event(&ui, |app| app.set_connection("Connecting…".into()));
         match connect_async(config.ws_url()).await {
             Ok((ws, _)) => {
-                if let Ok(mut guard) = store.lock() {
-                    guard.reset();
-                }
-                ui_event(&ui, |app| app.set_connection("Connected".into()));
+                // Button presses from a closed connection must never be replayed.
+                while command_rx.try_recv().is_ok() {}
+                let mut pending = Pending::new();
                 let (mut sink, mut stream) = ws.split();
                 let register = json!({"jsonrpc":"2.0", "id":next_id, "method":"register_endpoints", "params":ENDPOINTS});
                 next_id += 1;
@@ -89,20 +147,32 @@ pub(crate) async fn run(
                 {
                     continue;
                 }
+                let speed_id = next_id;
+                next_id += 1;
+                let status = json!({"jsonrpc":"2.0","id":speed_id,"method":"speedtest","params":{"action":"status"}});
+                if sink.send(Message::text(status.to_string())).await.is_err() {
+                    continue;
+                }
+                pending.insert(speed_id, ("speedtest".into(), time::Instant::now()));
+                ui_event(&ui, |app| app.set_connection("Connected".into()));
+                let cava = cava::cava_client(config.clone(), ui.clone());
+                tokio::pin!(cava);
                 loop {
                     tokio::select! {
+                        _ = &mut cava => break,
                         command = command_rx.recv() => {
-                            if let Some((method, params)) = command {
-                                let message = json!({"jsonrpc":"2.0", "id":next_id, "method":method, "params":params});
-                                next_id += 1;
-                                if sink.send(Message::Text(message.to_string().into())).await.is_err() { break; }
-                            }
+                            let Some((method, params)) = command else { return };
+                            pending.retain(|_, (_, sent)| sent.elapsed() < Duration::from_secs(60));
+                            pending.insert(next_id, (method.clone(), time::Instant::now()));
+                            let message = json!({"jsonrpc":"2.0", "id":next_id, "method":method, "params":params});
+                            next_id += 1;
+                            if sink.send(Message::Text(message.to_string().into())).await.is_err() { break; }
                         }
                         packet = stream.next() => {
                             match packet {
                                 Some(Ok(Message::Text(text))) => {
                                     if let Ok(value) = serde_json::from_str::<Value>(&text) {
-                                        let _ = tx.send(value);
+                                        handle_packet(value, &mut pending, &ui, &store);
                                     }
                                 }
                                 Some(Ok(Message::Ping(payload))) => { if sink.send(Message::Pong(payload)).await.is_err() { break; } }
@@ -118,11 +188,17 @@ pub(crate) async fn run(
                 ui_event(&ui, move |app| app.set_feedback(msg.into()));
             }
         }
-        if let Ok(mut guard) = store.lock() {
-            guard.reset();
-        }
-        ui_event(&ui, |app| {
-            app.set_connection("Disconnected — retrying".into())
+        let disconnected_store = store.clone();
+        ui_event(&ui, move |app| {
+            app.set_connection("Disconnected — retrying".into());
+            app.invoke_cancel_updates();
+            app.set_osd_visible(false);
+            if let Ok(mut state) = disconnected_store.lock() {
+                state.reset();
+                for method in ENDPOINTS.iter().filter(|m| **m != "notify_settings_update") {
+                    crate::notifications::apply(&app, &mut state, method, &Value::Null);
+                }
+            }
         });
         time::sleep(Duration::from_secs(2)).await;
     }

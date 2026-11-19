@@ -1,10 +1,9 @@
 //! Local dashboard configuration compatible with Quickshell Config.qml.
 use serde_json::{json, Value};
-use std::{env, fs, io, path::PathBuf};
+use std::{fs, io, path::PathBuf};
 
 fn path() -> PathBuf {
-    PathBuf::from(env::var_os("HOME").unwrap_or_default())
-        .join(".config/streambot/streambot-settings.json")
+    super::directory().join("streambot-settings.json")
 }
 
 pub(crate) fn load() -> [String; 4] {
@@ -34,92 +33,36 @@ pub(crate) fn load() -> [String; 4] {
             .unwrap_or("")
             .to_owned()
     };
-    [
+    normalize([
         read("left", 0),
         read("left", 1),
         read("right", 0),
         read("right", 1),
-    ]
+    ])
 }
 
 fn normalize(input: [String; 4]) -> [String; 4] {
     let allowed = ["interactions", "auto_macros", "macros", "music"];
-    let mut used = Vec::new();
     let mut columns = [Vec::<String>::new(), Vec::<String>::new()];
-    for (i, name) in input.into_iter().enumerate() {
-        if !allowed.contains(&name.as_str()) || used.contains(&name) {
-            continue;
-        }
-        let col = &mut columns[i / 2];
-        if col.contains(&"music".to_owned()) {
-            continue;
-        }
-        if name == "music" {
-            col.clear();
-            col.push(name.clone());
+    for (col, slots) in columns.iter_mut().zip(input.as_chunks::<2>().0) {
+        if slots.iter().any(|slot| slot == "music") {
+            col.push("music".into());
         } else {
-            col.push(name.clone());
+            for slot in slots {
+                if allowed.contains(&slot.as_str()) && !col.contains(slot) {
+                    col.push(slot.clone());
+                }
+            }
         }
-        used.push(name);
     }
+    let [left, right] = &mut columns;
+    right.retain(|name| !left.contains(name));
     [
         columns[0].first().cloned().unwrap_or_default(),
         columns[0].get(1).cloned().unwrap_or_default(),
         columns[1].first().cloned().unwrap_or_default(),
         columns[1].get(1).cloned().unwrap_or_default(),
     ]
-}
-
-pub(crate) fn save(input: [String; 4]) -> io::Result<[String; 4]> {
-    let normalized = normalize(input);
-    let target = path();
-    let mut data = match fs::read_to_string(&target) {
-        Ok(contents) => serde_json::from_str::<Value>(&contents).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Existing settings JSON is invalid: {e}"),
-            )
-        })?,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => json!({}),
-        Err(e) => return Err(e),
-    };
-    if !data.is_object() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "Settings root is not an object",
-        ));
-    }
-    let previous = data.get("touch_dashboard").cloned().unwrap_or(json!({}));
-    let macro_names = previous.get("macro_names").cloned().unwrap_or(json!([]));
-    let auto_macro_names = previous
-        .get("auto_macro_names")
-        .cloned()
-        .unwrap_or(json!([]));
-    let left: Vec<_> = normalized[0..2]
-        .iter()
-        .filter(|s| !s.is_empty())
-        .cloned()
-        .collect();
-    let right: Vec<_> = normalized[2..4]
-        .iter()
-        .filter(|s| !s.is_empty())
-        .cloned()
-        .collect();
-    data["touch_dashboard"] = json!({"version":1, "columns":{"left":left, "right":right},
-        "macro_names":macro_names, "auto_macro_names":auto_macro_names});
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let tmp = target.with_extension("json.tmp");
-    fs::write(
-        &tmp,
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(&data).map_err(io::Error::other)?
-        ),
-    )?;
-    fs::rename(&tmp, &target)?;
-    Ok(normalized)
 }
 
 pub(crate) fn selected_names(kind: &str) -> Vec<String> {
@@ -154,7 +97,7 @@ pub(crate) fn wallpaper() -> String {
 }
 
 pub(crate) fn assets_dir() -> PathBuf {
-    PathBuf::from(env::var_os("HOME").unwrap_or_default()).join(".config/streambot/assets")
+    super::directory().join("assets")
 }
 
 pub(crate) fn wallpaper_path(relative: &str) -> Option<PathBuf> {
@@ -189,7 +132,7 @@ pub(crate) fn wallpaper_files() -> Vec<String> {
             {
                 continue;
             }
-            if path.is_dir() {
+            if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
                 scan(&path, root, out);
             } else if path.extension().is_some_and(|ext| {
                 ["png", "jpg", "jpeg", "webp"]
@@ -216,23 +159,7 @@ pub(crate) fn save_full(
 ) -> io::Result<[String; 4]> {
     // Writes all editor values in a single atomic rename, preserving unrelated settings.
     let normalized = normalize(input);
-    let target = path();
-    let mut data = match fs::read_to_string(&target) {
-        Ok(contents) => serde_json::from_str::<Value>(&contents).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid settings JSON: {e}"),
-            )
-        })?,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => json!({}),
-        Err(e) => return Err(e),
-    };
-    if !data.is_object() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "Invalid settings root",
-        ));
-    }
+    let mut data = read_settings()?;
     if !wallpaper.is_empty() && wallpaper_path(wallpaper).is_none() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -253,6 +180,33 @@ pub(crate) fn save_full(
         "macro_names": macros.iter().take(4).collect::<Vec<_>>(),
         "auto_macro_names": auto_macros.iter().take(4).collect::<Vec<_>>()});
     data["touch_wallpaper"] = json!(wallpaper);
+    write_settings(&data)?;
+    Ok(normalized)
+}
+
+fn read_settings() -> io::Result<Value> {
+    let target = path();
+    let data = match fs::read_to_string(&target) {
+        Ok(contents) => serde_json::from_str::<Value>(&contents).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid settings JSON: {e}"),
+            )
+        })?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => json!({}),
+        Err(e) => return Err(e),
+    };
+    if !data.is_object() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid settings root",
+        ));
+    }
+    Ok(data)
+}
+
+fn write_settings(data: &Value) -> io::Result<()> {
+    let target = path();
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -265,5 +219,19 @@ pub(crate) fn save_full(
         ),
     )?;
     fs::rename(&temp, target)?;
-    Ok(normalized)
+    Ok(())
+}
+
+pub(crate) fn language() -> String {
+    read_settings()
+        .ok()
+        .and_then(|v| v["language"].as_str().map(str::to_owned))
+        .filter(|lang| lang == "de")
+        .unwrap_or_else(|| "en".into())
+}
+
+pub(crate) fn save_language(lang: &str) -> io::Result<()> {
+    let mut settings = read_settings()?;
+    settings["language"] = json!(lang);
+    write_settings(&settings)
 }

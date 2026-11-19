@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPOSITORY="${STREAMBOT_TOUCH_REPOSITORY:-eliteSchwein/streambot-local-touch-frontend}"
-BRANCH="${STREAMBOT_TOUCH_BRANCH:-main}"
+BRANCH="${STREAMBOT_TOUCH_BRANCH:-rust-native}"
 RAW_BASE="https://raw.githubusercontent.com/${REPOSITORY}/${BRANCH}/scripts"
 
 TEMP_DIR="$(mktemp -d)"
