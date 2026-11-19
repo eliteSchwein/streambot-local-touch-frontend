@@ -121,6 +121,20 @@ component LoadingSpinner inherits Rectangle {
     }
 }
 
+// Full-window backdrop for dialogs: dims what is behind and drives the entry animation.
+component DialogScrim inherits Rectangle {
+    in property <bool> animated: false;
+    in property <float> dim: 0.45;
+    // 0 → 1 once the dialog appears; dialog cards bind their opacity/scale to it.
+    out property <float> progress: 0;
+    animate progress {
+        duration: root.animated ? 240ms : 0ms;
+        easing: cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+    init => { self.progress = 1; }
+    background: #000000.with-alpha(root.dim * root.progress);
+}
+
 component Md3Card inherits Rectangle {
     background: Theme.surface;
     border-radius: 16px;
@@ -2557,10 +2571,12 @@ export component App inherits Window {
         moved => { if root.drawer-dragging { root.drawer-delta = self.mouse-y - self.pressed-y; } }
     }
 
-    if root.network-drawer-open && root.saved-wifi-open : Rectangle {
-        background: #aa000000;
+    if root.network-drawer-open && root.saved-wifi-open : dialog-1 := DialogScrim {
+        animated: root.gpu-effects;
         TouchArea { }
         Md3Card {
+            opacity: dialog-1.progress;
+            transform-scale: 0.94 + 0.06 * dialog-1.progress;
             width: min(520px, parent.width - 32px);
             height: min(parent.height - 32px, 102px + clamp(root.saved-wifi.length * 62px, 100px, 360px));
             x: (parent.width - self.width) / 2;
@@ -2601,10 +2617,12 @@ export component App inherits Window {
             }
         }
     }
-    if root.network-drawer-open && root.confirm-forget != "" : Rectangle {
-        background: #aa000000;
+    if root.network-drawer-open && root.confirm-forget != "" : dialog-2 := DialogScrim {
+        animated: root.gpu-effects;
         TouchArea { }
         Md3Card {
+            opacity: dialog-2.progress;
+            transform-scale: 0.94 + 0.06 * dialog-2.progress;
             width: min(440px, parent.width - 32px);
             height: 148px;
             x: (parent.width - self.width) / 2;
@@ -2633,10 +2651,12 @@ export component App inherits Window {
         }
     }
 
-    if root.page == 1 && root.routing != "" : Rectangle {
-        background: #aa000000;
+    if root.page == 1 && root.routing != "" : dialog-3 := DialogScrim {
+        animated: root.gpu-effects;
         TouchArea { clicked => { root.routing = ""; } }
         for device in root.audio-interfaces : Rectangle {
+            opacity: dialog-3.progress;
+            transform-scale: 0.94 + 0.06 * dialog-3.progress;
             visible: device.routable && device.id == root.routing;
             if device.routable && device.id == root.routing : Md3Card {
                 width: min(560px, parent.width - 36px);
@@ -2723,12 +2743,14 @@ export component App inherits Window {
         }
     }
 
-    if root.dashboard-picker-open : Rectangle {
+    if root.dashboard-picker-open : dialog-4 := DialogScrim {
+        animated: root.gpu-effects;
         width: parent.width;
         height: parent.height;
-        background: #aa000000;
         TouchArea { clicked => { root.dashboard-picker-open = false; } }
         Rectangle {
+            opacity: dialog-4.progress;
+            transform-scale: 0.94 + 0.06 * dialog-4.progress;
             property <bool> wallpapers: root.dashboard-picker-kind == "wallpaper";
             width: self.wallpapers ? parent.width - 32px : min(parent.width - 44px, 600px);
             height: self.wallpapers ? parent.height - 32px
@@ -2865,10 +2887,12 @@ export component App inherits Window {
         }
     }
 
-    if root.network-drawer-open && root.wifi-target != "" : Rectangle {
-        background: #aa000000;
+    if root.network-drawer-open && root.wifi-target != "" : dialog-5 := DialogScrim {
+        animated: root.gpu-effects;
         TouchArea { }
         Md3Card {
+            opacity: dialog-5.progress;
+            transform-scale: 0.94 + 0.06 * dialog-5.progress;
             width: min(parent.width - 32px, 420px);
             height: 170px;
             x: (parent.width - self.width) / 2;
@@ -2982,12 +3006,15 @@ export component App inherits Window {
         }
     }
     // Modal is on the root layer, above navigation and the drawer.
-    if root.power-menu-open : Rectangle {
+    if root.power-menu-open : dialog-6 := DialogScrim {
+        animated: root.gpu-effects;
         width: parent.width;
         height: parent.height;
-        background: #cc000000;
+        dim: 0.6;
         TouchArea { clicked => { root.power-menu-open = false; } }
         Rectangle {
+            opacity: dialog-6.progress;
+            transform-scale: 0.94 + 0.06 * dialog-6.progress;
             width: min(parent.width - 40px, 440px);
             height: 378px;
             x: (parent.width - self.width) / 2;
