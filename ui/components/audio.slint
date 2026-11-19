@@ -1,0 +1,222 @@
+// Audio page widgets: faders, icon buttons and the per-output row.
+import { Theme } from "../theme.slint";
+import { AudioEntry } from "../types.slint";
+import { GlassCard } from "common.slint";
+
+export component AudioIconControl inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <bool> enabled: true;
+    callback clicked();
+    width: 36px;
+    height: 34px;
+    border-radius: 17px;
+    background: hit.pressed ? Theme.elevated : Theme.raised;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    Image {
+        width: 17px;
+        height: 17px;
+        source: root.icon;
+        colorize: root.enabled ? Theme.text : Theme.muted;
+        opacity: root.enabled ? 1 : 0.55;
+    }
+    hit := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+}
+
+export component AudioFader inherits Rectangle {
+    in property <float> minimum;
+    in property <float> maximum;
+    in property <float> step;
+    in-out property <float> value;
+    in property <bool> enabled: true;
+    callback committed(float);
+    out property <bool> dragging: hit.pressed;
+    accessible-role: slider;
+    accessible-value: round(root.value * 100) + "%";
+    accessible-enabled: root.enabled;
+    function update-position(position: length) {
+        let fraction = clamp((position - 8px) / max(1px, root.width - 16px), 0, 1);
+        let increment = max(0.0001, root.step);
+        root.value = clamp(root.minimum + round(fraction * (root.maximum - root.minimum) / increment) * increment,
+            root.minimum, root.maximum);
+    }
+    height: 26px;
+    horizontal-stretch: 1;
+    Rectangle {
+        height: 6px;
+        x: 8px;
+        width: parent.width - 16px;
+        border-radius: 3px;
+        background: Theme.raised;
+        opacity: root.enabled ? 1 : 0.5;
+        Rectangle {
+            x: 0px;
+            width: parent.width * clamp((root.value - root.minimum) / max(0.001, root.maximum - root.minimum), 0, 1);
+            border-radius: 3px;
+            background: Theme.primary;
+        }
+    }
+    Rectangle {
+        width: 16px;
+        height: 16px;
+        x: (parent.width - self.width) * clamp((root.value - root.minimum) / max(0.001, root.maximum - root.minimum), 0, 1);
+        border-radius: 8px;
+        background: root.enabled ? Theme.primary : Theme.muted;
+        border-width: fader-focus.has-focus ? 2px : 0px;
+        border-color: Theme.text;
+    }
+    fader-focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.LeftArrow || event.text == Key.RightArrow {
+                root.value = clamp(root.value + (event.text == Key.RightArrow ? root.step : -root.step), root.minimum, root.maximum);
+            } else if event.text == Key.Home || event.text == Key.End {
+                root.value = event.text == Key.Home ? root.minimum : root.maximum;
+            } else {
+                return reject;
+            }
+            root.committed(root.value);
+            return accept;
+        }
+    }
+    hit := TouchArea {
+        enabled: root.enabled;
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left {
+                if event.kind == PointerEventKind.down {
+                    fader-focus.focus();
+                    root.update-position(self.mouse-x);
+                } else if event.kind == PointerEventKind.up {
+                    root.update-position(self.mouse-x);
+                    root.committed(root.value);
+                }
+            }
+        }
+        moved => { if self.pressed { root.update-position(self.mouse-x); } }
+    }
+}
+
+export component KioskAudioRow inherits GlassCard {
+    in property <AudioEntry> item;
+    in property <string> route-label;
+    in property <string> quieter;
+    in property <string> louder;
+    in property <string> mute-label;
+    in property <string> link-volume-label;
+    in property <string> levels-label;
+    in property <bool> ready;
+    property <float> draft: root.item.volume;
+    property <float> previous-volume: root.item.restore;
+    property <bool> fader-dragging;
+    callback volume(float);
+    callback mute(float);
+    callback routing();
+    function adjust(direction: int) {
+        root.draft = clamp(root.draft + direction * root.item.step, root.item.minimum, root.item.maximum);
+        root.volume(root.draft);
+    }
+    changed item => { if !root.fader-dragging { root.draft = root.item.volume; } }
+    changed draft => { if root.draft > root.item.minimum { root.previous-volume = root.draft; } }
+    function toggle-mute() {
+        let restore = root.item.volume > root.item.minimum ? root.item.volume : max(root.previous-volume, root.item.restore);
+        root.mute(root.item.muted ? clamp(restore, root.item.minimum, root.item.maximum) : 0);
+    }
+    height: 76px;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 12px;
+        HorizontalLayout {
+            width: 150px;
+            spacing: 5px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 1px;
+                Text { text: root.item.label; color: Theme.text; font-size: 13px; font-weight: 600; overflow: elide; }
+                Text { text: root.item.subtitle; color: Theme.muted; font-size: 9px; overflow: elide; }
+            }
+            if root.item.routable : AudioIconControl {
+                icon: @image-url("../icons/mdi/link-variant.svg");
+                label: root.route-label;
+                enabled: root.ready;
+                clicked => { root.routing(); }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            if !root.item.per-link : AudioFader {
+                minimum: root.item.minimum;
+                maximum: root.item.maximum;
+                step: root.item.step;
+                enabled: root.ready && !root.item.muted;
+                value <=> root.draft;
+                changed dragging => { root.fader-dragging = self.dragging; }
+                committed(value) => { root.volume(value); }
+            }
+            if root.item.per-link : Text {
+                height: 26px;
+                text: root.link-volume-label;
+                color: Theme.muted; font-size: 10px;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+            HorizontalLayout {
+                alignment: center;
+                spacing: 12px;
+                if !root.item.per-link : AudioIconControl {
+                    icon: @image-url("../icons/mdi/minus.svg");
+                    label: root.quieter;
+                    enabled: root.ready && !root.item.muted;
+                    clicked => { root.adjust(-1); }
+                }
+                Rectangle {
+                    width: 96px;
+                    height: 32px;
+                    border-radius: 16px;
+                    border-width: root.item.muted ? 0px : 1px;
+                    border-color: Theme.muted;
+                    background: root.item.muted ? Theme.primary : mute-touch.pressed ? Theme.elevated : Theme.raised;
+                    accessible-role: button;
+                    accessible-label: root.mute-label;
+                    accessible-action-default => { if root.ready { root.toggle-mute(); } }
+                    mute-caption := HorizontalLayout {
+                        width: mute-label-text.preferred-width + 23px;
+                        height: parent.height;
+                        spacing: 6px;
+                        Rectangle {
+                            width: 17px;
+                            Image {
+                                width: 17px;
+                                height: 17px;
+                                y: (parent.height - self.height) / 2;
+                                source: root.item.muted ? @image-url("../icons/mdi/volume-off.svg") : @image-url("../icons/mdi/volume-high.svg");
+                                colorize: root.item.muted ? Theme.on-primary : Theme.text;
+                            }
+                        }
+                        mute-label-text := Text {
+                            text: root.item.per-link ? root.levels-label : round(root.draft * 100) + "%";
+                            color: root.item.muted ? Theme.on-primary : Theme.text;
+                            font-size: 11px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
+                    mute-touch := TouchArea { enabled: root.ready; clicked => { root.toggle-mute(); } }
+                }
+                if !root.item.per-link : AudioIconControl {
+                    icon: @image-url("../icons/mdi/plus.svg");
+                    label: root.louder;
+                    enabled: root.ready && !root.item.muted;
+                    clicked => { root.adjust(1); }
+                }
+            }
+        }
+    }
+}

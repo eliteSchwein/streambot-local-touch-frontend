@@ -1,0 +1,393 @@
+// Dashboard cards and the edit-mode slot overlay.
+import { Spinner } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { AutoMacroEntry, DashboardMacroEntry, InteractionEntry } from "../types.slint";
+import { DashboardSwitch, GlassCard, PillButton, Scroller } from "common.slint";
+
+export component DashboardMacroCard inherits GlassCard {
+    tint-opacity: 0.88;
+    in property <[DashboardMacroEntry]> macros;
+    in property <[AutoMacroEntry]> automatic;
+    in property <bool> auto-mode;
+    in property <bool> enabled: true;
+    in property <string> empty-label;
+    callback run(string);
+    callback toggle(string, bool);
+    vertical-stretch: 1;
+    min-height: 0px;
+    preferred-height: 180px;
+    card-content := Rectangle {
+        x: 14px;
+        y: 14px;
+        width: parent.width - 28px;
+        height: parent.height - 28px;
+        clip: true;
+        property <int> count: root.auto-mode ? root.automatic.length : root.macros.length;
+        // Rows share the full card height; the minimum only matters for very small cards.
+        property <length> row-height: max((self.height + 4px) / max(1, self.count) - 4px,
+            root.auto-mode ? 32px : 30px);
+        // Taller rows get slightly larger labels so they don't look lost.
+        property <length> label-size: clamp(self.row-height * 0.24, 11px, 15px);
+        if self.count == 0 : Text {
+            text: root.empty-label;
+            color: Theme.muted;
+            font-size: 10px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        rows := VerticalLayout {
+            spacing: 4px;
+            alignment: start;
+            for item in (root.auto-mode ? root.automatic : []) : Rectangle {
+                height: card-content.row-height;
+                border-radius: 12px;
+                background: Theme.raised;
+                Rectangle {
+                    x: 0px;
+                    width: parent.width * item.progress;
+                    border-radius: 12px;
+                    background: Theme.elevated;
+                    animate width { duration: 950ms; }
+                    opacity: item.enabled ? 1 : 0;
+                    animate opacity { duration: 180ms; }
+                    Rectangle { border-radius: 12px; background: Theme.primary; opacity: 0.1; }
+                }
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 6px;
+                    spacing: 6px;
+                    Text {
+                        text: item.name;
+                        color: Theme.text;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                        font-size: card-content.label-size;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        width: 52px;
+                        DashboardSwitch {
+                            checked: item.enabled;
+                            enabled: root.enabled;
+                            toggled => { root.toggle(item.name, !item.enabled); }
+                        }
+                    }
+                }
+            }
+            for item in (root.auto-mode ? [] : root.macros) : Rectangle {
+                height: card-content.row-height;
+                border-radius: 12px;
+                background: macro-touch.pressed ? Theme.elevated : Theme.surface.with-alpha(0.94);
+                border-width: 1px;
+                border-color: Theme.outline-variant;
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 8px;
+                    spacing: 6px;
+                    Text {
+                        text: item.name;
+                        color: Theme.text;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                        font-size: card-content.label-size;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                    Rectangle {
+                        width: 26px;
+                        if item.state != "loading" : Image {
+                            width: 16px;
+                            height: 16px;
+                            source: item.state == "success" ? @image-url("../icons/mdi/check.svg")
+                                : item.state == "error" ? @image-url("../icons/mdi/alert-circle.svg")
+                                : @image-url("../icons/mdi/play.svg");
+                            colorize: Theme.text;
+                        }
+                        if item.state == "loading" : Spinner {
+                            width: 16px;
+                            height: 16px;
+                            indeterminate: true;
+                        }
+                    }
+                }
+                macro-touch := TouchArea { enabled: root.enabled && item.state != "loading"; clicked => { root.run(item.name); } }
+            }
+        }
+    }
+}
+
+export component MusicIconButton inherits Rectangle {
+    in property <string> glyph: "";
+    in property <bool> filled: false;
+    in property <bool> selected: false;
+    in property <length> diameter: root.filled ? 46px : 40px;
+    callback clicked();
+    width: root.diameter;
+    height: self.width;
+    border-radius: self.width / 2;
+    background: root.filled || root.selected ? Theme.primary : music-tap.pressed ? Theme.elevated : transparent;
+    Text {
+        text: root.glyph;
+        color: root.filled || root.selected ? Theme.on-primary : Theme.text;
+        font-size: root.width * (root.filled ? 0.48 : 0.47);
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    music-tap := TouchArea { clicked => { root.clicked(); } }
+}
+
+// Cava bars, centered and bottom-aligned; they scale with the available height.
+export component CavaBars inherits Rectangle {
+    in property <[float]> levels;
+    in property <length> bar-width: 14px;
+    in property <length> gap: 9px;
+    in property <length> max-bar-height: 1000px;
+    property <length> span: root.levels.length * root.bar-width + max(0, root.levels.length - 1) * root.gap;
+    // Bars live in a box capped at max-bar-height, centered vertically.
+    property <length> box: min(root.height, root.max-bar-height);
+    for level[index] in root.levels : Rectangle {
+        width: root.bar-width;
+        height: max(root.bar-width * 0.45, root.box * clamp(level, 0, 100) / 100);
+        x: (root.width - root.span) / 2 + index * (root.bar-width + root.gap);
+        y: (root.height + root.box) / 2 - self.height;
+        border-radius: root.bar-width / 2;
+        background: Theme.primary;
+        animate height { duration: 90ms; easing: ease-out; }
+    }
+}
+
+export component DashboardMusicCard inherits GlassCard {
+    in property <string> title;
+    in property <string> artist;
+    in property <[float]> levels;
+    in property <bool> playing;
+    in property <bool> shuffle;
+    in property <bool> looping;
+    in property <bool> requests;
+    in property <string> requests-label;
+    in property <float> progress;
+    in property <string> position;
+    in property <string> duration;
+    callback action(string);
+    // Sharing a column with another card switches to the compact layout.
+    property <bool> compact: root.height < 320px;
+    min-height: 0px;
+    vertical-stretch: 1;
+    tint-opacity: 0.88;
+
+    if root.compact : VerticalLayout {
+        padding: 14px;
+        padding-bottom: 10px;
+        spacing: 6px;
+        HorizontalLayout {
+            spacing: 10px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: 1px;
+                Text { text: root.title; color: Theme.text; font-size: 15px; font-weight: 600; overflow: elide; }
+                Text { text: root.artist; color: Theme.muted; font-size: 11px; overflow: elide; }
+            }
+            HorizontalLayout {
+                horizontal-stretch: 0;
+                spacing: 6px;
+                Text { horizontal-stretch: 0; text: root.requests-label; color: Theme.muted; font-size: 10px; vertical-alignment: center; }
+                VerticalLayout { alignment: center; DashboardSwitch { checked: root.requests; toggled => { root.action("songrequest_toggle"); } } }
+            }
+        }
+        CavaBars {
+            vertical-stretch: 1;
+            min-height: 8px;
+            levels: root.levels;
+            bar-width: 10px;
+            gap: 6px;
+        }
+        HorizontalLayout {
+            alignment: space-around;
+            MusicIconButton { diameter: 38px; glyph: "⤨"; selected: root.shuffle; clicked => { root.action("shuffle"); } }
+            MusicIconButton { diameter: 38px; glyph: "◀"; clicked => { root.action("back"); } }
+            MusicIconButton { diameter: 44px; glyph: root.playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.action(root.playing ? "pause" : "play"); } }
+            MusicIconButton { diameter: 38px; glyph: "▶"; clicked => { root.action("next"); } }
+            MusicIconButton { diameter: 38px; glyph: "↻"; selected: root.looping; clicked => { root.action("loop"); } }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            Text { text: root.position; color: Theme.muted; font-size: 10px; vertical-alignment: center; }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Rectangle {
+                    height: 5px;
+                    border-radius: 3px;
+                    background: Theme.raised;
+                    Rectangle {
+                        x: 0px;
+                        width: parent.width * clamp(root.progress, 0, 100) / 100;
+                        border-radius: 3px;
+                        background: Theme.primary;
+                    }
+                }
+            }
+            Text { text: root.duration; color: Theme.muted; font-size: 10px; vertical-alignment: center; }
+        }
+    }
+
+    if !root.compact : VerticalLayout {
+        padding: 20px;
+        padding-bottom: 14px;
+        spacing: 12px;
+        VerticalLayout {
+            vertical-stretch: 0;
+            spacing: 2px;
+            Text { text: root.title; color: Theme.text; font-size: 22px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
+            Text { text: root.artist; color: Theme.muted; font-size: 13px; horizontal-alignment: center; overflow: elide; }
+        }
+        CavaBars {
+            vertical-stretch: 1;
+            min-height: 40px;
+            max-bar-height: 220px;
+            levels: root.levels;
+            bar-width: 24px;
+            gap: 14px;
+        }
+        VerticalLayout {
+            vertical-stretch: 0;
+            spacing: 4px;
+            Rectangle {
+                height: 7px;
+                border-radius: 4px;
+                background: Theme.raised;
+                Rectangle {
+                    x: 0px;
+                    width: parent.width * clamp(root.progress, 0, 100) / 100;
+                    border-radius: 4px;
+                    background: Theme.primary;
+                }
+            }
+            HorizontalLayout {
+                Text { text: root.position; color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
+                Text { text: root.duration; color: Theme.muted; font-size: 11px; }
+            }
+        }
+        HorizontalLayout {
+            vertical-stretch: 0;
+            alignment: space-around;
+            MusicIconButton { diameter: 48px; glyph: "⤨"; selected: root.shuffle; clicked => { root.action("shuffle"); } }
+            MusicIconButton { diameter: 48px; glyph: "◀"; clicked => { root.action("back"); } }
+            MusicIconButton { diameter: 64px; glyph: root.playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.action(root.playing ? "pause" : "play"); } }
+            MusicIconButton { diameter: 48px; glyph: "▶"; clicked => { root.action("next"); } }
+            MusicIconButton { diameter: 48px; glyph: "↻"; selected: root.looping; clicked => { root.action("loop"); } }
+        }
+        HorizontalLayout {
+            vertical-stretch: 0;
+            alignment: center;
+            spacing: 10px;
+            Text { text: root.requests-label; color: Theme.muted; font-size: 12px; vertical-alignment: center; }
+            VerticalLayout { alignment: center; DashboardSwitch { checked: root.requests; toggled => { root.action("songrequest_toggle"); } } }
+        }
+    }
+}
+
+export component DashboardInteractionsCard inherits GlassCard {
+    in property <[InteractionEntry]> items;
+    in property <string> empty-label;
+    pure callback meta(InteractionEntry) -> string;
+    callback remove(string);
+    tint-opacity: 0.88;
+    vertical-stretch: 1;
+    min-height: 0px;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 5px;
+        if root.items.length == 0 : Text {
+            vertical-stretch: 1;
+            text: root.empty-label;
+            color: Theme.muted;
+            font-size: 13px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if root.items.length > 0 : Scroller {
+            min-height: 0px;
+            VerticalLayout {
+                spacing: 5px;
+                alignment: start;
+                for item in root.items : Rectangle {
+                    height: 50px;
+                    border-radius: 12px;
+                    background: (item.active ? Theme.elevated : Theme.raised).with-alpha(0.94);
+                    Rectangle {
+                        height: 3px;
+                        y: parent.height - self.height;
+                        x: 0px;
+                        width: parent.width * max(0, min(1, item.progress));
+                        border-radius: 2px;
+                        background: Theme.success;
+                        visible: item.active;
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 6px;
+                        spacing: 8px;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
+                                background: item.active ? Theme.success : (item.failed ? Theme.error : Theme.outline);
+                            }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 1px;
+                            Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
+                            Text { text: root.meta(item); color: item.failed ? Theme.error : Theme.muted; font-size: 8px; overflow: elide; }
+                            if item.uuid != "" : Text { text: item.uuid; color: Theme.outline; font-size: 7px; overflow: elide; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove(item.uuid); } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Shown over each dashboard slot while editing: change the card, pick its macros.
+export component SlotEditOverlay inherits Rectangle {
+    in property <bool> empty;
+    in property <string> card-label;
+    in property <string> macros-label;
+    callback change-card();
+    callback choose-macros();
+    border-radius: 16px;
+    border-width: 2px;
+    border-color: Theme.primary;
+    background: root.empty ? Theme.surface.with-alpha(0.6) : Theme.background.with-alpha(0.78);
+    TouchArea { clicked => { root.change-card(); } }
+    VerticalLayout {
+        alignment: center;
+        spacing: 8px;
+        padding: 12px;
+        HorizontalLayout {
+            alignment: center;
+            PillButton {
+                max-width: 260px;
+                label: (root.empty ? "+  " : "") + root.card-label + (root.empty ? "" : "  ▾");
+                selected: true;
+                clicked => { root.change-card(); }
+            }
+        }
+        if root.macros-label != "" : HorizontalLayout {
+            alignment: center;
+            PillButton { max-width: 260px; label: root.macros-label; clicked => { root.choose-macros(); } }
+        }
+    }
+}

@@ -1,0 +1,64 @@
+// Data structures shared between the UI and Rust.
+
+export struct EthernetRow { id: string, connected: bool, enabled: bool }
+
+export struct WifiRow { id: string, name: string, device: string, secured: bool, connected: bool, signal: int, profile: string }
+
+export struct SavedWifiRow { id: string, name: string, ssid: string, connected: bool }
+
+export struct BluetoothRow { id: string, name: string, kind: string, connected: bool }
+
+export struct ActionRow { label: string, id: string, active: bool }
+
+export struct ChannelPointRow {
+    id: string, label: string, subtitle: string, active: bool,
+    image-url: string, image: image, image-loading: bool, tint: color,
+}
+
+export struct SystemStats { cpu: float, temperature: float, ram: float, swap: float, has-swap: bool, storage: float }
+
+export struct StorageEntry { label-key: string, size: string, tint: color, fraction: float, offset: float }
+
+export struct SystemStorage { used: string, free: string, total: string, usage: float, other: float, rows: [StorageEntry] }
+
+export struct UpdateEntry {
+    id: string, active: bool, busy: bool, git: bool, available: bool, updating: bool, checking: bool,
+    version: string, count: int, preview: string, error: string, stage: string, message: string, progress: float,
+    package: string, package-progress: float,
+}
+
+export struct SystemMetric { label: string, tint: color, value: float, empty: string }
+
+export struct AudioLink { id: string, label: string, linked: bool, present: bool, default-output: bool, volume: float }
+
+export struct AudioEntry {
+    id: string, label: string, subtitle: string, physical: bool, volume: float, minimum: float, maximum: float,
+    step: float, muted: bool, restore: float, routable: bool, per-link: bool, links: [AudioLink],
+}
+
+export struct InteractionEntry {
+    name: string,
+    source: string,
+    state: string,
+    eta: int,
+    alerts: int,
+    uuid: string,
+    active: bool,
+    failed: bool,
+    progress: float,
+}
+
+export struct DashboardMacroEntry { name: string, state: string, ticket: int }
+
+export struct AutoMacroEntry {
+    name: string,
+    enabled: bool,
+    progress: float,
+}
+
+export struct PickerEntry {
+    name: string,
+    selected: bool,
+    thumbnail: image,
+    loading: bool,
+}

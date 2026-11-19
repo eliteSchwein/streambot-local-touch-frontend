@@ -1,0 +1,175 @@
+// System page widgets: usage rings, progress bars, language picker, speed metrics.
+import { Theme } from "../theme.slint";
+import { GlassCard, Md3Card } from "common.slint";
+
+export component SystemHeading inherits Text {
+    color: Theme.text;
+    font-size: 12px;
+    font-weight: 600;
+    overflow: elide;
+    vertical-alignment: center;
+}
+
+export component SystemRing inherits Rectangle {
+    in property <length> diameter;
+    in property <float> progress;
+    in property <color> tint;
+    width: root.diameter;
+    height: root.diameter;
+    border-radius: self.width / 2;
+    border-width: 6px;
+    border-color: Theme.raised;
+    if root.progress >= 1 : Rectangle {
+        border-radius: self.width / 2;
+        border-width: 6px;
+        border-color: root.tint;
+    }
+    if root.progress > 0 && root.progress < 1 : Path {
+        private property <float> edge: root.diameter / 1px;
+        private property <float> center: self.edge / 2;
+        private property <float> radius: self.center - 3;
+        viewbox-width: self.edge;
+        viewbox-height: self.edge;
+        stroke-width: 6px;
+        stroke: root.tint;
+        MoveTo { x: center; y: 3; }
+        ArcTo {
+            radius-x: radius;
+            radius-y: radius;
+            x: center + radius * sin(root.progress * 360deg);
+            y: center - radius * cos(root.progress * 360deg);
+            sweep: true;
+            large-arc: root.progress > 0.5;
+        }
+    }
+}
+
+export component SystemDetail inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> value;
+    in property <color> tint: transparent;
+    in property <color> value-color: Theme.text;
+    in property <length> font-size: 12px;
+    in property <length> marker-size: 9px;
+    in property <length> marker-radius: 5px;
+    spacing: 8px;
+    if root.tint != transparent : Rectangle {
+        width: root.marker-size;
+        Rectangle {
+            width: root.marker-size;
+            height: root.marker-size;
+            border-radius: root.marker-radius;
+            background: root.tint;
+        }
+    }
+    Text {
+        text: root.title;
+        color: Theme.muted;
+        font-size: root.font-size;
+        vertical-alignment: center;
+        overflow: elide;
+        horizontal-stretch: 1;
+    }
+    Text {
+        text: root.value;
+        color: root.value-color;
+        font-weight: 500;
+        font-size: 12px;
+        vertical-alignment: center;
+    }
+}
+
+export component SystemProgress inherits VerticalLayout {
+    in property <string> label;
+    in property <float> value;
+    alignment: start;
+    spacing: 3px;
+    HorizontalLayout {
+        spacing: 6px;
+        Text { text: root.label; horizontal-stretch: 1; color: Theme.muted; font-size: 10px; overflow: elide; }
+        if root.value >= 0 : Text { text: round(root.value) + "%"; color: Theme.text; font-size: 10px; }
+    }
+    if root.value >= 0 : Rectangle {
+        height: 5px;
+        border-radius: 3px;
+        background: Theme.raised;
+        Rectangle {
+            x: 0px;
+            width: parent.width * root.value / 100;
+            border-radius: 3px;
+            background: Theme.primary;
+        }
+    }
+}
+
+export component SystemLanguage inherits Rectangle {
+    in property <string> language;
+    in property <string> english;
+    in property <string> german;
+    callback selected(string);
+    height: 44px;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: Theme.muted;
+    background: Theme.elevated;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        Text {
+            text: root.language == "de" ? root.german : root.english;
+            color: Theme.text; vertical-alignment: center; font-size: 13px; horizontal-stretch: 1;
+        }
+        Text { text: "▼"; color: Theme.muted; font-size: 11px; vertical-alignment: center; }
+    }
+    accessible-role: combobox;
+    accessible-value: root.language == "de" ? root.german : root.english;
+    accessible-action-expand => { choices.show(); }
+    TouchArea { clicked => { choices.show(); } }
+    choices := PopupWindow {
+        x: 0px;
+        y: -96px;
+        width: root.width;
+        height: 92px;
+        close-policy: close-on-click-outside;
+        Md3Card {
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.raised;
+            VerticalLayout {
+                padding: 4px;
+                for option in [{code: "en", label: root.english}, {code: "de", label: root.german}] : Rectangle {
+                    background: option.code == root.language || option-hit.has-hover ? Theme.elevated : transparent;
+                    Text {
+                        x: 10px;
+                        width: parent.width - 20px;
+                        text: option.label;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                        font-size: 13px;
+                    }
+                    option-hit := TouchArea { clicked => { choices.close(); root.selected(option.code); } }
+                }
+            }
+        }
+    }
+}
+
+export component SpeedMetric inherits GlassCard {
+    in property <string> title;
+    in property <string> value;
+    in property <string> glyph;
+    in property <bool> active;
+    tint: root.active ? Theme.elevated : Theme.surface;
+    tint-opacity: root.active ? 0.92 : 0.88;
+    border-color: root.active ? Theme.primary : Theme.outline-variant;
+    HorizontalLayout {
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            spacing: 8px;
+            Text { text: root.glyph; color: Theme.text; font-size: 26px; horizontal-alignment: center; }
+            Text { text: root.title; color: Theme.muted; font-size: 14px; horizontal-alignment: center; }
+            Text { text: root.value; color: Theme.text; font-size: 24px; font-weight: 700; horizontal-alignment: center; }
+        }
+    }
+}

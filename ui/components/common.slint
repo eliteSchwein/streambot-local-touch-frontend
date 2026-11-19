@@ -1,0 +1,361 @@
+// Generic building blocks: cards, buttons, list tiles, scrolling, dialogs, inputs.
+import { Spinner } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+
+export component DashboardSwitch inherits Rectangle {
+    in property <bool> checked: false;
+    callback toggled();
+    in property <bool> enabled: true;
+    width: 52px;
+    height: 32px;
+    border-radius: 16px;
+    background: checked ? Theme.primary : Theme.raised;
+    border-width: checked ? 0px : 2px;
+    border-color: Theme.muted;
+    Rectangle {
+        width: root.checked ? 24px : 16px;
+        height: root.checked ? 24px : 16px;
+        x: root.checked ? 24px : 6px;
+        y: (parent.height - self.height) / 2;
+        background: root.checked ? Theme.on-primary : Theme.muted;
+        border-radius: self.width / 2;
+    }
+    TouchArea { enabled: root.enabled; clicked => { root.toggled(); } }
+}
+
+// Scrollbar-free replacement for std ScrollView; scrolls by touch drag / wheel.
+export component Scroller {
+    min-height: 50px;
+    min-width: 50px;
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
+    preferred-height: 100%;
+    preferred-width: 100%;
+    flick := Flickable {
+        width: parent.width;
+        height: parent.height;
+        @children
+    }
+}
+
+// Theme-colored indeterminate spinner (the std Spinner ignores Theme).
+export component LoadingSpinner inherits Rectangle {
+    in property <length> size: 32px;
+    width: root.size;
+    height: root.size;
+    Rectangle {
+        border-radius: self.width / 2;
+        border-width: 3px;
+        border-color: Theme.primary.with-alpha(0.2);
+    }
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: Theme.primary;
+        stroke-width: 3px;
+        transform-rotation: mod(animation-tick(), 900ms) / 900ms * 360deg;
+        MoveTo { x: 12; y: 1.5; }
+        ArcTo { x: 22.5; y: 12; radius-x: 10.5; radius-y: 10.5; sweep: true; }
+    }
+}
+
+// Full-window backdrop for dialogs: dims what is behind and drives the entry animation.
+export component DialogScrim inherits Rectangle {
+    in property <bool> animated: false;
+    in property <float> dim: 0.45;
+    // 0 → 1 once the dialog appears; dialog cards bind their opacity/scale to it.
+    out property <float> progress: 0;
+    animate progress {
+        duration: root.animated ? 240ms : 0ms;
+        easing: cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+    init => { self.progress = 1; }
+    background: #000000.with-alpha(root.dim * root.progress);
+}
+
+export component Md3Card inherits Rectangle {
+    background: Theme.surface;
+    border-radius: 16px;
+    min-width: 0px;
+}
+
+export component GlassCard inherits Md3Card {
+    in property <float> tint-opacity: 0.94;
+    in property <color> tint: Theme.surface;
+    background: root.tint.with-alpha(root.tint-opacity);
+    border-width: 1px;
+    border-color: Theme.outline-variant;
+}
+
+export component DrawerTitle inherits Text {
+    color: Theme.text;
+    font-size: 16px;
+    font-weight: 600;
+    overflow: elide;
+}
+
+export component DrawerEmpty inherits Text {
+    color: Theme.muted;
+    font-size: 13px;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    wrap: word-wrap;
+    vertical-stretch: 1;
+}
+
+export component Md3Button inherits Rectangle {
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <bool> filled: false;
+    callback clicked();
+    height: 34px;
+    width: max(34px, caption.preferred-width + 20px);
+    border-radius: 17px;
+    border-width: root.filled ? 0px : 1px;
+    border-color: root.enabled ? Theme.muted : Theme.raised;
+    background: root.filled ? (root.enabled ? Theme.primary : Theme.raised) : hit.pressed ? Theme.elevated : transparent;
+    caption := Text {
+        text: root.label;
+        color: !root.enabled ? Theme.muted : root.filled ? Theme.on-primary : Theme.primary;
+        font-size: 12px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    hit := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+}
+
+export component DrawerRowText inherits VerticalLayout {
+    in property <string> title;
+    in property <string> detail;
+    in property <bool> active;
+    horizontal-stretch: 1;
+    min-width: 0px;
+    alignment: center;
+    spacing: 1px;
+    Text { text: root.title; color: Theme.text; font-size: 12px; font-weight: 600; overflow: elide; }
+    if root.detail != "" : Text { text: root.detail; color: root.active ? Theme.success : Theme.muted; font-size: 10px; overflow: elide; }
+}
+
+export component KioskSearch inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder-text;
+    callback activated();
+    callback edited(string);
+    callback accepted();
+    forward-focus: input;
+
+    height: 44px;
+    horizontal-stretch: 1;
+    border-radius: 12px;
+    background: Theme.raised;
+    border-width: input.has-focus ? 2px : 1px;
+    border-color: input.has-focus ? Theme.primary : Theme.outline;
+
+    TouchArea { clicked => { input.focus(); } }
+    Rectangle {
+        x: 16px;
+        width: parent.width - 32px;
+        clip: true;
+
+        Text {
+            text: root.text == "" && input.preedit-text == "" ? root.placeholder-text : "";
+            color: Theme.muted;
+            font-size: input.font-size;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        input := TextInput {
+            property <length> scroll-offset;
+            x: clamp(self.scroll-offset, parent.width - self.width - self.text-cursor-width, 0px);
+            width: max(parent.width - self.text-cursor-width, self.preferred-width);
+            font-size: 14px;
+            vertical-alignment: center;
+            color: Theme.text;
+            selection-background-color: Theme.primary;
+            selection-foreground-color: Theme.on-primary;
+            accessible-placeholder-text: root.placeholder-text;
+
+            cursor-position-changed(position) => {
+                if position.x + self.x < 0px {
+                    self.scroll-offset = -position.x;
+                } else if position.x + self.x > parent.width - self.text-cursor-width {
+                    self.scroll-offset = parent.width - self.text-cursor-width - position.x;
+                }
+            }
+            changed has-focus => { if self.has-focus { root.activated(); } }
+            edited => { root.edited(self.text); }
+            accepted => { root.accepted(); }
+        }
+    }
+}
+
+export component PillButton inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> selected: false;
+    callback clicked();
+    height: 40px;
+    horizontal-stretch: 0;
+    min-width: min(caption.preferred-width + 32px, 96px);
+    preferred-width: max(82px, caption.preferred-width + 36px);
+    border-radius: 20px;
+    background: root.selected ? (pill-touch.pressed ? Theme.primary.darker(0.15) : Theme.primary)
+        : pill-touch.pressed ? Theme.raised : Theme.elevated;
+    border-width: 1px;
+    border-color: root.selected ? Theme.primary : Theme.outline-variant;
+    caption := Text {
+        x: 16px;
+        width: parent.width - 32px;
+        text: root.label;
+        color: root.selected ? Theme.on-primary : Theme.text;
+        font-size: 13px;
+        font-weight: root.selected ? 700 : 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    pill-touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+// Shared row for the controls page and the dashboard pickers.
+export component ListTile inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> show-leading: false;
+    in property <image> leading-image;
+    in property <image> leading-icon;
+    in property <color> leading-tint: transparent;
+    in property <bool> leading-loading: false;
+    in property <bool> leading-dim: false;
+    in property <bool> highlighted: false;
+    // "switch", "check" or "play"
+    in property <string> trailing: "";
+    in property <bool> checked: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 60px;
+    border-radius: 14px;
+    background: tile-tap.pressed ? Theme.elevated
+        : root.highlighted ? Theme.primary-container.with-alpha(0.94) : Theme.surface.with-alpha(0.9);
+    border-width: 1px;
+    border-color: root.highlighted ? Theme.primary : Theme.outline-variant;
+    opacity: root.enabled ? 1 : 0.6;
+    tile-tap := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+    HorizontalLayout {
+        padding-left: root.show-leading ? 10px : 16px;
+        padding-right: 12px;
+        spacing: 12px;
+        if root.show-leading : VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 42px;
+                height: 42px;
+                border-radius: 10px;
+                background: root.leading-tint != transparent ? root.leading-tint : Theme.raised;
+                clip: true;
+                if root.leading-image.width > 0 : Image {
+                    x: 4px;
+                    y: 4px;
+                    width: parent.width - 8px;
+                    height: parent.height - 8px;
+                    source: root.leading-image;
+                    image-fit: contain;
+                    opacity: root.leading-dim ? 0.45 : 1;
+                }
+                if root.leading-image.width == 0 && !root.leading-loading : Image {
+                    width: 22px;
+                    height: 22px;
+                    source: root.leading-icon;
+                    colorize: Theme.text;
+                }
+                if root.leading-loading : LoadingSpinner { size: 22px; }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            Text { text: root.title; color: Theme.text; font-size: 14px; font-weight: 600; overflow: elide; }
+            if root.subtitle != "" : Text { text: root.subtitle; color: Theme.muted; font-size: 11px; overflow: elide; }
+        }
+        if root.trailing == "switch" : VerticalLayout {
+            alignment: center;
+            DashboardSwitch { checked: root.checked; enabled: root.enabled; toggled => { root.clicked(); } }
+        }
+        if root.trailing == "check" : VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 26px;
+                height: 26px;
+                border-radius: 8px;
+                border-width: root.checked ? 0px : 2px;
+                border-color: Theme.muted;
+                background: root.checked ? Theme.primary : transparent;
+                if root.checked : Image { width: 18px; height: 18px; source: @image-url("../icons/mdi/check.svg"); colorize: Theme.on-primary; }
+            }
+        }
+        if root.trailing == "play" : VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                background: tile-tap.pressed ? Theme.primary : Theme.raised;
+                Image { width: 18px; height: 18px; source: @image-url("../icons/mdi/play.svg"); colorize: tile-tap.pressed ? Theme.on-primary : Theme.text; }
+            }
+        }
+    }
+}
+
+// Key caps match the original Md3Keyboard (8px radius, small gaps, pressed state).
+export component TouchKey inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> accent: false;
+    callback clicked();
+    vertical-stretch: 1;
+    border-radius: 8px;
+    background: touch.pressed ? Theme.primary : (accent ? Theme.elevated : Theme.raised);
+    Text {
+        text: root.label;
+        color: touch.pressed ? Theme.on-primary : Theme.text;
+        font-size: 17px;
+        font-weight: 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+export component NavItem inherits Rectangle {
+    in property <string> label;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    in property <image> icon;
+    in property <image> active-icon;
+    in property <bool> active: false;
+    callback clicked();
+    width: 72px;
+    height: 42px;
+    background: transparent;
+    Rectangle {
+        width: 56px;
+        height: 32px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 18px;
+        background: root.active ? Theme.primary : transparent;
+        Image {
+            width: 21px;
+            height: 21px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            source: root.active ? root.active-icon : root.icon;
+            image-fit: contain;
+        }
+    }
+    TouchArea { clicked => { root.clicked(); } }
+}

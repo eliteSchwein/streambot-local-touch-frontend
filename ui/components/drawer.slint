@@ -1,0 +1,49 @@
+// Rows used in the network / Bluetooth drawer.
+import { Theme } from "../theme.slint";
+import { BluetoothRow } from "../types.slint";
+import { DrawerRowText, Md3Button, Md3Card } from "common.slint";
+
+export component DrawerBluetoothDevice inherits Md3Card {
+    in property <BluetoothRow> device;
+    in property <string> status;
+    in property <bool> paired: false;
+    in property <bool> enabled: true;
+    callback activated();
+    callback removed();
+    height: root.paired ? 60px : 54px;
+    background: root.device.connected ? Theme.primary-container : Theme.raised;
+    HorizontalLayout {
+        padding: 10px;
+        spacing: 10px;
+        Rectangle {
+            width: 28px;
+            if root.device.kind == "SPK" : Image {
+                source: @image-url("../icons/mdi/volume-high.svg");
+                colorize: Theme.text;
+                width: 22px;
+                height: 22px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
+            if root.device.kind != "SPK" : Text {
+                text: root.device.kind; color: Theme.text; font-size: 9px; font-weight: 600;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+        }
+        DrawerRowText { title: root.device.name; detail: root.paired ? root.status : ""; active: root.device.connected; }
+        if !root.paired : Text { text: root.status; color: Theme.primary; font-size: 10px; vertical-alignment: center; }
+    }
+    TouchArea {
+        x: 0px;
+        width: root.paired ? parent.width - 42px : parent.width;
+        enabled: root.enabled;
+        clicked => { root.activated(); }
+    }
+    if root.paired : Md3Button {
+        x: parent.width - self.width - 8px;
+        y: (parent.height - self.height) / 2;
+        label: "×";
+        enabled: root.enabled;
+        clicked => { root.removed(); }
+    }
+}
