@@ -19,24 +19,23 @@ pub(crate) fn interaction_rows(items: &[Value]) -> slint::ModelRc<InteractionEnt
             } else {
                 0.0
             };
-            let mut meta = format!(
-                "{} · {}",
-                if source.is_empty() { "Other" } else { &source },
-                if state.is_empty() { "Queued" } else { &state }
-            );
-            if eta > 0.0 {
-                meta.push_str(&format!(" · {}s", eta.ceil() as i64));
-            }
-            if let Some(alerts) = item
-                .get("alert_count")
-                .and_then(Value::as_u64)
-                .filter(|n| *n > 0)
-            {
-                meta.push_str(&format!(" · Alerts {alerts}"));
-            }
             InteractionEntry {
                 name: string_field(item, &["name"]).into(),
-                meta: meta.into(),
+                state: if state.is_empty() {
+                    "queued".into()
+                } else {
+                    state.as_str().into()
+                },
+                source: if source.is_empty() {
+                    "other".into()
+                } else {
+                    source.into()
+                },
+                eta: eta.ceil() as i32,
+                alerts: item["alert_count"]
+                    .as_u64()
+                    .unwrap_or_default()
+                    .min(i32::MAX as u64) as i32,
                 uuid: string_field(item, &["uuid"]).into(),
                 active: state == "active",
                 failed: state == "failed",

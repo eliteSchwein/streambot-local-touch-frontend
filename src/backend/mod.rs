@@ -147,14 +147,18 @@ pub(crate) async fn run(
         if !ready {
             ui_event(&ui, move |app| {
                 app.set_connection("Backend not ready".into());
-                if !stage.is_empty() {
+                if status.is_some() {
+                    app.set_backend_ready(false);
                     app.set_backend_stage(stage.into());
                 }
             });
             time::sleep(Duration::from_millis(500)).await;
             continue;
         }
-        ui_event(&ui, |app| app.set_connection("Connecting…".into()));
+        ui_event(&ui, |app| {
+            app.set_backend_ready(true);
+            app.set_connection("Connecting…".into());
+        });
         match connect_async(config.ws_url()).await {
             Ok((ws, _)) => {
                 // Button presses from a closed connection must never be replayed.

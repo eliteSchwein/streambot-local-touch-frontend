@@ -3,9 +3,11 @@
 
 mod audio;
 mod backend;
+mod bluetooth;
 mod config;
 mod dashboard_editor;
 mod drawer;
+mod i18n;
 #[cfg(test)]
 mod native_ui_test;
 mod notifications;

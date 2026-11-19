@@ -1,8 +1,8 @@
-use crate::{ui_bridge::ui_event, App, BluetoothRow, EthernetRow, SavedWifiRow, WifiRow};
+use crate::{ui_bridge::ui_event, App, EthernetRow, SavedWifiRow, WifiRow};
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::{
     io::Write,
-    process::{Child, Command, Output, Stdio},
+    process::{Command, Output, Stdio},
     sync::mpsc,
     time::{Duration, Instant},
 };
@@ -47,7 +47,7 @@ fn clean_output(bytes: &[u8]) -> String {
     result.trim_end_matches('\n').into()
 }
 
-fn output(bin: &str, args: &[&str]) -> Result<String, String> {
+pub(crate) fn output(bin: &str, args: &[&str]) -> Result<String, String> {
     let result = command(bin, args)
         .output()
         .map_err(|e| format!("{bin}: {e}"))?;
@@ -58,12 +58,6 @@ fn nm(args: &[&str]) -> Result<String, String> {
     let mut argv = vec!["--wait", "20"];
     argv.extend_from_slice(args);
     output("nmcli", &argv)
-}
-
-fn bluetooth(args: &[&str]) -> Result<String, String> {
-    let mut argv = vec!["--timeout", "20"];
-    argv.extend_from_slice(args);
-    output("bluetoothctl", &argv)
 }
 
 // nmcli escapes colons and backslashes in terse output.
@@ -168,60 +162,6 @@ fn wifi_rows(list: &str, saved: &[SavedWifiRow]) -> Vec<WifiRow> {
     rows
 }
 
-fn bluetooth_rows() -> (Vec<BluetoothRow>, Vec<BluetoothRow>) {
-    let paired = bluetooth(&["devices", "Paired"])
-        .or_else(|_| bluetooth(&["paired-devices"]))
-        .unwrap_or_default();
-    let connected = bluetooth(&["devices", "Connected"]).unwrap_or_default();
-    let all = bluetooth(&["devices"]).unwrap_or_default();
-    let mut seen = std::collections::HashSet::new();
-    let mut saved = Vec::new();
-    let mut discovered = Vec::new();
-    for line in paired.lines().chain(all.lines()) {
-        let Some((id, name)) = line.strip_prefix("Device ").and_then(|s| s.split_once(' ')) else {
-            continue;
-        };
-        if !seen.insert(id) {
-            continue;
-        }
-        let has_address = |list: &str| {
-            list.lines()
-                .any(|l| l.split_whitespace().nth(1) == Some(id))
-        };
-        let info = bluetooth(&["info", id]).unwrap_or_default();
-        let has_property = |value: &str| info.lines().any(|line| line.trim() == value);
-        let icon = info
-            .lines()
-            .find_map(|line| line.trim().strip_prefix("Icon: "))
-            .unwrap_or("");
-        let kind = if icon.contains("audio") || icon.contains("headset") {
-            "SPK"
-        } else if icon.contains("phone") {
-            "PH"
-        } else if icon.contains("computer") {
-            "PC"
-        } else if icon.contains("keyboard") || icon.contains("mouse") {
-            "KB"
-        } else {
-            "BT"
-        };
-        let row = BluetoothRow {
-            id: id.into(),
-            name: name.into(),
-            kind: kind.into(),
-            connected: has_property("Connected: yes") || has_address(&connected),
-        };
-        if has_property("Paired: yes") || has_address(&paired) {
-            saved.push(row);
-        } else {
-            discovered.push(row);
-        }
-    }
-    saved.sort_by_key(|row| (!row.connected, row.name.to_lowercase()));
-    discovered.sort_by_key(|row| row.name.to_lowercase());
-    (saved, discovered)
-}
-
 fn route_address(route: &str) -> Option<std::net::Ipv4Addr> {
     route
         .split_whitespace()
@@ -306,48 +246,11 @@ enum Request {
 
 #[derive(Default)]
 struct Drawer {
-    scan: Option<Child>,
-    scanning: bool,
-    scan_le: bool,
     commander_url: Option<String>,
     last_wifi_scan: Option<Instant>,
 }
 
 impl Drawer {
-    fn stop_scan(&mut self) {
-        self.scanning = false;
-        self.scan_le = false;
-        if let Some(mut child) = self.scan.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
-
-    fn update_scan(&mut self) -> Result<(), String> {
-        if let Some(child) = &mut self.scan {
-            if child.try_wait().map_err(|e| e.to_string())?.is_some() {
-                self.scan = None;
-                self.scan_le = !self.scan_le;
-            }
-        }
-        if self.scanning && self.scan.is_none() {
-            let (timeout, transport) = if self.scan_le {
-                ("5", "le")
-            } else {
-                ("15", "bredr")
-            };
-            self.scan = Some(
-                command("bluetoothctl", &["--timeout", timeout, "scan", transport])
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn()
-                    .map_err(|e| e.to_string())?,
-            );
-        }
-        Ok(())
-    }
-
     fn action(&mut self, action: &str, id: &str, password: &str) -> Result<String, String> {
         match action {
             "ethernet-on" => nm(&["device", "set", id, "autoconnect", "yes"])
@@ -363,43 +266,6 @@ impl Drawer {
             "wifi-disconnect" => nm(&["device", "disconnect", id]),
             "wifi-saved" => nm(&["connection", "up", "uuid", id]),
             "wifi-forget" => nm(&["connection", "delete", "uuid", id]),
-            "bt-scan" => {
-                self.scanning = true;
-                self.update_scan().map(|_| String::new())
-            }
-            "bt-stop-scan" => {
-                self.stop_scan();
-                Ok(String::new())
-            }
-            "bt-pair" => {
-                self.stop_scan();
-                output(
-                    "bluetoothctl",
-                    &["--timeout", "20", "--agent", "NoInputNoOutput", "pair", id],
-                )
-                .and_then(|_| bluetooth(&["trust", id]))
-                .and_then(|_| {
-                    if bluetooth(&["info", id])
-                        .is_ok_and(|s| s.lines().any(|l| l.trim() == "Connected: yes"))
-                    {
-                        Ok(String::new())
-                    } else {
-                        bluetooth(&["connect", id])
-                    }
-                })
-            }
-            "bt-connect" => bluetooth(&["connect", id]),
-            "bt-disconnect" => bluetooth(&["disconnect", id]),
-            "bt-remove" => {
-                self.stop_scan();
-                let _ = bluetooth(&["disconnect", id]);
-                bluetooth(&["remove", id])
-            }
-            "bluetooth-on" => bluetooth(&["power", "on"]),
-            "bluetooth-off" => {
-                self.stop_scan();
-                bluetooth(&["power", "off"])
-            }
             _ => Err("Unknown device action".into()),
         }
     }
@@ -412,42 +278,9 @@ impl Drawer {
     ) {
         self.refresh_web(ui, port);
         self.refresh_network(ui);
-        let adapter = bluetooth(&["show"])
-            .ok()
-            .filter(|s| s.lines().any(|l| l.starts_with("Controller ")));
-        let bluetooth_powered = adapter
-            .as_ref()
-            .is_some_and(|s| s.lines().any(|l| l.trim() == "Powered: yes"));
-        let scan_error = if bluetooth_powered {
-            self.update_scan().err()
-        } else {
-            self.stop_scan();
-            None
-        };
-        if scan_error.is_some() {
-            self.stop_scan();
-        }
-        let (paired, discovered) = if bluetooth_powered {
-            bluetooth_rows()
-        } else {
-            Default::default()
-        };
-        let scanning = self.scanning;
-        let scan_le = self.scan_le;
         let finished_action = action_result.is_some();
-        let action_error = action_result.and_then(Result::err).or(scan_error);
+        let action_error = action_result.and_then(Result::err);
         ui_event(ui, move |app| {
-            app.set_bluetooth_available(adapter.is_some());
-            app.set_bluetooth_powered(bluetooth_powered);
-            app.set_bluetooth_scanning(scanning && app.get_network_drawer_open());
-            app.set_bluetooth_scan_le(scan_le);
-            app.set_bluetooth_connected_count(paired.iter().filter(|r| r.connected).count() as i32);
-            update_rows(app.get_paired_devices(), paired, |rows| {
-                app.set_paired_devices(rows)
-            });
-            update_rows(app.get_discovered_devices(), discovered, |rows| {
-                app.set_discovered_devices(rows)
-            });
             if let Some(error) = action_error {
                 app.set_drawer_error(error.into());
             }
@@ -545,13 +378,7 @@ impl Drawer {
     }
 }
 
-impl Drop for Drawer {
-    fn drop(&mut self) {
-        self.stop_scan();
-    }
-}
-
-fn update_rows<T: Clone + PartialEq + 'static>(
+pub(crate) fn update_rows<T: Clone + PartialEq + 'static>(
     current: ModelRc<T>,
     rows: Vec<T>,
     apply: impl FnOnce(ModelRc<T>),
@@ -575,10 +402,7 @@ pub(crate) fn install(ui: &App, port: u16) -> Timer {
         while let Ok(request) = rx.recv() {
             match request {
                 Request::Refresh => drawer.refresh(&weak, port, None),
-                Request::Close => {
-                    drawer.stop_scan();
-                    drawer.last_wifi_scan = None;
-                }
+                Request::Close => drawer.last_wifi_scan = None,
                 Request::Action(action, id, password) => {
                     let result = drawer.action(&action, &id, &password);
                     drawer.refresh(&weak, port, Some(result));
@@ -587,21 +411,36 @@ pub(crate) fn install(ui: &App, port: u16) -> Timer {
         }
     });
     let weak = ui.as_weak();
+    let bluetooth = crate::bluetooth::start(ui.as_weak());
+    let bluetooth_visibility = bluetooth.clone();
     let visibility_tx = tx.clone();
     ui.on_drawer_visibility(move |open| {
         if let Some(app) = weak.upgrade() {
             if open {
                 request_refresh(&app, &visibility_tx);
+                crate::bluetooth::request_refresh(&app, &bluetooth_visibility);
             } else {
                 let _ = visibility_tx.send(Request::Close);
+                let _ = bluetooth_visibility.send(crate::bluetooth::Request::Close);
                 app.set_bluetooth_scanning(false);
             }
         }
     });
     let weak = ui.as_weak();
     let action_tx = tx.clone();
+    let bluetooth_action = bluetooth.clone();
     ui.on_drawer_command(move |action, id, password| {
-        if let Some(app) = weak.upgrade().filter(|app| !app.get_drawer_busy()) {
+        let Some(app) = weak.upgrade() else { return };
+        if action.starts_with("bt-") || action.starts_with("bluetooth-") {
+            if !app.get_bluetooth_busy()
+                && bluetooth_action
+                    .send(crate::bluetooth::Request::Action(action.into(), id.into()))
+                    .is_ok()
+            {
+                app.set_bluetooth_error("".into());
+                app.set_bluetooth_busy(true);
+            }
+        } else if !app.get_drawer_busy() {
             if action_tx
                 .send(Request::Action(action.into(), id.into(), password.into()))
                 .is_ok()
@@ -616,6 +455,7 @@ pub(crate) fn install(ui: &App, port: u16) -> Timer {
     timer.start(TimerMode::Repeated, Duration::from_secs(3), move || {
         if let Some(app) = weak.upgrade().filter(|app| app.get_network_drawer_open()) {
             request_refresh(&app, &tx);
+            crate::bluetooth::request_refresh(&app, &bluetooth);
         }
     });
     timer

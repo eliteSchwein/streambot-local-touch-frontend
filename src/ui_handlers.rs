@@ -1,6 +1,8 @@
 use crate::App;
 use serde_json::{json, Value};
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model};
+use std::time::Duration;
 use tokio::sync::mpsc;
 
 fn send(tx: &mpsc::UnboundedSender<(String, Value)>, method: &str, params: Value) {
@@ -8,7 +10,28 @@ fn send(tx: &mpsc::UnboundedSender<(String, Value)>, method: &str, params: Value
 }
 
 pub(crate) fn install(ui: &App, command_tx: mpsc::UnboundedSender<(String, Value)>) {
+    ui.on_locale_text(|language, key| crate::i18n::text(&language, &key).into());
+    ui.on_fill_text(|text, token, value| text.replace(token.as_str(), value.as_str()).into());
+    ui.on_startup_stage(|language, stage| crate::i18n::stage(&language, &stage).into());
     ui.set_language(crate::config::dashboard::language().into());
+    let weak = ui.as_weak();
+    ui.on_keyboard_input(move |key| {
+        let weak = weak.clone();
+        let text = if key == "backspace" {
+            Key::Backspace.into()
+        } else {
+            key
+        };
+        // Deliver the key after the touch handler returns, to whichever input holds focus.
+        slint::Timer::single_shot(Duration::ZERO, move || {
+            if let Some(app) = weak.upgrade().filter(|app| app.get_touch_keyboard_open()) {
+                app.window()
+                    .dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+                app.window()
+                    .dispatch_event(WindowEvent::KeyReleased { text });
+            }
+        });
+    });
     let weak = ui.as_weak();
     ui.on_choose_language(move |lang| {
         if let Some(app) = weak.upgrade() {

@@ -4688,6 +4688,7 @@ dependencies = [
  "slint-build",
  "tokio",
  "tokio-tungstenite",
+ "zbus",
 ]
 
 [[package]]

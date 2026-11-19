@@ -21,26 +21,26 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
                 .get("current_song")
                 .or_else(|| state.get("current_track"))
                 .unwrap_or(&state);
-            let title = string_field(song, &["title", "name"]);
-            let artist = string_field(song, &["artist", "author"]);
+            let field = |keys| {
+                let direct = string_field(&state, keys);
+                if direct.is_empty() {
+                    string_field(song, keys)
+                } else {
+                    direct
+                }
+            };
+            let title = field(&["title", "name"]);
+            let artist = field(&["artist", "author"]);
             app.set_track(if title.is_empty() {
-                "No track information".into()
+                crate::i18n::text(&app.get_language(), "no_track_information").into()
             } else if artist.is_empty() {
                 title.clone().into()
             } else {
                 format!("{title} — {artist}").into()
             });
             app.set_music_state(string_field(&state, &["status"]).into());
-            app.set_music_title(if title.is_empty() {
-                "No song".into()
-            } else {
-                title.into()
-            });
-            app.set_music_artist(if artist.is_empty() {
-                "Unknown artist".into()
-            } else {
-                artist.into()
-            });
+            app.set_music_title(title.into());
+            app.set_music_artist(artist.into());
             app.set_music_playing(state.get("status").and_then(Value::as_str) == Some("playing"));
             app.set_music_shuffle(
                 state
@@ -76,7 +76,9 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
                 .as_array()
                 .or_else(|| state.get("queue").and_then(Value::as_array));
             app.set_interaction_summary(
-                format!("{} queued interactions", queue.map_or(0, Vec::len)).into(),
+                crate::i18n::text(&app.get_language(), "queued_interactions_count")
+                    .replace("%1", &queue.map_or(0, Vec::len).to_string())
+                    .into(),
             );
             app.set_dashboard_interactions(interaction_rows(&guard.interactions));
         }

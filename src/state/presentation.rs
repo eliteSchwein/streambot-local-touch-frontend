@@ -86,50 +86,38 @@ pub(crate) fn storage(state: &Value) -> crate::SystemStorage {
     let mut categorized = 0.;
     let rows = [
         (
-            "Used by Media",
-            "Belegt durch Medien",
+            "system_media_used",
             0x2196f3,
             &["/media", "/assets"][..],
             &["/mediaUsed", "/assetUsed", "/assetsUsed"][..],
         ),
         (
-            "Used by asset configs",
-            "Von Asset-Konfigurationen verwendet",
+            "system_asset_config_used",
             0x9c27b0,
             &["/asset_configs", "/assetConfigs"],
             &["/assetConfigUsed", "/assetConfigsUsed"],
         ),
         (
-            "Used by Overlays",
-            "Belegt durch Overlays",
+            "system_overlay_used",
             0x00bcd4,
             &["/overlays", "/overlay"],
             &["/overlayUsed", "/overlaysUsed"],
         ),
+        ("system_music_used", 0x4caf50, &["/music"], &["/musicUsed"]),
         (
-            "Used by Music",
-            "Belegt durch Musik",
-            0x4caf50,
-            &["/music"],
-            &["/musicUsed"],
-        ),
-        (
-            "Used by Macros",
-            "Belegt durch Makros",
+            "system_macro_used",
             0xffc107,
             &["/macros", "/macro"],
             &["/macroUsed", "/macrosUsed"],
         ),
         (
-            "Used by Auto Macros",
-            "Belegt durch Auto-Makros",
+            "system_auto_macro_used",
             0xff5722,
             &["/auto_macros", "/autoMacros", "/auto_macro"],
             &["/autoMacroUsed", "/autoMacrosUsed"],
         ),
         (
-            "Used by Channel Points",
-            "Belegt durch Kanalpunkte",
+            "system_channel_point_used",
             0xe91e63,
             &[
                 "/channel_points",
@@ -139,51 +127,35 @@ pub(crate) fn storage(state: &Value) -> crate::SystemStorage {
             &["/channelPointUsed", "/channelPointsUsed"],
         ),
         (
-            "Used by Commands",
-            "Belegt durch Befehle",
+            "system_command_used",
             0x009688,
             &["/commands", "/commands_configs"],
             &["/commands", "/commandUsed", "/commandsUsed"],
         ),
         (
-            "Used by Scene rotation",
-            "Belegt durch Szenenwechsel",
+            "system_rotating_scene_used",
             0xcddc39,
             &["/rotating_scenes", "/rotatingScenes", "/rotating_scene"],
             &["/rotatingSceneUsed", "/rotatingScenesUsed"],
         ),
+        ("system_tts_used", 0x673ab7, &["/tts"], &["/ttsUsed"]),
         (
-            "Used by TTS",
-            "Belegt durch TTS",
-            0x673ab7,
-            &["/tts"],
-            &["/ttsUsed"],
-        ),
-        (
-            "Used by Ollama",
-            "Belegt durch Ollama",
+            "system_ollama_used",
             0x3f51b5,
             &["/ollama"],
             &["/ollamaUsed"],
         ),
-        (
-            "Used by the webcam blur",
-            "Belegt durch Webcam-Unschärfe",
-            0x26c6da,
-            &["/webcam"],
-            &[],
-        ),
+        ("system_webcam_used", 0x26c6da, &["/webcam"], &[]),
     ]
     .into_iter()
-    .filter_map(|(label, german, color, keys, aliases)| {
+    .filter_map(|(label_key, color, keys, aliases)| {
         let amount = metric(folders, keys)
             .or_else(|| metric(raw, aliases))
             .filter(|n| *n > 0.)?;
         let offset = fraction(categorized);
         categorized += amount;
         Some(crate::StorageEntry {
-            label: label.into(),
-            german: german.into(),
+            label_key: label_key.into(),
             size: bytes(amount).into(),
             tint: slint::Color::from_argb_encoded(0xff000000 | color),
             fraction: fraction(amount),

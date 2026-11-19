@@ -1,7 +1,7 @@
 use super::*;
 use serde_json::json;
 use slint::platform::{software_renderer::MinimalSoftwareWindow, Platform, WindowAdapter};
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{LogicalPosition, Model, ModelRc, PhysicalSize, PlatformError, Rgb8Pixel, VecModel};
 use std::rc::Rc;
 
@@ -35,6 +35,12 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
         ),
         ("notify_macro_update", json!({"macros":{"Start Stream":{}}})),
         (
+            "notify_music_update",
+            json!({
+                "title":"Live Session", "artist":"Streambot", "status":"playing", "shuffle":true
+            }),
+        ),
+        (
             "notify_update_manager",
             json!({"managers":{"backend":{"update_available":true},"system":{"package_count":2}}}),
         ),
@@ -45,6 +51,9 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     ] {
         notifications::apply(&app, &mut store, method, &params);
     }
+    assert_eq!(app.get_music_title(), "Live Session");
+    assert_eq!(app.get_music_artist(), "Streambot");
+    assert!(app.get_music_playing());
     app.set_routing("music".into());
     let music = app.get_audio_interfaces().row_data(0).unwrap();
     assert!(music.links.row_data(0).unwrap().linked);
@@ -120,6 +129,11 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
         progress: 0.55,
     }])));
     let mut buffer = vec![Rgb8Pixel::default(); 800 * 480];
+    let primary = Rgb8Pixel {
+        r: 0xa8,
+        g: 0xc7,
+        b: 0xfa,
+    };
     for page in 0..5 {
         app.set_page(page);
         window.draw_if_needed(|r| {
@@ -129,6 +143,10 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
             buffer.windows(2).any(|p| p[0] != p[1]),
             "page {page} is blank"
         );
+        // Sample both halves of the active pill, clear of its glyph.
+        let x = (236 + page * 82 - 15) as usize;
+        assert_eq!(buffer[440 * 800 + x], primary, "page {page} nav top");
+        assert_eq!(buffer[467 * 800 + x], primary, "page {page} nav bottom");
     }
     let (drawer_tx, drawer_rx) = std::sync::mpsc::channel();
     app.on_drawer_command(move |action, id, password| {
@@ -192,6 +210,18 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
             position: LogicalPosition::new(x, y),
         })
     };
+    app.set_page(0);
+    press(30., 471.);
+    release(30., 471.);
+    assert!(app.get_dashboard_editing());
+    press(30., 471.);
+    release(30., 471.);
+    assert!(!app.get_dashboard_editing());
+    press(770., 471.);
+    release(770., 471.);
+    assert!(app.get_power_menu_open());
+    app.set_power_menu_open(false);
+
     app.set_page(1);
     app.set_routing("".into());
     slint::platform::update_timers_and_animations();
@@ -221,12 +251,59 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
         "focusing macro search must open the keyboard"
     );
 
+    for (language, query) in [("en", "y"), ("de", "yz")] {
+        app.set_language(language.into());
+        press(440., 305.);
+        release(440., 305.);
+        slint::platform::update_timers_and_animations();
+        assert_eq!(app.get_search(), query);
+    }
+    app.set_touch_keyboard_symbols(true);
+    press(400., 453.);
+    release(400., 453.);
+    slint::platform::update_timers_and_animations();
+    assert_eq!(app.get_search(), "yz ");
+
+    for _ in 0..2 {
+        app.window().dispatch_event(WindowEvent::KeyPressed {
+            text: Key::LeftArrow.into(),
+        });
+        app.window().dispatch_event(WindowEvent::KeyReleased {
+            text: Key::LeftArrow.into(),
+        });
+    }
+    for (key, query) in [("ä", "yäz "), ("x", "yäxz "), ("backspace", "yäz ")] {
+        app.invoke_keyboard_input(key.into());
+        slint::platform::update_timers_and_animations();
+        assert_eq!(app.get_search(), query);
+    }
+    app.set_touch_keyboard_symbols(false);
+    app.set_language("en".into());
+
     app.set_page(0);
     slint::platform::update_timers_and_animations();
     assert!(
         !app.get_touch_keyboard_open(),
         "leaving the search page must dismiss the keyboard"
     );
+    let (filter_tx, filter_rx) = std::sync::mpsc::channel();
+    app.on_dashboard_filter(move |query| filter_tx.send(query).unwrap());
+    app.set_dashboard_picker_kind("macros".into());
+    app.set_dashboard_picker_open(true);
+    window.draw_if_needed(|r| {
+        r.render(&mut buffer, 800);
+    });
+    press(145., 114.);
+    release(145., 114.);
+    slint::platform::update_timers_and_animations();
+    assert!(app.get_touch_keyboard_open());
+    app.invoke_keyboard_input("m".into());
+    slint::platform::update_timers_and_animations();
+    assert_eq!(app.get_dashboard_picker_search(), "m");
+    assert_eq!(filter_rx.try_recv().unwrap(), "m");
+    app.set_dashboard_picker_open(false);
+    slint::platform::update_timers_and_animations();
+
     window.draw_if_needed(|r| {
         r.render(&mut buffer, 800);
     });

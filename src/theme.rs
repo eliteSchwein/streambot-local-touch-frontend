@@ -18,6 +18,7 @@ pub(crate) fn apply(app: &App, palette: &serde_json::Value) {
     theme.set_surface(color("surface_container", 0x1d2024));
     theme.set_elevated(color("surface_container_high", 0x282a2f));
     theme.set_raised(color("surface_container_highest", 0x33353a));
+    theme.set_outline(color("outline", 0x8e9099));
     theme.set_outline_variant(color("outline_variant", 0x44474f));
     theme.set_primary(color("primary", 0xa8c7fa));
     theme.set_primary_container(color("primary_container", 0x062e6f));

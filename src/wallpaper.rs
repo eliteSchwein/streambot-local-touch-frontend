@@ -63,7 +63,11 @@ pub(crate) fn set(app: &App, name: &str) {
                                 theme::apply(&app, &serde_json::Value::Null);
                                 eprintln!("Matugen: {error}");
                                 if app.get_dashboard_editing() {
-                                    app.set_feedback(format!("Wallpaper palette: {error}").into());
+                                    let label = crate::i18n::text(
+                                        &app.get_language(),
+                                        "dashboard_wallpaper_palette_error",
+                                    );
+                                    app.set_feedback(format!("{label}: {error}").into());
                                 }
                             }
                         }
@@ -107,7 +111,7 @@ impl Picker {
                     if epoch.load(Ordering::Relaxed) != request {
                         return;
                     }
-                    let entries = std::iter::once("No wallpaper".to_owned())
+                    let entries = std::iter::once(String::new())
                         .chain(display_names)
                         .enumerate()
                         .map(|(index, name)| PickerEntry {

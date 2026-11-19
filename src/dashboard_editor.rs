@@ -41,28 +41,23 @@ fn set_draft_slots(ui: &App, slots: &[String; 4]) {
 }
 
 fn summaries(ui: &App, draft: &Editor) {
-    ui.set_dashboard_selected_macros(format!("Selected {}/4", draft.draft_macros.len()).into());
-    ui.set_dashboard_selected_auto_macros(
-        format!("Selected {}/4", draft.draft_auto_macros.len()).into(),
-    );
-    let label = if draft.draft_wallpaper.is_empty() {
-        "No wallpaper".to_owned()
-    } else {
+    ui.set_dashboard_selected_macros(draft.draft_macros.len() as i32);
+    ui.set_dashboard_selected_auto_macros(draft.draft_auto_macros.len() as i32);
+    ui.set_wallpaper_label(
         draft
             .draft_wallpaper
             .rsplit('/')
             .next()
             .unwrap_or("")
-            .to_owned()
-    };
-    ui.set_wallpaper_label(label.into());
+            .into(),
+    );
 }
 
 pub(crate) use crate::wallpaper::set as set_wallpaper_image;
 
 fn candidates(kind: &str, store: &Arc<Mutex<Store>>) -> Vec<String> {
     if kind.starts_with("slot:") {
-        return vec!["Empty", "Interactions", "Auto Macros", "Macros", "Music"]
+        return vec!["", "interactions", "auto_macros", "macros", "music"]
             .into_iter()
             .map(str::to_owned)
             .collect();
@@ -104,7 +99,7 @@ fn display(ui: &App, editor: &Editor, store: &Arc<Mutex<Store>>) {
             let selected = if editor.kind.starts_with("slot:") {
                 let index = slot_index(&editor.kind).unwrap_or(0);
                 let raw = slots(ui)[index].clone();
-                name == card_label(&raw)
+                name == &raw
             } else {
                 editor.picker_selection.contains(name)
             };
@@ -128,25 +123,6 @@ fn slot_index(kind: &str) -> Option<usize> {
     }
 }
 
-fn card_label(raw: &str) -> &str {
-    match raw {
-        "interactions" => "Interactions",
-        "auto_macros" => "Auto Macros",
-        "macros" => "Macros",
-        "music" => "Music",
-        _ => "Empty",
-    }
-}
-fn card_value(label: &str) -> &str {
-    match label {
-        "Interactions" => "interactions",
-        "Auto Macros" => "auto_macros",
-        "Macros" => "macros",
-        "Music" => "music",
-        _ => "",
-    }
-}
-
 pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
     let initial = dashboard::load();
     set_slots(ui, &initial);
@@ -159,6 +135,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
         let draft = editor.clone();
         ui.on_dashboard_editor_open(move || {
             if let Some(ui) = weak.upgrade() {
+                ui.set_feedback("".into());
                 let mut state = draft.borrow_mut();
                 state.draft_macros = dashboard::selected_names("macro_names");
                 state.draft_auto_macros = dashboard::selected_names("auto_macro_names");
@@ -235,51 +212,13 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
         let weak = ui.as_weak();
         let draft = editor.clone();
         let source = store.clone();
-        ui.on_keyboard_input(move |key| {
-            let Some(ui) = weak.upgrade() else {
-                return;
-            };
-            if !ui.get_dashboard_picker_open() {
-                let wifi = !ui.get_wifi_target().is_empty();
-                let mut text = if wifi {
-                    ui.get_wifi_password()
-                } else {
-                    ui.get_search()
-                }
-                .to_string();
-                if key == "backspace" {
-                    text.pop();
-                } else {
-                    text.push_str(&key);
-                }
-                if wifi {
-                    ui.set_wifi_password(text.into());
-                } else {
-                    ui.set_search(text.into());
-                }
-                return;
-            }
-            let mut state = draft.borrow_mut();
-            if key.as_str() == "backspace" {
-                state.search.pop();
-            } else {
-                state.search.push_str(key.as_str());
-            }
-            ui.set_dashboard_picker_search(state.search.clone().into());
-            display(&ui, &state, &source);
-        });
-    }
-    {
-        let weak = ui.as_weak();
-        let draft = editor.clone();
-        let source = store.clone();
         ui.on_dashboard_select_option(move |name| {
             if let Some(ui) = weak.upgrade() {
                 let mut state = draft.borrow_mut();
                 let name = name.to_string();
                 if let Some(index) = slot_index(&state.kind) {
                     let mut values = slots(&ui);
-                    let selected = card_value(&name).to_string();
+                    let selected = name;
                     // Keep one occurrence per card and reserve a whole column for Music.
                     for (i, value) in values.iter_mut().enumerate() {
                         if i != index && *value == selected && !selected.is_empty() {
@@ -299,11 +238,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                     ui.set_dashboard_picker_open(false);
                     ui.set_touch_keyboard_open(false);
                 } else if state.kind == "wallpaper" {
-                    state.draft_wallpaper = if name == "No wallpaper" {
-                        "".into()
-                    } else {
-                        name
-                    };
+                    state.draft_wallpaper = name;
                     summaries(&ui, &state);
                     set_wallpaper_image(&ui, &state.draft_wallpaper);
                     ui.set_dashboard_picker_open(false);
@@ -364,9 +299,12 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                             ));
                         }
                         ui.set_dashboard_editing(false);
-                        ui.set_feedback("Dashboard saved".into());
                     }
-                    Err(err) => ui.set_feedback(format!("Save failed: {err}").into()),
+                    Err(err) => {
+                        let label =
+                            crate::i18n::text(&ui.get_language(), "dashboard_card_saved_error");
+                        ui.set_feedback(format!("{label}: {err}").into());
+                    }
                 }
             }
         });
@@ -405,7 +343,8 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
         if let Some(ui) = weak.upgrade() {
             ui.set_power_menu_open(false);
             if let Err(err) = result {
-                ui.set_feedback(format!("Power action failed: {err}").into());
+                let label = crate::i18n::text(&ui.get_language(), "power_action_failed");
+                ui.set_feedback(format!("{label}: {err}").into());
             }
         }
     });

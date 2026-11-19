@@ -6,6 +6,7 @@ export global Theme {
     in-out property <color> surface: #1d2024;
     in-out property <color> elevated: #282a2f;
     in-out property <color> raised: #33353a;
+    in-out property <color> outline: #8e9099;
     in-out property <color> outline-variant: #44474f;
     in-out property <color> primary: #a8c7fa;
     in-out property <color> primary-container: #062e6f;
@@ -24,7 +25,7 @@ export struct BluetoothRow { id: string, name: string, kind: string, connected: 
 
 export struct ActionRow { label: string, id: string, active: bool }
 export struct SystemStats { cpu: float, temperature: float, ram: float, swap: float, has-swap: bool, storage: float }
-export struct StorageEntry { label: string, german: string, size: string, tint: color, fraction: float, offset: float }
+export struct StorageEntry { label-key: string, size: string, tint: color, fraction: float, offset: float }
 export struct SystemStorage { used: string, free: string, total: string, usage: float, other: float, rows: [StorageEntry] }
 export struct UpdateEntry {
     id: string, active: bool, busy: bool, git: bool, available: bool, updating: bool, checking: bool,
@@ -39,7 +40,10 @@ export struct AudioEntry {
 }
 export struct InteractionEntry {
     name: string,
-    meta: string,
+    source: string,
+    state: string,
+    eta: int,
+    alerts: int,
     uuid: string,
     active: bool,
     failed: bool,
@@ -466,9 +470,58 @@ component SpeedMetric inherits GlassCard {
     }
 }
 
-component KioskSearch inherits LineEdit {
+component KioskSearch inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder-text;
     callback activated();
-    changed has-focus => { if self.has-focus { root.activated(); } }
+    callback edited(string);
+    callback accepted();
+    forward-focus: input;
+
+    height: 44px;
+    horizontal-stretch: 1;
+    border-radius: 12px;
+    background: Theme.raised;
+    border-width: input.has-focus ? 2px : 1px;
+    border-color: input.has-focus ? Theme.primary : Theme.outline;
+
+    TouchArea { clicked => { input.focus(); } }
+    Rectangle {
+        x: 16px;
+        width: parent.width - 32px;
+        clip: true;
+
+        Text {
+            text: root.text == "" && input.preedit-text == "" ? root.placeholder-text : "";
+            color: Theme.muted;
+            font-size: input.font-size;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        input := TextInput {
+            property <length> scroll-offset;
+            x: clamp(self.scroll-offset, parent.width - self.width - self.text-cursor-width, 0px);
+            width: max(parent.width - self.text-cursor-width, self.preferred-width);
+            font-size: 14px;
+            vertical-alignment: center;
+            color: Theme.text;
+            selection-background-color: Theme.primary;
+            selection-foreground-color: Theme.on-primary;
+            accessible-placeholder-text: root.placeholder-text;
+
+            cursor-position-changed(position) => {
+                if position.x + self.x < 0px {
+                    self.scroll-offset = -position.x;
+                } else if position.x + self.x > parent.width - self.text-cursor-width {
+                    self.scroll-offset = parent.width - self.text-cursor-width - position.x;
+                }
+            }
+            changed has-focus => { if self.has-focus { root.activated(); } }
+            edited => { root.edited(self.text); }
+            accepted => { root.accepted(); }
+        }
+    }
 }
 
 component AudioIconControl inherits Rectangle {
@@ -654,16 +707,21 @@ component KioskAudioRow inherits GlassCard {
                     accessible-role: button;
                     accessible-label: root.mute-label;
                     accessible-action-default => { if root.ready { root.toggle-mute(); } }
-                    HorizontalLayout {
-                        alignment: center;
+                    mute-caption := HorizontalLayout {
+                        width: mute-label-text.preferred-width + 23px;
+                        height: parent.height;
                         spacing: 6px;
-                        Image {
+                        Rectangle {
                             width: 17px;
-                            height: 17px;
-                            source: root.item.muted ? @image-url("icons/mdi/volume-off.svg") : @image-url("icons/mdi/volume-high.svg");
-                            colorize: root.item.muted ? Theme.on-primary : Theme.text;
+                            Image {
+                                width: 17px;
+                                height: 17px;
+                                y: (parent.height - self.height) / 2;
+                                source: root.item.muted ? @image-url("icons/mdi/volume-off.svg") : @image-url("icons/mdi/volume-high.svg");
+                                colorize: root.item.muted ? Theme.on-primary : Theme.text;
+                            }
                         }
-                        Text {
+                        mute-label-text := Text {
                             text: root.item.per-link ? root.levels-label : round(root.draft * 100) + "%";
                             color: root.item.muted ? Theme.on-primary : Theme.text;
                             font-size: 11px;
@@ -689,18 +747,103 @@ component MusicIconButton inherits Rectangle {
     in property <bool> filled: false;
     in property <bool> selected: false;
     callback clicked();
-    width: 48px;
-    height: 48px;
-    border-radius: 24px;
-    background: filled ? Theme.primary : (selected ? Theme.elevated : transparent);
+    width: root.filled ? 46px : 40px;
+    height: self.width;
+    border-radius: self.width / 2;
+    background: root.filled || root.selected ? Theme.primary : music-tap.pressed ? Theme.elevated : transparent;
     Text {
         text: root.glyph;
-        color: root.filled ? Theme.on-primary : Theme.text;
-        font-size: 24px;
+        color: root.filled || root.selected ? Theme.on-primary : Theme.text;
+        font-size: root.filled ? 22px : 19px;
+        font-weight: 600;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
-    TouchArea { clicked => { root.clicked(); } }
+    music-tap := TouchArea { clicked => { root.clicked(); } }
+}
+
+component DashboardMusicCard inherits GlassCard {
+    in property <string> title;
+    in property <string> artist;
+    in property <[float]> levels;
+    in property <bool> playing;
+    in property <bool> shuffle;
+    in property <bool> looping;
+    in property <bool> requests;
+    in property <string> requests-label;
+    in property <float> progress;
+    in property <string> position;
+    in property <string> duration;
+    callback action(string);
+    vertical-stretch: 1;
+    tint-opacity: 0.88;
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 10px;
+        VerticalLayout {
+            spacing: 2px;
+            Text { text: root.title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
+            Text { text: root.artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
+        }
+        Rectangle {
+            min-height: 90px;
+            vertical-stretch: 1;
+            Rectangle {
+                width: 106px;
+                height: min(110px, parent.height);
+                y: parent.height - self.height;
+                for level[index] in root.levels : Rectangle {
+                    width: 14px;
+                    height: max(6px, parent.height * clamp(level, 0, 100) / 100);
+                    x: index * 23px;
+                    y: parent.height - self.height;
+                    border-radius: 7px;
+                    background: Theme.primary;
+                    animate height { duration: 28ms; }
+                }
+            }
+        }
+        Rectangle {
+            height: 58px;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 12px;
+                MusicIconButton { glyph: "⤨"; selected: root.shuffle; clicked => { root.action("shuffle"); } }
+                MusicIconButton { glyph: "◀"; clicked => { root.action("back"); } }
+                MusicIconButton { glyph: root.playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.action(root.playing ? "pause" : "play"); } }
+                MusicIconButton { glyph: "▶"; clicked => { root.action("next"); } }
+                MusicIconButton { glyph: "↻"; selected: root.looping; clicked => { root.action("loop"); } }
+            }
+        }
+        VerticalLayout {
+            spacing: 3px;
+            Rectangle {
+                height: 7px;
+                border-radius: 4px;
+                background: Theme.raised;
+                Rectangle {
+                    x: 0px;
+                    width: parent.width * clamp(root.progress, 0, 100) / 100;
+                    border-radius: 4px;
+                    background: Theme.primary;
+                }
+            }
+            HorizontalLayout {
+                Text { text: root.position; color: Theme.muted; font-size: 10px; horizontal-stretch: 1; }
+                Text { text: root.duration; color: Theme.muted; font-size: 10px; }
+            }
+        }
+        Rectangle {
+            height: 42px;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+                Text { text: root.requests-label; color: Theme.muted; font-size: 10px; vertical-alignment: center; }
+                DashboardSwitch { checked: root.requests; toggled => { root.action("songrequest_toggle"); } }
+            }
+        }
+    }
 }
 
 component PillButton inherits Rectangle {
@@ -726,7 +869,7 @@ component TouchKey inherits Rectangle {
     in property <string> label: "";
     in property <bool> accent: false;
     callback clicked();
-    height: 42px;
+    vertical-stretch: 1;
     border-radius: 8px;
     background: touch.pressed ? Theme.primary : (accent ? Theme.elevated : Theme.raised);
     Text {
@@ -742,6 +885,7 @@ component TouchKey inherits Rectangle {
 
 component CardSelector inherits Rectangle {
     in-out property <string> value: "";
+    in property <string> display-label;
     callback changed(string);
     height: 42px;
     background: Theme.elevated;
@@ -752,7 +896,7 @@ component CardSelector inherits Rectangle {
         x: 12px;
         width: parent.width - 34px;
         height: parent.height;
-        text: root.value == "" ? "Empty" : root.value == "auto_macros" ? "Auto Macros" : root.value == "interactions" ? "Interactions" : root.value == "macros" ? "Macros" : "Music";
+        text: root.display-label;
         color: Theme.text;
         font-size: 13px;
         vertical-alignment: center;
@@ -768,6 +912,10 @@ export struct PickerEntry {
 }
 
 component NavItem inherits Rectangle {
+    in property <string> label;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
     in property <image> icon;
     in property <image> active-icon;
     in property <bool> active: false;
@@ -806,10 +954,14 @@ export component App inherits Window {
     in-out property <int> page: 0;
     in-out property <string> connection: "Waiting for backend";
     in-out property <string> backend-stage: "";
+    in-out property <bool> backend-ready;
+    pure callback locale-text(string, string) -> string;
+    pure callback fill-text(string, string, string) -> string;
+    pure callback startup-stage(string, string) -> string;
     in-out property <string> detail: "";
-    in-out property <string> track: "No track information";
+    in-out property <string> track;
     in-out property <string> music-state: "";
-    in-out property <string> interaction-summary: "No interactions";
+    in-out property <string> interaction-summary;
     in-out property <SystemStats> system-stats: { cpu: -1, temperature: -1, ram: -1, swap: -1, has-swap: false, storage: -1 };
     in-out property <SystemStorage> system-storage: { used: "—", free: "—", total: "—", usage: -1, other: 0, rows: [] };
     in-out property <bool> updates-available;
@@ -817,24 +969,17 @@ export component App inherits Window {
     in-out property <bool> updates-running;
     in-out property <bool> backend-update-running;
     property <[SystemMetric]> system-metrics: [
-        { label: root.tr("CPU usage", "CPU-Auslastung"), tint: #ef5350, value: root.system-stats.cpu, empty: "—" },
-        { label: root.tr("RAM usage", "RAM-Auslastung"), tint: #ffb300, value: root.system-stats.ram, empty: "—" },
-        { label: root.tr("Swap usage", "Swap-Auslastung"), tint: #ab47bc,
-            value: root.system-stats.has-swap ? root.system-stats.swap : -1, empty: root.system-stats.has-swap ? "—" : root.tr("No swap", "Kein Swap") },
-        { label: root.tr("Internal storage", "Interner Speicher"), tint: #26c6da,
+        { label: root.loc("system_cpu_usage"), tint: #ef5350, value: root.system-stats.cpu, empty: "—" },
+        { label: root.loc("system_ram_usage"), tint: #ffb300, value: root.system-stats.ram, empty: "—" },
+        { label: root.loc("system_swap_usage"), tint: #ab47bc,
+            value: root.system-stats.has-swap ? root.system-stats.swap : -1, empty: root.system-stats.has-swap ? "—" : root.loc("system_no_swap") },
+        { label: root.loc("system_internal_storage_usage"), tint: #26c6da,
             value: root.system-stats.storage >= 0 ? root.system-stats.storage : root.system-storage.usage, empty: "—" },
     ];
     pure function update-stage(stage: string) -> string {
-        if stage == "preparing" { return root.tr("Preparing", "Vorbereiten"); }
-        if stage == "downloading" { return root.tr("Downloading", "Herunterladen"); }
-        if stage == "extracting" { return root.tr("Extracting", "Entpacken"); }
-        if stage == "installing" { return root.tr("Installing", "Installieren"); }
-        if stage == "configuring" { return root.tr("Configuring", "Konfigurieren"); }
-        if stage == "pulling" { return root.tr("Pulling changes", "Änderungen abrufen"); }
-        if stage == "dependencies" { return root.tr("Installing dependencies", "Abhängigkeiten installieren"); }
-        if stage == "verifying" { return root.tr("Verifying", "Überprüfen"); }
-        if stage == "restarting" { return root.tr("Restarting", "Neustarten"); }
-        return stage == "" ? root.tr("Updating…", "Wird aktualisiert…") : stage;
+        let key = "system_updates_stage_" + stage;
+        let translation = root.loc(key);
+        return stage == "" ? root.loc("system_updates_updating") : translation == key ? stage : translation;
     }
     in-out property <string> speedtest-stage: "idle";
     in-out property <string> speedtest-ping: "—";
@@ -875,7 +1020,9 @@ export component App inherits Window {
     in-out property <bool> bluetooth-available;
     in-out property <bool> bluetooth-powered;
     in-out property <bool> bluetooth-scanning;
-    in-out property <bool> bluetooth-scan-le;
+    in-out property <bool> bluetooth-busy;
+    in-out property <bool> bluetooth-refreshing;
+    in-out property <string> bluetooth-error;
     in-out property <int> bluetooth-connected-count;
     in-out property <bool> touch-keyboard-open: false;
     in-out property <bool> touch-keyboard-shift: false;
@@ -904,7 +1051,7 @@ export component App inherits Window {
         root.drawer-visibility(root.network-drawer-open);
     }
     pure function connection-status(connected: bool) -> string {
-        return connected ? root.tr("Connected", "Verbunden") : root.tr("Disconnected", "Getrennt");
+        return connected ? root.loc("connected") : root.loc("disconnected");
     }
     function start-drawer-drag() {
         root.drawer-delta = 0px;
@@ -931,7 +1078,19 @@ export component App inherits Window {
     }
     in-out property <string> language: "en";
     callback choose-language(string);
-    pure function tr(en:string,de:string)->string { return root.language == "de" ? de : en; }
+    pure function loc(key: string) -> string { return root.locale-text(root.language, key); }
+    pure function interaction-meta(item: InteractionEntry) -> string {
+        let source-key = "interaction_source_" + item.source;
+        let state-key = "interaction_state_" + item.state;
+        let source = root.loc(source-key);
+        let state = root.loc(state-key);
+        return (source == source-key ? item.source : source) + " · " + (state == state-key ? item.state : state)
+            + (item.eta > 0 ? " · " + item.eta + "s" : "")
+            + (item.alerts > 0 ? " · " + root.loc("interaction_alerts") + " " + item.alerts : "");
+    }
+    pure function card-name(card: string) -> string {
+        return root.loc(card == "" ? "dashboard_empty" : "dashboard_card_" + card);
+    }
 
     callback keyboard-input(string);
     callback dashboard-save(string, string, string, string);
@@ -964,10 +1123,10 @@ export component App inherits Window {
     in-out property <string> dashboard-picker-kind: "";
     in-out property <string> dashboard-picker-search: "";
     in-out property <[PickerEntry]> dashboard-picker-items: [];
-    in-out property <string> dashboard-selected-macros: "None selected";
-    in-out property <string> dashboard-selected-auto-macros: "None selected";
+    in-out property <int> dashboard-selected-macros;
+    in-out property <int> dashboard-selected-auto-macros;
     in-out property <image> wallpaper-image;
-    in-out property <string> wallpaper-label: "No wallpaper";
+    in-out property <string> wallpaper-label;
     in-out property <[DashboardMacroEntry]> dashboard-macro-list: [];
     callback dashboard-open-picker(string);
     callback dashboard-filter(string);
@@ -980,8 +1139,8 @@ export component App inherits Window {
     in-out property <bool> show-dashboard-macros: false;
     in-out property <[InteractionEntry]> dashboard-interactions: [];
     in-out property <[AutoMacroEntry]> dashboard-auto-macros: [];
-    in-out property <string> music-title: "No song";
-    in-out property <string> music-artist: "Unknown artist";
+    in-out property <string> music-title;
+    in-out property <string> music-artist;
     in-out property <bool> music-playing: false;
     in-out property <bool> music-shuffle: false;
     in-out property <bool> music-loop: false;
@@ -1046,7 +1205,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: root.tr("No interactions","Keine Interaktionen");
+                                                        text: root.loc("no_interactions");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -1084,7 +1243,7 @@ export component App inherits Window {
                                                                     horizontal-stretch: 1;
                                                                     spacing: 1px;
                                                                     Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
                                                                     if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
                                                                 }
                                                                 MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
@@ -1098,78 +1257,29 @@ export component App inherits Window {
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
-                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        empty-label: root.loc("no_auto_macros");
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.left-slot-0 == "macros" : DashboardMacroCard {
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
-                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
-                    if root.left-slot-0 == "music" : Rectangle {
-                                        horizontal-stretch: 1;
-                                        background: Theme.surface;
-                                        border-radius: 16px;
-                                        VerticalLayout {
-                                            padding: 18px;
-                                            spacing: 10px;
-                                            VerticalLayout {
-                                                spacing: 2px;
-                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
-                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
-                                            }
-                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
-                                            // never the Music card's preferred size or layout stretch.
-                                            Rectangle {
-                                                vertical-stretch: 1;
-                                                background: transparent;
-                                                Rectangle {
-                                                    height: 110px;
-                                                    width: 106px;
-                                                    x: (parent.width - self.width) / 2;
-                                                    y: parent.height - self.height;
-                                                    background: transparent;
-                                                    for level[i] in root.cava-bars : Rectangle {
-                                                        width: 14px;
-                                                        x: i * 23px;
-                                                        height: max(6px, min(110px, level * 1.1px));
-                                                        y: parent.height - self.height;
-                                                        background: Theme.primary;
-                                                        border-radius: 7px;
-                                                    }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 12px;
-                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
-                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
-                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
-                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
-                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
-                                            }
-                                            VerticalLayout {
-                                                spacing: 3px;
-                                                Rectangle {
-                                                    height: 7px;
-                                                    background: Theme.raised;
-                                                    border-radius: 4px;
-                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
-                                                }
-                                                HorizontalLayout {
-                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
-                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 8px;
-                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
-                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
-                                            }
-                                        }
-                                    }
+                    if root.left-slot-0 == "music" : DashboardMusicCard {
+                        title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                        artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                        levels: root.cava-bars;
+                        playing: root.music-playing;
+                        shuffle: root.music-shuffle;
+                        looping: root.music-loop;
+                        requests: root.music-song-requests;
+                        requests-label: root.loc("song_requests");
+                        progress: root.music-progress;
+                        position: root.music-position;
+                        duration: root.music-duration;
+                        action(name) => { root.music-action(name); }
+                    }
                     if root.left-slot-1 == "interactions" : Rectangle {
                                             vertical-stretch: 1;
                                             background: Theme.surface;
@@ -1181,7 +1291,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: root.tr("No interactions","Keine Interaktionen");
+                                                        text: root.loc("no_interactions");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -1219,7 +1329,7 @@ export component App inherits Window {
                                                                     horizontal-stretch: 1;
                                                                     spacing: 1px;
                                                                     Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
                                                                     if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
                                                                 }
                                                                 MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
@@ -1233,78 +1343,29 @@ export component App inherits Window {
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
-                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        empty-label: root.loc("no_auto_macros");
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.left-slot-1 == "macros" : DashboardMacroCard {
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
-                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
-                    if root.left-slot-1 == "music" : Rectangle {
-                                        horizontal-stretch: 1;
-                                        background: Theme.surface;
-                                        border-radius: 16px;
-                                        VerticalLayout {
-                                            padding: 18px;
-                                            spacing: 10px;
-                                            VerticalLayout {
-                                                spacing: 2px;
-                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
-                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
-                                            }
-                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
-                                            // never the Music card's preferred size or layout stretch.
-                                            Rectangle {
-                                                vertical-stretch: 1;
-                                                background: transparent;
-                                                Rectangle {
-                                                    height: 110px;
-                                                    width: 106px;
-                                                    x: (parent.width - self.width) / 2;
-                                                    y: parent.height - self.height;
-                                                    background: transparent;
-                                                    for level[i] in root.cava-bars : Rectangle {
-                                                        width: 14px;
-                                                        x: i * 23px;
-                                                        height: max(6px, min(110px, level * 1.1px));
-                                                        y: parent.height - self.height;
-                                                        background: Theme.primary;
-                                                        border-radius: 7px;
-                                                    }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 12px;
-                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
-                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
-                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
-                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
-                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
-                                            }
-                                            VerticalLayout {
-                                                spacing: 3px;
-                                                Rectangle {
-                                                    height: 7px;
-                                                    background: Theme.raised;
-                                                    border-radius: 4px;
-                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
-                                                }
-                                                HorizontalLayout {
-                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
-                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 8px;
-                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
-                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
-                                            }
-                                        }
-                                    }
+                    if root.left-slot-1 == "music" : DashboardMusicCard {
+                        title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                        artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                        levels: root.cava-bars;
+                        playing: root.music-playing;
+                        shuffle: root.music-shuffle;
+                        looping: root.music-loop;
+                        requests: root.music-song-requests;
+                        requests-label: root.loc("song_requests");
+                        progress: root.music-progress;
+                        position: root.music-position;
+                        duration: root.music-duration;
+                        action(name) => { root.music-action(name); }
+                    }
                 }
                 VerticalLayout {
                     spacing: 8px;
@@ -1320,7 +1381,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: root.tr("No interactions","Keine Interaktionen");
+                                                        text: root.loc("no_interactions");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -1358,7 +1419,7 @@ export component App inherits Window {
                                                                     horizontal-stretch: 1;
                                                                     spacing: 1px;
                                                                     Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
                                                                     if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
                                                                 }
                                                                 MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
@@ -1372,78 +1433,29 @@ export component App inherits Window {
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
-                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        empty-label: root.loc("no_auto_macros");
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.right-slot-0 == "macros" : DashboardMacroCard {
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
-                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
-                    if root.right-slot-0 == "music" : Rectangle {
-                                        horizontal-stretch: 1;
-                                        background: Theme.surface;
-                                        border-radius: 16px;
-                                        VerticalLayout {
-                                            padding: 18px;
-                                            spacing: 10px;
-                                            VerticalLayout {
-                                                spacing: 2px;
-                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
-                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
-                                            }
-                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
-                                            // never the Music card's preferred size or layout stretch.
-                                            Rectangle {
-                                                vertical-stretch: 1;
-                                                background: transparent;
-                                                Rectangle {
-                                                    height: 110px;
-                                                    width: 106px;
-                                                    x: (parent.width - self.width) / 2;
-                                                    y: parent.height - self.height;
-                                                    background: transparent;
-                                                    for level[i] in root.cava-bars : Rectangle {
-                                                        width: 14px;
-                                                        x: i * 23px;
-                                                        height: max(6px, min(110px, level * 1.1px));
-                                                        y: parent.height - self.height;
-                                                        background: Theme.primary;
-                                                        border-radius: 7px;
-                                                    }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 12px;
-                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
-                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
-                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
-                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
-                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
-                                            }
-                                            VerticalLayout {
-                                                spacing: 3px;
-                                                Rectangle {
-                                                    height: 7px;
-                                                    background: Theme.raised;
-                                                    border-radius: 4px;
-                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
-                                                }
-                                                HorizontalLayout {
-                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
-                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 8px;
-                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
-                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
-                                            }
-                                        }
-                                    }
+                    if root.right-slot-0 == "music" : DashboardMusicCard {
+                        title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                        artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                        levels: root.cava-bars;
+                        playing: root.music-playing;
+                        shuffle: root.music-shuffle;
+                        looping: root.music-loop;
+                        requests: root.music-song-requests;
+                        requests-label: root.loc("song_requests");
+                        progress: root.music-progress;
+                        position: root.music-position;
+                        duration: root.music-duration;
+                        action(name) => { root.music-action(name); }
+                    }
                     if root.right-slot-1 == "interactions" : Rectangle {
                                             vertical-stretch: 1;
                                             background: Theme.surface;
@@ -1455,7 +1467,7 @@ export component App inherits Window {
                                                     vertical-stretch: 1;
                                                     background: transparent;
                                                     Text {
-                                                        text: root.tr("No interactions","Keine Interaktionen");
+                                                        text: root.loc("no_interactions");
                                                         color: Theme.muted;
                                                         font-size: 13px;
                                                         horizontal-alignment: center;
@@ -1493,7 +1505,7 @@ export component App inherits Window {
                                                                     horizontal-stretch: 1;
                                                                     spacing: 1px;
                                                                     Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: item.meta; color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
+                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
                                                                     if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
                                                                 }
                                                                 MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
@@ -1507,78 +1519,29 @@ export component App inherits Window {
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
-                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        empty-label: root.loc("no_auto_macros");
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.right-slot-1 == "macros" : DashboardMacroCard {
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
-                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
-                    if root.right-slot-1 == "music" : Rectangle {
-                                        horizontal-stretch: 1;
-                                        background: Theme.surface;
-                                        border-radius: 16px;
-                                        VerticalLayout {
-                                            padding: 18px;
-                                            spacing: 10px;
-                                            VerticalLayout {
-                                                spacing: 2px;
-                                                Text { text: root.music-title; color: Theme.text; font-size: 20px; font-weight: 600; horizontal-alignment: center; overflow: elide; }
-                                                Text { text: root.music-artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
-                                            }
-                                            // Fixed-size CAVA region. Audio levels only change bar geometry,
-                                            // never the Music card's preferred size or layout stretch.
-                                            Rectangle {
-                                                vertical-stretch: 1;
-                                                background: transparent;
-                                                Rectangle {
-                                                    height: 110px;
-                                                    width: 106px;
-                                                    x: (parent.width - self.width) / 2;
-                                                    y: parent.height - self.height;
-                                                    background: transparent;
-                                                    for level[i] in root.cava-bars : Rectangle {
-                                                        width: 14px;
-                                                        x: i * 23px;
-                                                        height: max(6px, min(110px, level * 1.1px));
-                                                        y: parent.height - self.height;
-                                                        background: Theme.primary;
-                                                        border-radius: 7px;
-                                                    }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 12px;
-                                                MusicIconButton { glyph: "⤨"; selected: root.music-shuffle; clicked => { root.music-action("shuffle"); } }
-                                                MusicIconButton { glyph: "◀"; clicked => { root.music-action("back"); } }
-                                                MusicIconButton { glyph: root.music-playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.music-action(root.music-playing ? "pause" : "play"); } }
-                                                MusicIconButton { glyph: "▶"; clicked => { root.music-action("next"); } }
-                                                MusicIconButton { glyph: "↻"; selected: root.music-loop; clicked => { root.music-action("loop"); } }
-                                            }
-                                            VerticalLayout {
-                                                spacing: 3px;
-                                                Rectangle {
-                                                    height: 7px;
-                                                    background: Theme.raised;
-                                                    border-radius: 4px;
-                                                    Rectangle { height: parent.height; x: 0px; width: parent.width * max(0, min(100, root.music-progress)) / 100; background: Theme.primary; border-radius: 4px; }
-                                                }
-                                                HorizontalLayout {
-                                                    Text { text: root.music-position; font-size: 10px; color: Theme.muted; horizontal-stretch: 1; }
-                                                    Text { text: root.music-duration; font-size: 10px; color: Theme.muted; }
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                alignment: center;
-                                                spacing: 8px;
-                                                Text { text: root.tr("Song requests","Songwünsche"); font-size: 10px; color: Theme.muted; vertical-alignment: center; }
-                                                DashboardSwitch { checked: root.music-song-requests; toggled => { root.music-action("songrequest_toggle"); } }
-                                            }
-                                        }
-                                    }
+                    if root.right-slot-1 == "music" : DashboardMusicCard {
+                        title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                        artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                        levels: root.cava-bars;
+                        playing: root.music-playing;
+                        shuffle: root.music-shuffle;
+                        looping: root.music-loop;
+                        requests: root.music-song-requests;
+                        requests-label: root.loc("song_requests");
+                        progress: root.music-progress;
+                        position: root.music-position;
+                        duration: root.music-duration;
+                        action(name) => { root.music-action(name); }
+                    }
                 }
             }
             if root.page == 0 && root.dashboard-editing : VerticalLayout {
@@ -1586,13 +1549,13 @@ export component App inherits Window {
                 spacing: 10px;
                 HorizontalLayout {
                     spacing: 8px;
-                    Text { text: root.tr("Edit dashboard","Dashboard bearbeiten"); color: Theme.text; font-size: 17px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
-                    PillButton { width: 170px; label: root.wallpaper-label; clicked => { root.dashboard-open-picker("wallpaper"); } }
-                    PillButton { width: 82px; label: root.tr("Reset","Zurücksetzen"); clicked => { root.dashboard-editor-reset(); } }
-                    PillButton { width: 82px; label: root.tr("Cancel","Abbrechen"); clicked => { root.dashboard-cancel(); root.dashboard-editing = false; } }
-                    PillButton { width: 82px; label: root.tr("Save","Speichern"); selected: true; clicked => { root.dashboard-save(root.edit-left-0, root.edit-left-1, root.edit-right-0, root.edit-right-1); } }
+                    Rectangle { horizontal-stretch: 1; }
+                    PillButton { width: 170px; label: root.wallpaper-label == "" ? root.loc("dashboard_wallpaper_none") : root.wallpaper-label; clicked => { root.dashboard-open-picker("wallpaper"); } }
+                    PillButton { width: 82px; label: root.loc("dashboard_reset"); clicked => { root.dashboard-editor-reset(); } }
+                    PillButton { width: 82px; label: root.loc("cancel"); clicked => { root.dashboard-cancel(); root.dashboard-editing = false; } }
+                    PillButton { width: 82px; label: root.loc("save"); selected: true; clicked => { root.dashboard-save(root.edit-left-0, root.edit-left-1, root.edit-right-0, root.edit-right-1); } }
                 }
-                Text { text: root.feedback; color: Theme.muted; font-size: 11px; }
+                if root.feedback != "" : Text { text: root.feedback; color: Theme.muted; font-size: 11px; }
                 HorizontalLayout {
                     spacing: 8px;
                     Rectangle {
@@ -1602,20 +1565,20 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
-                            Text { text: root.tr("Left column","Linke Spalte"); color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: root.tr("Slot 1","Platz 1"); color: Theme.muted; font-size: 10px; }
-                            CardSelector { value: root.edit-left-0; changed(card) => { root.dashboard-open-picker("slot:left-0"); } }
-                            Text { text: root.tr("Slot 2","Platz 2"); color: Theme.muted; font-size: 10px; }
-                            CardSelector { value: root.edit-left-1; changed(card) => { root.dashboard-open-picker("slot:left-1"); } }
+                            Text { text: root.loc("dashboard_left_column"); color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.fill-text(root.loc("dashboard_slot_number"), "%1", "1"); color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-left-0; display-label: root.card-name(self.value); changed(card) => { root.dashboard-open-picker("slot:left-0"); } }
+                            Text { text: root.fill-text(root.loc("dashboard_slot_number"), "%1", "2"); color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-left-1; display-label: root.card-name(self.value); changed(card) => { root.dashboard-open-picker("slot:left-1"); } }
                             if root.edit-left-0 == "macros" || root.edit-left-1 == "macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: root.tr("Dashboard macros (max 4)","Dashboard-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
-                                PillButton { label: root.dashboard-selected-macros; clicked => { root.dashboard-open-picker("macros"); } }
+                                Text { text: root.loc("dashboard_macro_limit"); font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.fill-text(root.loc("dashboard_selected_count"), "%1", root.dashboard-selected-macros + ""); clicked => { root.dashboard-open-picker("macros"); } }
                             }
                             if root.edit-left-0 == "auto_macros" || root.edit-left-1 == "auto_macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: root.tr("Auto macros (max 4)","Auto-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
-                                PillButton { label: root.dashboard-selected-auto-macros; clicked => { root.dashboard-open-picker("auto_macros"); } }
+                                Text { text: root.loc("dashboard_auto_macro_limit"); font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.fill-text(root.loc("dashboard_selected_count"), "%1", root.dashboard-selected-auto-macros + ""); clicked => { root.dashboard-open-picker("auto_macros"); } }
                             }
 
                             Rectangle { vertical-stretch: 1; background: transparent; }
@@ -1628,20 +1591,20 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
-                            Text { text: root.tr("Right column","Rechte Spalte"); color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: root.tr("Slot 1","Platz 1"); color: Theme.muted; font-size: 10px; }
-                            CardSelector { value: root.edit-right-0; changed(card) => { root.dashboard-open-picker("slot:right-0"); } }
-                            Text { text: root.tr("Slot 2","Platz 2"); color: Theme.muted; font-size: 10px; }
-                            CardSelector { value: root.edit-right-1; changed(card) => { root.dashboard-open-picker("slot:right-1"); } }
+                            Text { text: root.loc("dashboard_right_column"); color: Theme.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.fill-text(root.loc("dashboard_slot_number"), "%1", "1"); color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-right-0; display-label: root.card-name(self.value); changed(card) => { root.dashboard-open-picker("slot:right-0"); } }
+                            Text { text: root.fill-text(root.loc("dashboard_slot_number"), "%1", "2"); color: Theme.muted; font-size: 10px; }
+                            CardSelector { value: root.edit-right-1; display-label: root.card-name(self.value); changed(card) => { root.dashboard-open-picker("slot:right-1"); } }
                             if root.edit-right-0 == "macros" || root.edit-right-1 == "macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: root.tr("Dashboard macros (max 4)","Dashboard-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
-                                PillButton { label: root.dashboard-selected-macros; clicked => { root.dashboard-open-picker("macros"); } }
+                                Text { text: root.loc("dashboard_macro_limit"); font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.fill-text(root.loc("dashboard_selected_count"), "%1", root.dashboard-selected-macros + ""); clicked => { root.dashboard-open-picker("macros"); } }
                             }
                             if root.edit-right-0 == "auto_macros" || root.edit-right-1 == "auto_macros" : VerticalLayout {
                                 spacing: 4px;
-                                Text { text: root.tr("Auto macros (max 4)","Auto-Makros (max. 4)"); font-size: 11px; color: Theme.muted; }
-                                PillButton { label: root.dashboard-selected-auto-macros; clicked => { root.dashboard-open-picker("auto_macros"); } }
+                                Text { text: root.loc("dashboard_auto_macro_limit"); font-size: 11px; color: Theme.muted; }
+                                PillButton { label: root.fill-text(root.loc("dashboard_selected_count"), "%1", root.dashboard-selected-auto-macros + ""); clicked => { root.dashboard-open-picker("auto_macros"); } }
                             }
 
                             Rectangle { vertical-stretch: 1; background: transparent; }
@@ -1652,7 +1615,7 @@ export component App inherits Window {
             if root.page == 1 : VerticalLayout {
                 padding: 10px;
                 if root.audio-interfaces.length == 0 : DrawerEmpty {
-                    text: root.tr("No audio outputs", "Keine Audioausgänge");
+                    text: root.loc("audio_no_outputs");
                 }
                 if root.audio-interfaces.length > 0 : ScrollView {
                     horizontal-scrollbar-policy: always-off;
@@ -1668,12 +1631,12 @@ export component App inherits Window {
                             KioskAudioRow {
                                 item: item;
                                 ready: root.connection == "Connected";
-                                quieter: root.tr("Volume down", "Leiser");
-                                louder: root.tr("Volume up", "Lauter");
-                                route-label: root.tr("Link audio outputs", "Audioausgänge verknüpfen");
-                                mute-label: item.muted ? root.tr("Unmute", "Ton an") : root.tr("Mute", "Stumm");
-                                link-volume-label: root.tr("Volume is set per output", "Lautstärke wird pro Ausgang eingestellt");
-                                levels-label: root.tr("Per output", "Pro Ausgang");
+                                quieter: root.loc("audio_volume_down");
+                                louder: root.loc("audio_volume_up");
+                                route-label: root.loc("audio_link_outputs");
+                                mute-label: item.muted ? root.loc("audio_unmute") : root.loc("audio_mute");
+                                link-volume-label: root.loc("audio_per_link_hint");
+                                levels-label: root.loc("audio_per_link_short");
                                 volume(value) => { root.change-volume(item, value, false); }
                                 mute(value) => { root.change-volume(item, value, true); }
                                 routing => { root.routing = item.id; }
@@ -1688,12 +1651,14 @@ export component App inherits Window {
                 spacing: 8px;
                 HorizontalLayout {
                     spacing: 8px;
-                    PillButton { width: 132px; label: root.tr("Macros","Makros"); selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
-                    PillButton { width: 132px; label: root.tr("Auto Macros","Auto-Makros"); selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
-                    PillButton { width: 160px; label: root.tr("Channel Points","Kanalpunkte"); selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
+                    PillButton { width: 132px; label: root.loc("macros"); selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
+                    PillButton { width: 132px; label: root.loc("auto_macros"); selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
+                    PillButton { width: 160px; label: root.loc("channel_points"); selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
                 }
                 KioskSearch {
-                    placeholder-text: root.tr("Search", "Suchen");
+                    background: Theme.raised.with-alpha(0.94);
+                    placeholder-text: root.loc(root.macro-tab == 0 ? "macro_search"
+                        : root.macro-tab == 1 ? "auto_macro_search" : "channel_points_search");
                     text <=> root.search;
                     activated => { root.touch-keyboard-open = true; }
                     accepted => { root.hide-keyboard(); }
@@ -1744,16 +1709,16 @@ export component App inherits Window {
                 VerticalLayout {
                     spacing: 8px;
                     width: (root.width - 28px) / 2;
-                    Md3Card {
+                    GlassCard {
                         height: 165px;
                         VerticalLayout {
                             padding: 12px;
                             spacing: 6px;
                             HorizontalLayout {
-                                SystemHeading { text: root.tr("System", "System"); horizontal-stretch: 1; }
+                                SystemHeading { text: root.loc("system_stats"); horizontal-stretch: 1; }
                                 SystemHeading {
                                     font-size: 11px;
-                                    text: root.tr("CPU temperature", "CPU-Temperatur") + "  "
+                                    text: root.loc("system_cpu_temp") + "  "
                                         + (root.system-stats.temperature >= 0 ? round(root.system-stats.temperature) + " °C" : "—");
                                 }
                             }
@@ -1788,7 +1753,7 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 12px;
                             spacing: 8px;
-                            SystemHeading { text: root.tr("Storage", "Speicher"); }
+                            SystemHeading { text: root.loc("system_storage"); }
                             Rectangle {
                                 height: 10px;
                                 background: Theme.raised;
@@ -1807,9 +1772,9 @@ export component App inherits Window {
                             }
                             VerticalLayout {
                                 spacing: 3px;
-                                SystemDetail { title: root.tr("Used Storage", "Belegter Speicher"); value: root.system-storage.used; }
-                                SystemDetail { title: root.tr("Free Storage", "Freier Speicher"); value: root.system-storage.free; }
-                                SystemDetail { title: root.tr("Total Storage", "Gesamter Speicher"); value: root.system-storage.total; }
+                                SystemDetail { title: root.loc("system_storage_used"); value: root.system-storage.used; }
+                                SystemDetail { title: root.loc("system_storage_free"); value: root.system-storage.free; }
+                                SystemDetail { title: root.loc("system_storage_total"); value: root.system-storage.total; }
                             }
                             Rectangle { height: 1px; background: Theme.raised; }
                             ScrollView {
@@ -1820,7 +1785,7 @@ export component App inherits Window {
                                     spacing: 2px;
                                     for row in root.system-storage.rows : SystemDetail {
                                         height: 26px;
-                                        title: root.tr(row.label, row.german);
+                                        title: root.loc(row.label-key);
                                         value: row.size;
                                         tint: row.tint;
                                         marker-size: 12px;
@@ -1834,17 +1799,17 @@ export component App inherits Window {
                 VerticalLayout {
                     spacing: 8px;
                     width: (root.width - 28px) / 2;
-                    Md3Card {
+                    GlassCard {
                         vertical-stretch: 1;
                         VerticalLayout {
                             padding: 12px;
                             spacing: 6px;
                             HorizontalLayout {
                                 spacing: 8px;
-                                SystemHeading { text: "Updates"; horizontal-stretch: 1; }
+                                SystemHeading { text: root.loc("system_updates"); horizontal-stretch: 1; }
                                 Md3Button {
                                     filled: true;
-                                    label: root.updating-manager != "" ? root.tr("Updating…", "Wird aktualisiert…") : root.tr("Update all", "Alle aktualisieren");
+                                    label: root.updating-manager != "" ? root.loc("system_updates_updating") : root.loc("system_updates_update_all");
                                     enabled: root.updates-available && !root.updates-running && !root.updates-checking && root.updating-manager == "";
                                     clicked => { root.update-all(); }
                                 }
@@ -1861,7 +1826,7 @@ export component App inherits Window {
                                         transform-rotation: root.updates-checking ? 360deg * mod(animation-tick(), 900ms) / 900ms : 0deg;
                                     }
                                     accessible-role: button;
-                                    accessible-label: root.tr("Check for updates", "Updates neu prüfen");
+                                    accessible-label: root.loc("system_updates_refresh");
                                     refresh-hit := TouchArea {
                                         enabled: !root.updates-running && root.updating-manager == "";
                                         clicked => { root.update-refresh(); }
@@ -1869,7 +1834,7 @@ export component App inherits Window {
                                 }
                             }
                             if root.updates.length == 0 : DrawerEmpty {
-                                text: root.tr("No update status yet", "Noch kein Update-Status verfügbar");
+                                text: root.loc("system_updates_no_state");
                                 font-size: 12px;
                             }
                             if root.updates.length > 0 : ScrollView {
@@ -1910,9 +1875,9 @@ export component App inherits Window {
                                                             border-radius: 10px;
                                                             background: item.updating ? Theme.primary : item.available ? Theme.error : Theme.raised;
                                                             update-status := Text {
-                                                                text: item.updating ? root.tr("Updating…", "Wird aktualisiert…")
-                                                                    : item.checking ? root.tr("Checking…", "Wird geprüft…")
-                                                                    : item.available ? root.tr("Update available", "Update verfügbar") : root.tr("Up to date", "Aktuell");
+                                                                text: item.updating ? root.loc("system_updates_updating")
+                                                                    : item.checking ? root.loc("system_updates_checking")
+                                                                    : item.available ? root.loc("system_updates_available") : root.loc("system_updates_up_to_date");
                                                                 color: item.updating ? Theme.on-primary : item.available ? Theme.on-error : Theme.muted;
                                                                 font-size: 12px;
                                                                 font-weight: 600;
@@ -1922,7 +1887,7 @@ export component App inherits Window {
                                                         }
                                                     }
                                                     Text {
-                                                        text: item.error != "" ? item.error : item.id == "system" ? item.count + root.tr(" packages", " Pakete") : item.version;
+                                                        text: item.error != "" ? item.error : item.id == "system" ? root.fill-text(root.loc("system_updates_package_count"), "{count}", item.count + "") : item.version;
                                                         color: item.error != "" ? Theme.error : Theme.muted;
                                                         font-size: 12px;
                                                         overflow: elide;
@@ -1930,7 +1895,7 @@ export component App inherits Window {
                                                     if item.preview != "" : Text { text: item.preview; color: Theme.muted; font-size: 12px; overflow: elide; }
                                                 }
                                                 Md3Button {
-                                                    label: root.tr("Update", "Aktualisieren");
+                                                    label: root.loc("system_updates_update");
                                                     height: 28px;
                                                     filled: true;
                                                     enabled: item.active && root.updating-manager == ""
@@ -1952,17 +1917,17 @@ export component App inherits Window {
                             }
                         }
                     }
-                    Md3Card {
+                    GlassCard {
                         height: 118px;
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
                             alignment: start;
-                            DrawerTitle { text: root.tr("Language", "Sprache"); }
+                            DrawerTitle { text: root.loc("language"); }
                             SystemLanguage {
                                 language: root.language;
-                                english: root.tr("English", "Englisch");
-                                german: root.tr("German", "Deutsch");
+                                english: root.loc("english");
+                                german: root.loc("german");
                                 selected(code) => { root.choose-language(code); }
                             }
                         }
@@ -1975,9 +1940,9 @@ export component App inherits Window {
                 HorizontalLayout {
                     spacing: 8px;
                     vertical-stretch: 1;
-                    SpeedMetric { width: (root.width - 40px) / 3; title: "Ping"; glyph: "◷"; value: root.speedtest-ping; active: root.speedtest-stage == "ping"; }
-                    SpeedMetric { width: (root.width - 40px) / 3; title: "Download"; glyph: "↓"; value: root.speedtest-download; active: root.speedtest-stage == "download"; }
-                    SpeedMetric { width: (root.width - 40px) / 3; title: "Upload"; glyph: "↑"; value: root.speedtest-upload; active: root.speedtest-stage == "upload"; }
+                    SpeedMetric { width: (root.width - 40px) / 3; title: root.loc("speedtest_ping"); glyph: "◷"; value: root.speedtest-ping; active: root.speedtest-stage == "ping"; }
+                    SpeedMetric { width: (root.width - 40px) / 3; title: root.loc("speedtest_download"); glyph: "↓"; value: root.speedtest-download; active: root.speedtest-stage == "download"; }
+                    SpeedMetric { width: (root.width - 40px) / 3; title: root.loc("speedtest_upload"); glyph: "↑"; value: root.speedtest-upload; active: root.speedtest-stage == "upload"; }
                 }
                 if root.speedtest-error != "" : Text {
                     text: root.speedtest-error; color: Theme.error; font-size: 12px; wrap: word-wrap;
@@ -1988,9 +1953,9 @@ export component App inherits Window {
                     border-radius: 22px;
                     filled: true;
                     enabled: root.connection == "Connected" && !root.speedtest-running && !root.speedtest-starting;
-                    label: root.speedtest-running ? root.tr("Speedtest running…", "Speedtest läuft …")
-                        : root.speedtest-starting ? root.tr("Starting…", "Wird gestartet …")
-                        : root.tr("Run Speedtest", "Speedtest starten");
+                    label: root.speedtest-running ? root.loc("speedtest_running")
+                        : root.speedtest-starting ? root.loc("speedtest_starting")
+                        : root.loc("speedtest_run");
                     clicked => { root.speedtest-start(); }
                 }
             }
@@ -2000,9 +1965,18 @@ export component App inherits Window {
                 VerticalLayout {
                     alignment: center;
                     spacing: 14px;
-                    Text { text: root.tr("Connecting to Streambot","Verbindung zu Streambot wird aufgebaut"); color: Theme.text; font-size: 22px; font-weight: 600; horizontal-alignment: center; }
-                    Text { text: root.connection; color: Theme.muted; font-size: 14px; horizontal-alignment: center; }
-                    Text { text: root.backend-stage; color: Theme.primary; font-size: 12px; horizontal-alignment: center; }
+                    Text {
+                        text: root.loc(root.backend-ready ? "connect_connection_lost" : "connect_starting_title");
+                        color: Theme.text; font-size: 22px; font-weight: 600; horizontal-alignment: center;
+                    }
+                    Text {
+                        text: root.loc(root.backend-ready ? "connect_connection_lost_text" : "connect_starting_text");
+                        color: Theme.muted; font-size: 14px; horizontal-alignment: center; wrap: word-wrap;
+                    }
+                    Text {
+                        text: root.backend-ready ? root.loc("connect_reconnecting") : root.startup-stage(root.language, root.backend-stage);
+                        color: Theme.primary; font-size: 12px; horizontal-alignment: center;
+                    }
                 }
             }
         }
@@ -2011,43 +1985,52 @@ export component App inherits Window {
             height: 52px;
             background: Theme.surface;
             HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 10px;
-                spacing: 0px;
-                Rectangle {
-                    width: 50px;
-                    background: transparent;
-                    if root.page == 0 : Rectangle {
-                        width: 42px;
-                        height: 42px;
-                        border-radius: 21px;
-                        background: root.dashboard-editing ? Theme.primary : transparent;
-                        Text {
-                            text: root.dashboard-editing ? "✓" : "✎";
-                            color: root.dashboard-editing ? Theme.on-primary : Theme.muted;
-                            font-size: 20px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                width: self.preferred-width;
+                height: 42px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                spacing: 10px;
+                NavItem { label: root.loc("page_home"); icon: @image-url("icons/mdi/home.svg"); active-icon: @image-url("icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.page = 0; } }
+                NavItem { label: root.loc("audio"); icon: @image-url("icons/mdi/volume-high.svg"); active-icon: @image-url("icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.page = 1; root.dashboard-editing = false; } }
+                NavItem { label: root.loc("page_controls"); icon: @image-url("icons/mdi/tune.svg"); active-icon: @image-url("icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.page = 2; root.dashboard-editing = false; } }
+                NavItem { label: root.loc("page_system"); icon: @image-url("icons/mdi/server.svg"); active-icon: @image-url("icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.page = 3; if root.connection=="Connected" {root.update-refresh();} root.dashboard-editing = false; } }
+                NavItem { label: root.loc("page_speedtest"); icon: @image-url("icons/mdi/speedometer.svg"); active-icon: @image-url("icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.page = 4; root.dashboard-editing = false; } }
+            }
+            if root.page == 0 : Rectangle {
+                width: 40px;
+                height: 40px;
+                x: 10px;
+                y: (parent.height - self.height) / 2;
+                border-radius: 20px;
+                background: root.dashboard-editing ? Theme.primary : transparent;
+                Text {
+                    text: root.dashboard-editing ? "✓" : "✎";
+                    color: root.dashboard-editing ? Theme.on-primary : Theme.muted;
+                    font-size: 20px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                TouchArea {
+                    clicked => {
+                        if !root.dashboard-editing {
+                            root.edit-left-0 = root.left-slot-0;
+                            root.edit-left-1 = root.left-slot-1;
+                            root.edit-right-0 = root.right-slot-0;
+                            root.edit-right-1 = root.right-slot-1;
                         }
-                        TouchArea { clicked => { if !root.dashboard-editing {
-                            root.edit-left-0 = root.left-slot-0; root.edit-left-1 = root.left-slot-1;
-                            root.edit-right-0 = root.right-slot-0; root.edit-right-1 = root.right-slot-1;
-                        }
-                        root.dashboard-editing = !root.dashboard-editing; if root.dashboard-editing { root.dashboard-editor-open(); } } }
+                        root.dashboard-editing = !root.dashboard-editing;
+                        if root.dashboard-editing { root.dashboard-editor-open(); }
                     }
                 }
-                Rectangle { horizontal-stretch: 1; background: transparent; }
-                NavItem { icon: @image-url("icons/mdi/home.svg"); active-icon: @image-url("icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.page = 0; } }
-                NavItem { icon: @image-url("icons/mdi/volume-high.svg"); active-icon: @image-url("icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.page = 1; root.dashboard-editing = false; } }
-                NavItem { icon: @image-url("icons/mdi/tune.svg"); active-icon: @image-url("icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.page = 2; root.dashboard-editing = false; } }
-                NavItem { icon: @image-url("icons/mdi/server.svg"); active-icon: @image-url("icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.page = 3; if root.connection=="Connected" {root.update-refresh();} root.dashboard-editing = false; } }
-                NavItem { icon: @image-url("icons/mdi/speedometer.svg"); active-icon: @image-url("icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.page = 4; root.dashboard-editing = false; } }
-                Rectangle { horizontal-stretch: 1; background: transparent; }
-                Rectangle {
-                    width: 40px; height: 40px; border-radius: 20px; background: transparent;
-                    Image { width: 21px; height: 21px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; source: @image-url("icons/mdi/power.svg"); }
-                    TouchArea { clicked => { root.power-menu-open = true; } }
-                }
+            }
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                x: parent.width - self.width - 10px;
+                y: (parent.height - self.height) / 2;
+                border-radius: 20px;
+                Image { width: 21px; height: 21px; source: @image-url("icons/mdi/power.svg"); }
+                TouchArea { clicked => { root.power-menu-open = true; } }
             }
         }
     }
@@ -2077,7 +2060,7 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
-                            DrawerTitle { text: "Ethernet"; }
+                            DrawerTitle { text: root.loc("ethernet"); }
                             ScrollView {
                                 VerticalLayout {
                                     spacing: 6px;
@@ -2106,9 +2089,9 @@ export component App inherits Window {
                             spacing: 8px;
                             HorizontalLayout {
                                 spacing: 8px;
-                                DrawerTitle { text: root.tr("Wi-Fi", "WLAN"); horizontal-stretch: 1; }
+                                DrawerTitle { text: root.loc("wifi"); horizontal-stretch: 1; }
                                 Md3Button {
-                                    label: root.tr("Saved Wi-Fi", "Gespeichertes WLAN");
+                                    label: root.loc("saved_wifi");
                                     clicked => { root.saved-wifi-open = true; }
                                 }
                                 DashboardSwitch {
@@ -2124,9 +2107,9 @@ export component App inherits Window {
                                 overflow: elide;
                             }
                             if !root.wifi-enabled || root.wifi.length == 0 : DrawerEmpty {
-                                text: root.wifi-enabled ? root.tr("No Wi-Fi networks found", "Keine WLAN-Netze gefunden")
-                                    : root.wifi-available ? root.tr("Wi-Fi is disabled", "WLAN ist deaktiviert")
-                                        : root.tr("Wi-Fi unavailable", "WLAN nicht verfügbar");
+                                text: root.wifi-enabled ? root.loc("no_wifi_networks")
+                                    : root.wifi-available ? root.loc("wifi_disabled")
+                                        : root.loc("wifi_unavailable");
                             }
                             if root.wifi-enabled && root.wifi.length > 0 : ScrollView {
                                 VerticalLayout {
@@ -2141,7 +2124,7 @@ export component App inherits Window {
                                             DrawerRowText {
                                                 title: row.name;
                                                 detail: row.connected ? root.connection-status(true)
-                                                    : row.profile != "" ? root.tr("Saved", "Gespeichert") : "";
+                                                    : row.profile != "" ? root.loc("saved") : "";
                                                 active: row.connected;
                                             }
                                             Text { text: row.signal + "%"; color: Theme.muted; font-size: 10px; vertical-alignment: center; }
@@ -2179,60 +2162,70 @@ export component App inherits Window {
                             spacing: 7px;
                             HorizontalLayout {
                                 spacing: 8px;
-                                DrawerTitle { text: "Bluetooth"; horizontal-stretch: 1; }
+                                DrawerTitle { text: root.loc("bluetooth"); horizontal-stretch: 1; }
                                 Md3Button {
-                                    label: root.bluetooth-scanning ? root.tr("Stop", "Stopp") : root.tr("Scan", "Suchen");
-                                    enabled: root.bluetooth-powered && !root.drawer-busy;
+                                    label: root.bluetooth-scanning ? root.loc("bluetooth_stop_scan") : root.loc("bluetooth_scan");
+                                    enabled: root.bluetooth-powered && !root.bluetooth-busy;
                                     clicked => { root.drawer-command(root.bluetooth-scanning ? "bt-stop-scan" : "bt-scan", "", ""); }
                                 }
                                 DashboardSwitch {
                                     checked: root.bluetooth-powered;
-                                    enabled: root.bluetooth-available && !root.drawer-busy;
+                                    enabled: root.bluetooth-available && !root.bluetooth-busy;
                                     toggled => { root.drawer-command(root.bluetooth-powered ? "bluetooth-off" : "bluetooth-on", "", ""); }
                                 }
                             }
                             Text {
-                                text: !root.bluetooth-available ? root.tr("Bluetooth unavailable", "Bluetooth nicht verfügbar")
-                                    : !root.bluetooth-powered ? root.tr("Bluetooth is disabled", "Bluetooth ist deaktiviert")
+                                text: !root.bluetooth-available ? root.loc("bluetooth_unavailable")
+                                    : !root.bluetooth-powered ? root.loc("bluetooth_disabled")
                                     : root.bluetooth-scanning
-                                        ? (root.bluetooth-scan-le ? root.tr("Scanning Bluetooth LE devices…", "Suche nach Bluetooth-LE-Geräten …")
-                                            : root.tr("Scanning Classic Bluetooth devices…", "Suche nach Classic-Bluetooth-Geräten …"))
-                                        : root.paired-devices.length + root.tr(" paired • ", " gekoppelt • ")
-                                            + root.bluetooth-connected-count + root.tr(" connected", " verbunden");
+                                        ? root.loc("bluetooth_scanning")
+                                        : root.fill-text(root.fill-text(root.loc("bluetooth_device_counts"), "{paired}", root.paired-devices.length + ""), "{connected}", root.bluetooth-connected-count + "");
                                 color: root.bluetooth-scanning ? Theme.primary : Theme.muted;
                                 font-size: 10px;
                                 overflow: elide;
                             }
+                            if root.bluetooth-error != "" : HorizontalLayout {
+                                spacing: 6px;
+                                Text {
+                                    text: root.loc(root.bluetooth-error);
+                                    color: Theme.error;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                                Md3Button { label: "×"; height: 28px; clicked => { root.bluetooth-error = ""; } }
+                            }
                             if root.bluetooth-powered && root.paired-devices.length == 0 &&
                                 (!root.bluetooth-scanning || root.discovered-devices.length == 0) : DrawerEmpty {
-                                text: root.bluetooth-scanning ? root.tr("Scanning for devices…", "Suche nach Geräten …")
-                                    : root.tr("No paired devices", "Keine gekoppelten Geräte");
+                                text: root.bluetooth-scanning ? root.loc("bluetooth_scanning")
+                                    : root.loc("bluetooth_no_paired");
                             }
                             if root.bluetooth-powered && (root.paired-devices.length > 0 ||
                                 (root.bluetooth-scanning && root.discovered-devices.length > 0)) : ScrollView {
                                 VerticalLayout {
                                     spacing: 6px;
                                     if root.paired-devices.length > 0 : Text {
-                                        text: root.tr("Paired", "Gekoppelt"); color: Theme.muted; font-size: 10px;
+                                        text: root.loc("bluetooth_paired"); color: Theme.muted; font-size: 10px;
                                     }
                                     for row in root.paired-devices : DrawerBluetoothDevice {
                                         device: row;
                                         status: root.connection-status(row.connected);
                                         paired: true;
-                                        enabled: !root.drawer-busy;
+                                        enabled: !root.bluetooth-busy;
                                         activated => { root.drawer-command(row.connected ? "bt-disconnect" : "bt-connect", row.id, ""); }
                                         removed => { root.drawer-command("bt-remove", row.id, ""); }
                                     }
                                     if root.bluetooth-scanning && root.discovered-devices.length > 0 : Text {
-                                        text: root.tr("Available devices", "Verfügbare Geräte"); color: Theme.muted; font-size: 10px;
+                                        text: root.loc("bluetooth_discovered"); color: Theme.muted; font-size: 10px;
                                     }
                                     if root.bluetooth-scanning : VerticalLayout {
                                         spacing: 6px;
                                         for row in root.discovered-devices : DrawerBluetoothDevice {
                                             device: row;
-                                            status: root.drawer-busy && root.drawer-pairing == row.id
-                                                ? root.tr("Pairing…", "Wird gekoppelt …") : root.tr("Pair", "Koppeln");
-                                            enabled: !root.drawer-busy;
+                                            status: root.bluetooth-busy && root.drawer-pairing == row.id
+                                                ? root.loc("bluetooth_pairing") : root.loc("bluetooth_pair");
+                                            enabled: !root.bluetooth-busy;
                                             activated => {
                                                 root.drawer-pairing = row.id;
                                                 root.drawer-command("bt-pair", row.id, "");
@@ -2248,7 +2241,7 @@ export component App inherits Window {
                         VerticalLayout {
                             padding: 14px;
                             spacing: 4px;
-                            DrawerTitle { text: root.tr("Web access", "Webzugriff"); }
+                            DrawerTitle { text: root.loc("web_access"); }
                             Rectangle {
                                 if root.commander-url != "" : Image {
                                     width: max(0px, min(260px, min(parent.width - 8px, parent.height - 4px)));
@@ -2261,7 +2254,7 @@ export component App inherits Window {
                                 }
                             }
                             Text {
-                                text: root.commander-url != "" ? root.commander-url : root.tr("No network connection", "Keine Netzwerkverbindung");
+                                text: root.commander-url != "" ? root.commander-url : root.loc("no_ip");
                                 color: Theme.muted;
                                 font-size: 13px;
                                 horizontal-alignment: center;
@@ -2341,9 +2334,9 @@ export component App inherits Window {
             VerticalLayout {
                 padding: 16px;
                 spacing: 10px;
-                DrawerTitle { text: root.tr("Saved Wi-Fi", "Gespeichertes WLAN"); }
+                DrawerTitle { text: root.loc("saved_wifi"); }
                 if root.saved-wifi.length == 0 : DrawerEmpty {
-                    text: root.tr("No saved Wi-Fi connections", "Keine gespeicherten WLAN-Verbindungen");
+                    text: root.loc("no_saved_wifi");
                 }
                 if root.saved-wifi.length > 0 : ScrollView {
                     VerticalLayout {
@@ -2357,7 +2350,7 @@ export component App inherits Window {
                                 spacing: 10px;
                                 DrawerRowText { title: row.name; detail: root.connection-status(row.connected); active: row.connected; }
                                 Md3Button {
-                                    label: root.tr("Delete", "Löschen");
+                                    label: root.loc("delete");
                                     enabled: !root.drawer-busy;
                                     clicked => { root.confirm-forget = row.id; root.forget-name = row.name; }
                                 }
@@ -2367,7 +2360,7 @@ export component App inherits Window {
                 }
                 HorizontalLayout {
                     alignment: end;
-                    Md3Button { label: root.tr("Cancel", "Abbrechen"); clicked => { root.saved-wifi-open = false; } }
+                    Md3Button { label: root.loc("cancel"); clicked => { root.saved-wifi-open = false; } }
                 }
             }
         }
@@ -2383,10 +2376,9 @@ export component App inherits Window {
             VerticalLayout {
                 padding: 16px;
                 spacing: 8px;
-                DrawerTitle { text: root.tr("Delete saved Wi-Fi?", "Gespeichertes WLAN löschen?"); }
+                DrawerTitle { text: root.loc("delete_saved_wifi"); }
                 Text {
-                    text: root.tr("The saved connection for “", "Die gespeicherte Verbindung für „")
-                        + root.forget-name + root.tr("” will be removed.", "“ wird entfernt.");
+                    text: root.fill-text(root.loc("delete_saved_wifi_text"), "%1", root.forget-name);
                     color: Theme.muted;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -2394,9 +2386,9 @@ export component App inherits Window {
                 HorizontalLayout {
                     alignment: end;
                     spacing: 8px;
-                    Md3Button { label: root.tr("Cancel", "Abbrechen"); clicked => { root.confirm-forget = ""; } }
+                    Md3Button { label: root.loc("cancel"); clicked => { root.confirm-forget = ""; } }
                     Md3Button {
-                        label: root.tr("Delete", "Löschen");
+                        label: root.loc("delete");
                         filled: true;
                         clicked => { root.drawer-command("wifi-forget", root.confirm-forget, ""); root.confirm-forget = ""; }
                     }
@@ -2417,11 +2409,11 @@ export component App inherits Window {
                 VerticalLayout {
                     padding: 16px;
                     spacing: 10px;
-                    DrawerTitle { text: device.label + " · " + root.tr("Audio outputs", "Audioausgänge"); }
+                    DrawerTitle { text: device.label + " · " + root.loc("audio_outputs"); }
                     HorizontalLayout {
                         spacing: 8px;
                         Text {
-                            text: root.tr("Volume per output", "Lautstärke pro Ausgang");
+                            text: root.loc("audio_per_link_control");
                             color: Theme.text;
                             vertical-alignment: center;
                             horizontal-stretch: 1;
@@ -2432,7 +2424,7 @@ export component App inherits Window {
                         }
                     }
                     if device.links.length == 0 : DrawerEmpty {
-                        text: root.tr("No physical audio outputs", "Keine physischen Audioausgänge");
+                        text: root.loc("audio_no_physical_outputs");
                     }
                     if device.links.length > 0 : ScrollView {
                         min-height: 0;
@@ -2457,15 +2449,15 @@ export component App inherits Window {
                                         }
                                         DrawerRowText {
                                             title: link.label;
-                                            detail: !link.present ? root.tr("Disconnected", "Getrennt")
-                                                : link.linked ? root.tr("Linked", "Verknüpft") : root.tr("Not linked", "Nicht verknüpft");
+                                            detail: !link.present ? root.loc("disconnected")
+                                                : link.linked ? root.loc("audio_linked") : root.loc("audio_not_linked");
                                             active: link.linked;
                                         }
                                         if link.default-output : Text {
                                             text: "★";
                                             color: Theme.primary;
                                             vertical-alignment: center;
-                                            accessible-label: root.tr("Default audio output", "Standard-Audioausgang");
+                                            accessible-label: root.loc("audio_default");
                                         }
                                         DashboardSwitch {
                                             checked: link.linked;
@@ -2489,7 +2481,7 @@ export component App inherits Window {
                     }
                     HorizontalLayout {
                         alignment: end;
-                        Md3Button { label: root.tr("Close", "Schließen"); clicked => { root.routing = ""; } }
+                        Md3Button { label: root.loc("close"); clicked => { root.routing = ""; } }
                     }
                 }
             }
@@ -2503,7 +2495,7 @@ export component App inherits Window {
         TouchArea { clicked => { root.dashboard-picker-open = false; } }
         Rectangle {
             width: min(parent.width - 44px, 600px);
-            height: root.touch-keyboard-open ? min(parent.height - 242px, 380px) : min(parent.height - 60px, 500px);
+            height: root.touch-keyboard-open ? min(parent.height - root.keyboard-height - 24px, 380px) : min(parent.height - 60px, 500px);
             x: (parent.width - self.width) / 2;
             y: root.touch-keyboard-open ? 12px : (parent.height - self.height) / 2;
             border-radius: 20px;
@@ -2515,19 +2507,21 @@ export component App inherits Window {
                 spacing: 10px;
                 HorizontalLayout {
                     Text {
-                        text: root.dashboard-picker-kind == "wallpaper" ? "Choose wallpaper" : root.dashboard-picker-kind == "macros" ? "Choose macros (up to 4)" : root.dashboard-picker-kind == "auto_macros" ? "Choose auto macros (up to 4)" : "Choose dashboard card";
+                        text: root.loc(root.dashboard-picker-kind == "wallpaper" ? "dashboard_wallpaper_title"
+                            : root.dashboard-picker-kind == "macros" ? "dashboard_choose_macros"
+                            : root.dashboard-picker-kind == "auto_macros" ? "dashboard_choose_auto_macros" : "dashboard_choose_card");
                         color: Theme.text;
                         font-size: 18px;
                         font-weight: 600;
                         horizontal-stretch: 1;
                     }
-                    PillButton { width: 68px; label: "Close"; clicked => { root.dashboard-picker-open = false; root.touch-keyboard-open = false; } }
+                    PillButton { width: 68px; label: root.loc("close"); clicked => { root.dashboard-picker-open = false; root.touch-keyboard-open = false; } }
                 }
                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
                     spacing: 8px;
                     search-entry := KioskSearch {
                         horizontal-stretch: 1;
-                        placeholder-text: root.tr("Search...","Suchen …");
+                        placeholder-text: root.loc("dashboard_search");
                         text <=> root.dashboard-picker-search;
                         edited(search) => { root.dashboard-filter(search); }
                         activated => { root.touch-keyboard-open = true; }
@@ -2536,7 +2530,7 @@ export component App inherits Window {
                     }
                 }
                 if root.wallpaper-picker-loading && root.dashboard-picker-kind == "wallpaper" : DrawerEmpty {
-                    text: root.tr("Loading wallpapers…", "Hintergrundbilder werden geladen …");
+                    text: root.loc("dashboard_wallpaper_loading");
                 }
                 ListView {
                     vertical-stretch: 1;
@@ -2557,7 +2551,13 @@ export component App inherits Window {
                                     clip: true;
                                     Image { source: item.thumbnail; width: parent.width; height: parent.height; image-fit: cover; }
                                 }
-                                Text { text: item.name; color: Theme.text; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                                Text {
+                                    text: root.dashboard-picker-kind == "wallpaper" && item.name == ""
+                                        ? root.loc("dashboard_wallpaper_none")
+                                        : root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros"
+                                            || root.dashboard-picker-kind == "wallpaper" ? item.name : root.card-name(item.name);
+                                    color: Theme.text; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; overflow: elide;
+                                }
                                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : Text {
                                     text: item.selected ? "☑" : "□";
                                     color: Theme.primary;
@@ -2570,8 +2570,8 @@ export component App inherits Window {
                         }
                 }
                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
-                    Text { text: root.tr("Choose at most four items","Höchstens vier Einträge wählen"); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
-                    PillButton { label: root.tr("Apply","Übernehmen"); selected: true; width: 90px; clicked => { root.dashboard-apply-picker(); } }
+                    Text { text: root.loc("dashboard_selection_limit"); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
+                    PillButton { label: root.loc("apply"); selected: true; width: 90px; clicked => { root.dashboard-apply-picker(); } }
                 }
             }
         }
@@ -2584,16 +2584,16 @@ export component App inherits Window {
             width: min(parent.width - 32px, 420px);
             height: 170px;
             x: (parent.width - self.width) / 2;
-            y: root.touch-keyboard-open ? max(8px, (parent.height - min(250px, parent.height * 0.42) - self.height) / 2)
+            y: root.touch-keyboard-open ? max(8px, (parent.height - root.keyboard-height - self.height) / 2)
                 : (parent.height - self.height) / 2;
             VerticalLayout {
                 padding: 16px;
                 spacing: 8px;
-                DrawerTitle { text: root.tr("Connect to Wi-Fi", "Mit WLAN verbinden"); }
+                DrawerTitle { text: root.loc("wifi_connect"); }
                 Text { text: root.wifi-name; color: Theme.muted; font-size: 13px; overflow: elide; }
                 password := LineEdit {
                     text <=> root.wifi-password;
-                    placeholder-text: root.tr("Wi-Fi password", "WLAN-Passwort");
+                    placeholder-text: root.loc("wifi_password_hint");
                     input-type: InputType.password;
                     accepted => { root.submit-wifi-password(); }
                     changed has-focus => { if self.has-focus { root.touch-keyboard-open = true; } }
@@ -2601,9 +2601,9 @@ export component App inherits Window {
                 HorizontalLayout {
                     alignment: end;
                     spacing: 8px;
-                    Md3Button { label: root.tr("Cancel", "Abbrechen"); clicked => { root.close-wifi-password(); } }
+                    Md3Button { label: root.loc("cancel"); clicked => { root.close-wifi-password(); } }
                     Md3Button {
-                        label: root.tr("Connect", "Verbinden");
+                        label: root.loc("connect");
                         filled: true;
                         enabled: root.wifi-password != "" && !root.drawer-busy;
                         clicked => { root.submit-wifi-password(); }
@@ -2613,11 +2613,13 @@ export component App inherits Window {
             init => { password.focus(); }
         }
     }
-    // Md3Keyboard: automatic on search focus, in-process, German QWERTZ.
+    // Fit the keys to the keyboard surface, including its optional symbols row.
     if (root.dashboard-picker-open || root.wifi-target != "" || root.page == 2) && root.touch-keyboard-open : Rectangle {
-        width: parent.width;
+        x: 0px;
+        width: root.width;
         height: root.keyboard-height;
-        y: parent.height - self.height;
+        y: root.height - self.height;
+        clip: true;
         background: Theme.surface;
         border-width: 1px;
         border-color: Theme.elevated;
@@ -2627,8 +2629,9 @@ export component App inherits Window {
             padding: 6px;
             spacing: 5px;
             HorizontalLayout {
+                vertical-stretch: 1;
                 spacing: 4px;
-                for key in (root.touch-keyboard-symbols ? ["1","2","3","4","5","6","7","8","9","0"] : ["q","w","e","r","t","z","u","i","o","p"]) : TouchKey {
+                for key in (root.touch-keyboard-symbols ? ["1","2","3","4","5","6","7","8","9","0"] : ["q","w","e","r","t",root.language == "de" ? "z" : "y","u","i","o","p"]) : TouchKey {
                     horizontal-stretch: 1;
                     label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
                     clicked => {
@@ -2638,9 +2641,10 @@ export component App inherits Window {
                 }
             }
             HorizontalLayout {
+                vertical-stretch: 1;
                 spacing: 4px;
                 Rectangle { width: 18px; background: transparent; }
-                for key in (root.touch-keyboard-symbols ? ["@","#","$","%","&","-","+","(",")","/"] : ["a","s","d","f","g","h","j","k","l","ö"]) : TouchKey {
+                for key in (root.touch-keyboard-symbols ? ["@","#","$","%","&","-","+","(",")","/"] : (root.language == "de" ? ["a","s","d","f","g","h","j","k","l","ö"] : ["a","s","d","f","g","h","j","k","l"])) : TouchKey {
                     horizontal-stretch: 1;
                     label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
                     clicked => { root.keyboard-input(self.label); root.touch-keyboard-shift = false; }
@@ -2648,9 +2652,10 @@ export component App inherits Window {
                 Rectangle { width: 18px; background: transparent; }
             }
             HorizontalLayout {
+                vertical-stretch: 1;
                 spacing: 4px;
                 TouchKey { width: 58px; accent: true; label: "⇧"; clicked => { root.touch-keyboard-shift = !root.touch-keyboard-shift; } }
-                for key in (root.touch-keyboard-symbols ? ["*","\"","'",";",":","!","?","=","_","\\"] : ["y","x","c","v","b","n","m","ä","ü"]) : TouchKey {
+                for key in (root.touch-keyboard-symbols ? ["*","\"","'",";",":","!","?","=","_","\\"] : (root.language == "de" ? ["y","x","c","v","b","n","m","ä","ü"] : ["z","x","c","v","b","n","m"])) : TouchKey {
                     horizontal-stretch: 1;
                     label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
                     clicked => { root.keyboard-input(self.label); root.touch-keyboard-shift = false; }
@@ -2658,6 +2663,7 @@ export component App inherits Window {
                 TouchKey { width: 58px; accent: true; label: "⌫"; clicked => { root.keyboard-input("backspace"); } }
             }
             if root.touch-keyboard-symbols : HorizontalLayout {
+                vertical-stretch: 1;
                 spacing: 4px;
                 for key in ["{", "}", "<", ">", "^", "~", "`", "|"] : TouchKey {
                     horizontal-stretch: 1;
@@ -2666,22 +2672,23 @@ export component App inherits Window {
                 }
             }
             HorizontalLayout {
+                vertical-stretch: 1;
                 spacing: 4px;
                 TouchKey { width: 64px; accent: true; label: root.touch-keyboard-symbols ? "ABC" : "?123"; clicked => { root.touch-keyboard-symbols = !root.touch-keyboard-symbols; } }
                 TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "[" : ","; clicked => { root.keyboard-input(self.label); } }
-                TouchKey { horizontal-stretch: 1; label: root.touch-keyboard-symbols ? "Symbols" : "Deutsch"; clicked => { root.keyboard-input(" "); } }
+                TouchKey { horizontal-stretch: 1; label: root.touch-keyboard-symbols ? root.loc("keyboard_symbols") : root.loc(root.language == "de" ? "german" : "english"); clicked => { root.keyboard-input(" "); } }
                 TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "]" : "."; clicked => { root.keyboard-input(self.label); } }
                 TouchKey { width: 58px; accent: true; label: "⌄"; clicked => { root.hide-keyboard(); } }
             }
         }
     }
 
-    if root.osd-visible && root.page != 1 && !root.network-drawer-open && !root.dashboard-editing : Rectangle {
+    if root.osd-visible && root.page != 1 && !root.network-drawer-open && !root.dashboard-editing && !root.touch-keyboard-open : Rectangle {
         y: parent.height - self.height - 60px; x: (parent.width - self.width)/2;
         width: min(520px,parent.width); height: 58px; border-radius: 16px; background: Theme.raised;
         HorizontalLayout { padding: 6px; spacing: 8px;
             Text { text: root.osd-item.label; color: Theme.text; vertical-alignment: center; }
-            PillButton { width: 74px; label: root.osd-item.muted ? root.tr("Unmute","Ton ein") : root.tr("Mute","Stumm"); clicked => {root.change-volume(root.osd-item,root.osd-item.muted ? root.osd-item.restore : 0,true);} }
+            PillButton { width: 74px; label: root.osd-item.muted ? root.loc("audio_unmute") : root.loc("audio_mute"); clicked => {root.change-volume(root.osd-item,root.osd-item.muted ? root.osd-item.restore : 0,true);} }
             Slider { minimum: root.osd-item.minimum; maximum: root.osd-item.maximum; value: root.osd-item.volume; released(v) => {root.change-volume(root.osd-item,v,false);} }
             PillButton { width: 40px; label: "×"; clicked => {root.osd-visible=false;} }
         }
@@ -2702,12 +2709,12 @@ export component App inherits Window {
             VerticalLayout {
                 padding: 18px;
                 spacing: 9px;
-                Text { text: root.tr("Power menu","Ein/Aus"); font-size: 22px; font-weight: 600; color: Theme.text; }
+                Text { text: root.loc("power_menu"); font-size: 22px; font-weight: 600; color: Theme.text; }
                 Rectangle {
                     height: 74px; background: Theme.elevated; border-radius: 14px;
                     HorizontalLayout { padding: 12px; spacing: 12px;
                         Image { source: @image-url("icons/mdi/power-standby.svg"); width: 36px; height: 36px; }
-                        VerticalLayout { Text { text: root.tr("Shutdown device","Gerät ausschalten"); color: Theme.text; font-size: 15px; } Text { text: root.tr("Turn off the Raspberry Pi","Raspberry Pi ausschalten"); color: Theme.muted; font-size: 11px; } }
+                        VerticalLayout { Text { text: root.loc("shutdown_device"); color: Theme.text; font-size: 15px; } Text { text: root.loc("shutdown_device_text"); color: Theme.muted; font-size: 11px; } }
                     }
                     TouchArea { clicked => { root.power-action("poweroff"); } }
                 }
@@ -2715,7 +2722,7 @@ export component App inherits Window {
                     height: 74px; background: Theme.elevated; border-radius: 14px;
                     HorizontalLayout { padding: 12px; spacing: 12px;
                         Image { source: @image-url("icons/mdi/restart.svg"); width: 36px; height: 36px; }
-                        VerticalLayout { Text { text: root.tr("Restart device","Gerät neu starten"); color: Theme.text; font-size: 15px; } Text { text: root.tr("Reboot the Raspberry Pi","Raspberry Pi neu starten"); color: Theme.muted; font-size: 11px; } }
+                        VerticalLayout { Text { text: root.loc("restart_device"); color: Theme.text; font-size: 15px; } Text { text: root.loc("restart_device_text"); color: Theme.muted; font-size: 11px; } }
                     }
                     TouchArea { clicked => { root.power-action("reboot"); } }
                 }
@@ -2723,11 +2730,11 @@ export component App inherits Window {
                     height: 74px; background: Theme.elevated; border-radius: 14px;
                     HorizontalLayout { padding: 12px; spacing: 12px;
                         Image { source: @image-url("icons/mdi/server.svg"); width: 36px; height: 36px; }
-                        VerticalLayout { Text { text: root.tr("Restart backend","Backend neu starten"); color: Theme.text; font-size: 15px; } Text { text: root.tr("Restart stream-overlord.service","stream-overlord.service neu starten"); color: Theme.muted; font-size: 11px; } }
+                        VerticalLayout { Text { text: root.loc("restart_backend"); color: Theme.text; font-size: 15px; } Text { text: root.loc("restart_backend_text"); color: Theme.muted; font-size: 11px; } }
                     }
                     TouchArea { clicked => { root.power-action("restart-backend"); } }
                 }
-                HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { width: 108px; label: root.tr("Cancel","Abbrechen"); clicked => { root.power-menu-open = false; } } }
+                HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { width: 108px; label: root.loc("cancel"); clicked => { root.power-menu-open = false; } } }
             }
         }
     }
