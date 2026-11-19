@@ -1434,6 +1434,57 @@ export component App inherits Window {
             }
         }
     }
+    // Motion: enabled from Rust only when rendering through Vulkan.
+    in-out property <bool> gpu-effects: false;
+    property <bool> intro-running: false;
+    property <duration> intro-start;
+    property <bool> page-running: false;
+    property <duration> page-start;
+    // 0 → 1 over the startup animation / a page switch; 1 when idle.
+    // animation-tick() is only read while running, so idle frames stay idle.
+    property <float> intro: root.intro-running ? clamp((animation-tick() - root.intro-start) / 1100ms, 0, 1) : 1;
+    property <float> page-reveal: root.page-running
+        ? root.ease-out(clamp((animation-tick() - root.page-start) / 340ms, 0, 1)) : 1;
+    pure function ease-out(t: float) -> float { return 1 - pow(1 - t, 3); }
+    // Eased progress of an intro stage running from `from` to `to` (fractions of the intro).
+    pure function stage(from: float, to: float) -> float {
+        return root.ease-out(clamp((root.intro - from) / (to - from), 0, 1));
+    }
+    public function start-intro() {
+        root.gpu-effects = true;
+        root.intro-start = animation-tick();
+        root.intro-running = true;
+    }
+    motion-timer := Timer {
+        interval: 100ms;
+        running: root.intro-running || root.page-running;
+        triggered => {
+            if root.intro-running && animation-tick() - root.intro-start > 1150ms { root.intro-running = false; }
+            if root.page-running && animation-tick() - root.page-start > 380ms { root.page-running = false; }
+        }
+    }
+    // Swipe between pages: the outgoing page stays alive until the swipe ends.
+    property <int> previous-page: 0;
+    function go-to(target: int) {
+        if target == root.page { return; }
+        if root.gpu-effects {
+            root.previous-page = root.page;
+            root.page-start = animation-tick();
+            root.page-running = true;
+        }
+        root.page = target;
+    }
+    pure function page-shown(index: int) -> bool {
+        return root.page == index || (root.page-running && root.previous-page == index);
+    }
+    // Pages to the right of the current one enter from the right, and vice versa.
+    pure function page-x(index: int) -> length {
+        if !root.page-running || root.previous-page == root.page { return 0px; }
+        let direction = root.page > root.previous-page ? 1 : -1;
+        return index == root.page
+            ? (1 - root.page-reveal) * content-area.width * direction
+            : -root.page-reveal * content-area.width * direction;
+    }
     changed page => {
         root.touch-keyboard-open = false;
         root.routing = "";
@@ -1506,15 +1557,19 @@ export component App inherits Window {
         height: parent.height;
         source: root.wallpaper-image;
         image-fit: cover;
+        opacity: root.stage(0, 0.5);
+        transform-scale: 1.08 - 0.08 * root.stage(0, 0.9);
     }
     VerticalLayout {
         spacing: 0px;
         content-area := Rectangle {
             vertical-stretch: 1;
             background: transparent;
+            clip: true;
             // Quickshell's content area ends directly above the bottom navigation.
             // DashboardPage.qml: 10px margins, 8px columns, no card headings.
-            if root.page == 0 : HorizontalLayout {
+            if root.page-shown(0) : HorizontalLayout {
+                x: root.page-x(0);
                 padding: 10px;
                 spacing: 8px;
                 VerticalLayout {
@@ -1523,6 +1578,8 @@ export component App inherits Window {
                     width: (root.width - 28px) / 2;
                     if root.slot-shown(root.view-left-0, root.view-left-1) : Rectangle {
                         height: root.slot-height(root.view-left-0, root.view-left-1);
+                        opacity: root.stage(0.22, 0.62);
+                        transform-scale: 0.92 + 0.08 * root.stage(0.22, 0.62);
                         if root.view-left-0 == "interactions" : DashboardInteractionsCard {
                             items: root.dashboard-interactions;
                             empty-label: root.loc("no_interactions");
@@ -1566,6 +1623,8 @@ export component App inherits Window {
                     }
                     if root.slot-shown(root.view-left-1, root.view-left-0) : Rectangle {
                         height: root.slot-height(root.view-left-1, root.view-left-0);
+                        opacity: root.stage(0.38, 0.78);
+                        transform-scale: 0.92 + 0.08 * root.stage(0.38, 0.78);
                         if root.view-left-1 == "interactions" : DashboardInteractionsCard {
                             items: root.dashboard-interactions;
                             empty-label: root.loc("no_interactions");
@@ -1614,6 +1673,8 @@ export component App inherits Window {
                     width: (root.width - 28px) / 2;
                     if root.slot-shown(root.view-right-0, root.view-right-1) : Rectangle {
                         height: root.slot-height(root.view-right-0, root.view-right-1);
+                        opacity: root.stage(0.3, 0.7);
+                        transform-scale: 0.92 + 0.08 * root.stage(0.3, 0.7);
                         if root.view-right-0 == "interactions" : DashboardInteractionsCard {
                             items: root.dashboard-interactions;
                             empty-label: root.loc("no_interactions");
@@ -1657,6 +1718,8 @@ export component App inherits Window {
                     }
                     if root.slot-shown(root.view-right-1, root.view-right-0) : Rectangle {
                         height: root.slot-height(root.view-right-1, root.view-right-0);
+                        opacity: root.stage(0.46, 0.86);
+                        transform-scale: 0.92 + 0.08 * root.stage(0.46, 0.86);
                         if root.view-right-1 == "interactions" : DashboardInteractionsCard {
                             items: root.dashboard-interactions;
                             empty-label: root.loc("no_interactions");
@@ -1718,7 +1781,8 @@ export component App inherits Window {
                     overflow: elide;
                 }
             }
-            if root.page == 1 : VerticalLayout {
+            if root.page-shown(1) : VerticalLayout {
+                x: root.page-x(1);
                 padding: 10px;
                 if root.audio-interfaces.length == 0 : DrawerEmpty {
                     text: root.loc("audio_no_outputs");
@@ -1750,7 +1814,8 @@ export component App inherits Window {
                     }
                 }
             }
-            if root.page == 2 : VerticalLayout {
+            if root.page-shown(2) : VerticalLayout {
+                x: root.page-x(2);
                 padding: 10px;
                 padding-bottom: root.touch-keyboard-open ? max(10px, root.keyboard-height - 42px) : 10px;
                 spacing: 8px;
@@ -1852,7 +1917,8 @@ export component App inherits Window {
                     }
                 }
             }
-            if root.page == 3 : HorizontalLayout {
+            if root.page-shown(3) : HorizontalLayout {
+                x: root.page-x(3);
                 padding: 10px;
                 spacing: 8px;
                 VerticalLayout {
@@ -2079,7 +2145,8 @@ export component App inherits Window {
                     }
                 }
             }
-            if root.page == 4 : VerticalLayout {
+            if root.page-shown(4) : VerticalLayout {
+                x: root.page-x(4);
                 padding: 12px;
                 spacing: 8px;
                 HorizontalLayout {
@@ -2128,6 +2195,7 @@ export component App inherits Window {
         // Quickshell bottom navigation: 52px, five centered pill icons.
         Rectangle {
             height: 52px;
+            opacity: root.stage(0.12, 0.55);
             background: Theme.surface;
             if root.dashboard-editing : HorizontalLayout {
                 width: self.preferred-width;
@@ -2147,11 +2215,11 @@ export component App inherits Window {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 spacing: 10px;
-                NavItem { label: root.loc("page_home"); icon: @image-url("icons/mdi/home.svg"); active-icon: @image-url("icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.page = 0; } }
-                NavItem { label: root.loc("audio"); icon: @image-url("icons/mdi/volume-high.svg"); active-icon: @image-url("icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.page = 1; } }
-                NavItem { label: root.loc("page_controls"); icon: @image-url("icons/mdi/tune.svg"); active-icon: @image-url("icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.page = 2; } }
-                NavItem { label: root.loc("page_system"); icon: @image-url("icons/mdi/server.svg"); active-icon: @image-url("icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.page = 3; if root.connection=="Connected" {root.update-refresh();} } }
-                NavItem { label: root.loc("page_speedtest"); icon: @image-url("icons/mdi/speedometer.svg"); active-icon: @image-url("icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.page = 4; } }
+                NavItem { label: root.loc("page_home"); icon: @image-url("icons/mdi/home.svg"); active-icon: @image-url("icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.go-to(0); } }
+                NavItem { label: root.loc("audio"); icon: @image-url("icons/mdi/volume-high.svg"); active-icon: @image-url("icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.go-to(1); } }
+                NavItem { label: root.loc("page_controls"); icon: @image-url("icons/mdi/tune.svg"); active-icon: @image-url("icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.go-to(2); } }
+                NavItem { label: root.loc("page_system"); icon: @image-url("icons/mdi/server.svg"); active-icon: @image-url("icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.go-to(3); if root.connection=="Connected" {root.update-refresh();} } }
+                NavItem { label: root.loc("page_speedtest"); icon: @image-url("icons/mdi/speedometer.svg"); active-icon: @image-url("icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.go-to(4); } }
             }
             if root.page == 0 : Rectangle {
                 width: 40px;

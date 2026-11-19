@@ -6,7 +6,7 @@ license = "GPL-3.0-only"
 build = "build.rs"
 
 [dependencies]
-slint = { version = "=1.19.0", default-features = false, features = ["std", "backend-winit", "renderer-skia-vulkan", "renderer-skia-opengl", "renderer-software", "compat-1-18", "image-default-formats"] }
+slint = { version = "=1.19.0", default-features = false, features = ["std", "backend-winit", "renderer-skia-vulkan", "renderer-skia-opengl", "renderer-software", "compat-1-18", "image-default-formats", "unstable-wgpu-30"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "signal"] }
