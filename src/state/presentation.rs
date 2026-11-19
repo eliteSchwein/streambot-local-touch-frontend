@@ -1,5 +1,13 @@
 use serde_json::Value;
 
+/// Backend-internal macros (triggered by events, channel points or chat commands)
+/// are not meant to be started by hand.
+pub(crate) fn is_manual_macro(name: &str) -> bool {
+    !["event_", "channel_point_", "command_"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+}
+
 pub(crate) fn string_field(v: &Value, keys: &[&str]) -> String {
     keys.iter()
         .find_map(|key| v.get(*key).and_then(Value::as_str))

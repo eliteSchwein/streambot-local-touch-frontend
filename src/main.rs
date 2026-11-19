@@ -4,6 +4,7 @@
 mod audio;
 mod backend;
 mod bluetooth;
+mod channel_points;
 mod config;
 mod dashboard_editor;
 mod drawer;

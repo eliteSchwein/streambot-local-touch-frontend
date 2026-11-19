@@ -158,6 +158,7 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
                 guard
                     .macros
                     .iter()
+                    .filter(|m| presentation::is_manual_macro(m))
                     .map(|m| SharedString::from(m.as_str()))
                     .collect::<Vec<_>>(),
             )));
@@ -188,23 +189,7 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
                     .collect::<Vec<_>>(),
             )));
         }
-        "notify_channel_point_update" => {
-            app.set_channel_points(slint::ModelRc::new(VecModel::from(
-                guard
-                    .points
-                    .iter()
-                    .map(|m| {
-                        let label =
-                            string_field(m, &["label", "name", "twitch_label", "twitch_name"]);
-                        crate::ActionRow {
-                            id: m.to_string().into(),
-                            label: label.into(),
-                            active: m["active"] == true,
-                        }
-                    })
-                    .collect::<Vec<_>>(),
-            )));
-        }
+        "notify_channel_point_update" => crate::channel_points::update(app, &guard.points),
         _ => {}
     }
 }

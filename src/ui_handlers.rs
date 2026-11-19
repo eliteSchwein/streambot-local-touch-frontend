@@ -5,6 +5,10 @@ use slint::{ComponentHandle, Model};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
+fn matches(label: &str, query: &str) -> bool {
+    label.to_lowercase().contains(&query.trim().to_lowercase())
+}
+
 fn send(tx: &mpsc::UnboundedSender<(String, Value)>, method: &str, params: Value) {
     let _ = tx.send((method.into(), params));
 }
@@ -42,7 +46,26 @@ pub(crate) fn install(ui: &App, command_tx: mpsc::UnboundedSender<(String, Value
         }
     });
     install_update_queue(ui, command_tx.clone());
-    ui.on_matches(|label, query| label.to_lowercase().contains(&query.trim().to_lowercase()));
+    ui.on_matches(|label, query| matches(&label, &query));
+    // Search filtering happens here so hidden rows leave no gaps in the grid.
+    ui.on_filter_names(|names, query| {
+        let shown: Vec<_> = names.iter().filter(|name| matches(name, &query)).collect();
+        slint::ModelRc::new(slint::VecModel::from(shown))
+    });
+    ui.on_filter_rows(|rows, query| {
+        let shown: Vec<_> = rows
+            .iter()
+            .filter(|row| matches(&row.label, &query))
+            .collect();
+        slint::ModelRc::new(slint::VecModel::from(shown))
+    });
+    ui.on_filter_points(|rows, query| {
+        let shown: Vec<_> = rows
+            .iter()
+            .filter(|row| matches(&row.label, &query) || matches(&row.subtitle, &query))
+            .collect();
+        slint::ModelRc::new(slint::VecModel::from(shown))
+    });
     {
         let tx = command_tx.clone();
         ui.on_remove_interaction(move |uuid| {

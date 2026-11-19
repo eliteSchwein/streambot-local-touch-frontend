@@ -87,11 +87,7 @@ fn candidates(kind: &str, store: &Arc<Mutex<Store>>) -> Vec<String> {
         store
             .macros
             .iter()
-            .filter(|s| {
-                !["event_", "channel_point_", "command_"]
-                    .iter()
-                    .any(|prefix| s.starts_with(prefix))
-            })
+            .filter(|s| crate::state::presentation::is_manual_macro(s))
             .cloned()
             .collect()
     } else {
