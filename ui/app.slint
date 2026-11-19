@@ -1,4 +1,4 @@
-import { LineEdit, ListView, ScrollView, Slider, Spinner } from "std-widgets.slint";
+import { LineEdit, Slider, Spinner } from "std-widgets.slint";
 
 // Original Quickshell Material 3 fallback palette (Md3Theme.qml).
 export global Theme {
@@ -77,6 +77,21 @@ component DashboardSwitch inherits Rectangle {
         border-radius: self.width / 2;
     }
     TouchArea { enabled: root.enabled; clicked => { root.toggled(); } }
+}
+
+// Scrollbar-free replacement for std ScrollView; scrolls by touch drag / wheel.
+component Scroller {
+    min-height: 50px;
+    min-width: 50px;
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
+    preferred-height: 100%;
+    preferred-width: 100%;
+    flick := Flickable {
+        width: parent.width;
+        height: parent.height;
+        @children
+    }
 }
 
 component Md3Card inherits Rectangle {
@@ -350,6 +365,7 @@ component DashboardMacroCard inherits GlassCard {
     callback run(string);
     callback toggle(string, bool);
     vertical-stretch: 1;
+    min-height: 0px;
     preferred-height: 180px;
     card-content := Rectangle {
         x: 14px;
@@ -763,6 +779,7 @@ component MusicIconButton inherits Rectangle {
 }
 
 component DashboardMusicCard inherits GlassCard {
+    min-height: 0px;
     in property <string> title;
     in property <string> artist;
     in property <[float]> levels;
@@ -787,7 +804,7 @@ component DashboardMusicCard inherits GlassCard {
             Text { text: root.artist; color: Theme.muted; font-size: 12px; horizontal-alignment: center; overflow: elide; }
         }
         Rectangle {
-            min-height: 90px;
+            min-height: 40px;
             vertical-stretch: 1;
             Rectangle {
                 width: 106px;
@@ -800,7 +817,7 @@ component DashboardMusicCard inherits GlassCard {
                     y: parent.height - self.height;
                     border-radius: 7px;
                     background: Theme.primary;
-                    animate height { duration: 28ms; }
+                    animate height { duration: 90ms; easing: ease-out; }
                 }
             }
         }
@@ -846,22 +863,99 @@ component DashboardMusicCard inherits GlassCard {
     }
 }
 
+component DashboardInteractionsCard inherits GlassCard {
+    in property <[InteractionEntry]> items;
+    in property <string> empty-label;
+    pure callback meta(InteractionEntry) -> string;
+    callback remove(string);
+    tint-opacity: 0.88;
+    vertical-stretch: 1;
+    min-height: 0px;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 5px;
+        if root.items.length == 0 : Text {
+            vertical-stretch: 1;
+            text: root.empty-label;
+            color: Theme.muted;
+            font-size: 13px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if root.items.length > 0 : Scroller {
+            min-height: 0px;
+            VerticalLayout {
+                spacing: 5px;
+                alignment: start;
+                for item in root.items : Rectangle {
+                    height: 50px;
+                    border-radius: 12px;
+                    background: (item.active ? Theme.elevated : Theme.raised).with-alpha(0.94);
+                    Rectangle {
+                        height: 3px;
+                        y: parent.height - self.height;
+                        x: 0px;
+                        width: parent.width * max(0, min(1, item.progress));
+                        border-radius: 2px;
+                        background: Theme.success;
+                        visible: item.active;
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 6px;
+                        spacing: 8px;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
+                                background: item.active ? Theme.success : (item.failed ? Theme.error : Theme.outline);
+                            }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 1px;
+                            Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
+                            Text { text: root.meta(item); color: item.failed ? Theme.error : Theme.muted; font-size: 8px; overflow: elide; }
+                            if item.uuid != "" : Text { text: item.uuid; color: Theme.outline; font-size: 7px; overflow: elide; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove(item.uuid); } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 component PillButton inherits Rectangle {
     in property <string> label: "";
     in property <bool> selected: false;
     callback clicked();
     height: 40px;
+    min-width: min(caption.preferred-width + 32px, 96px);
+    preferred-width: max(82px, caption.preferred-width + 36px);
     border-radius: 20px;
-    background: selected ? Theme.primary : Theme.elevated;
-    Text {
+    background: root.selected ? (pill-touch.pressed ? Theme.primary.darker(0.15) : Theme.primary)
+        : pill-touch.pressed ? Theme.raised : Theme.elevated;
+    border-width: 1px;
+    border-color: root.selected ? Theme.primary : Theme.outline-variant;
+    caption := Text {
+        x: 16px;
+        width: parent.width - 32px;
         text: root.label;
         color: root.selected ? Theme.on-primary : Theme.text;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: root.selected ? 700 : 600;
         horizontal-alignment: center;
         vertical-alignment: center;
+        overflow: elide;
     }
-    TouchArea { clicked => { root.clicked(); } }
+    pill-touch := TouchArea { clicked => { root.clicked(); } }
 }
 
 // Key caps match the original Md3Keyboard (8px radius, small gaps, pressed state).
@@ -1088,6 +1182,11 @@ export component App inherits Window {
             + (item.eta > 0 ? " · " + item.eta + "s" : "")
             + (item.alerts > 0 ? " · " + root.loc("interaction_alerts") + " " + item.alerts : "");
     }
+    // Two cards in a column share it evenly; a lone card fills the column.
+    pure function slot-height(other: string) -> length {
+        let column = content-area.height - 20px;
+        return other == "" ? column : (column - 8px) / 2;
+    }
     pure function card-name(card: string) -> string {
         return root.loc(card == "" ? "dashboard_empty" : "dashboard_card_" + card);
     }
@@ -1183,7 +1282,7 @@ export component App inherits Window {
     }
     VerticalLayout {
         spacing: 0px;
-        Rectangle {
+        content-area := Rectangle {
             vertical-stretch: 1;
             background: transparent;
             // Quickshell's content area ends directly above the bottom navigation.
@@ -1193,67 +1292,17 @@ export component App inherits Window {
                 spacing: 8px;
                 VerticalLayout {
                     spacing: 8px;
+                    alignment: start;
                     width: (root.width - 28px) / 2;
-                    if root.left-slot-0 == "interactions" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 5px;
-                                                if root.dashboard-interactions.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.loc("no_interactions");
-                                                        color: Theme.muted;
-                                                        font-size: 13px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                if root.dashboard-interactions.length > 0 : ScrollView {
-                                                    vertical-stretch: 1;
-                                                    VerticalLayout {
-                                                        spacing: 5px;
-                                                        for item[i] in root.dashboard-interactions : Rectangle {
-                                                            height: 50px;
-                                                            border-radius: 12px;
-                                                            background: item.active ? Theme.elevated : Theme.raised;
-                                                            Rectangle {
-                                                                height: 3px;
-                                                                y: parent.height - self.height;
-                                                                x: 0px;
-                                                                width: parent.width * max(0, min(1, item.progress));
-                                                                border-radius: 2px;
-                                                                background: Theme.success;
-                                                                visible: item.active;
-                                                            }
-                                                            HorizontalLayout {
-                                                                padding-left: 10px;
-                                                                padding-right: 6px;
-                                                                spacing: 8px;
-                                                                Rectangle {
-                                                                    width: 8px;
-                                                                    height: 8px;
-                                                                    border-radius: 4px;
-                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
-                                                                }
-                                                                VerticalLayout {
-                                                                    horizontal-stretch: 1;
-                                                                    spacing: 1px;
-                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
-                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
-                                                                }
-                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                    if root.left-slot-0 == "interactions" : DashboardInteractionsCard {
+                        height: root.slot-height(root.left-slot-1);
+                        items: root.dashboard-interactions;
+                        empty-label: root.loc("no_interactions");
+                        meta(item) => { return root.interaction-meta(item); }
+                        remove(uuid) => { root.remove-interaction(uuid); }
+                    }
                     if root.left-slot-0 == "auto_macros" : DashboardMacroCard {
+                        height: root.slot-height(root.left-slot-1);
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
@@ -1261,12 +1310,14 @@ export component App inherits Window {
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.left-slot-0 == "macros" : DashboardMacroCard {
+                        height: root.slot-height(root.left-slot-1);
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
                         empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
                     if root.left-slot-0 == "music" : DashboardMusicCard {
+                        height: root.slot-height(root.left-slot-1);
                         title: root.music-title != "" ? root.music-title : root.loc("no_song");
                         artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
                         levels: root.cava-bars;
@@ -1280,66 +1331,15 @@ export component App inherits Window {
                         duration: root.music-duration;
                         action(name) => { root.music-action(name); }
                     }
-                    if root.left-slot-1 == "interactions" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 5px;
-                                                if root.dashboard-interactions.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.loc("no_interactions");
-                                                        color: Theme.muted;
-                                                        font-size: 13px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                if root.dashboard-interactions.length > 0 : ScrollView {
-                                                    vertical-stretch: 1;
-                                                    VerticalLayout {
-                                                        spacing: 5px;
-                                                        for item[i] in root.dashboard-interactions : Rectangle {
-                                                            height: 50px;
-                                                            border-radius: 12px;
-                                                            background: item.active ? Theme.elevated : Theme.raised;
-                                                            Rectangle {
-                                                                height: 3px;
-                                                                y: parent.height - self.height;
-                                                                x: 0px;
-                                                                width: parent.width * max(0, min(1, item.progress));
-                                                                border-radius: 2px;
-                                                                background: Theme.success;
-                                                                visible: item.active;
-                                                            }
-                                                            HorizontalLayout {
-                                                                padding-left: 10px;
-                                                                padding-right: 6px;
-                                                                spacing: 8px;
-                                                                Rectangle {
-                                                                    width: 8px;
-                                                                    height: 8px;
-                                                                    border-radius: 4px;
-                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
-                                                                }
-                                                                VerticalLayout {
-                                                                    horizontal-stretch: 1;
-                                                                    spacing: 1px;
-                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
-                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
-                                                                }
-                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                    if root.left-slot-1 == "interactions" : DashboardInteractionsCard {
+                        height: root.slot-height(root.left-slot-0);
+                        items: root.dashboard-interactions;
+                        empty-label: root.loc("no_interactions");
+                        meta(item) => { return root.interaction-meta(item); }
+                        remove(uuid) => { root.remove-interaction(uuid); }
+                    }
                     if root.left-slot-1 == "auto_macros" : DashboardMacroCard {
+                        height: root.slot-height(root.left-slot-0);
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
@@ -1347,12 +1347,14 @@ export component App inherits Window {
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.left-slot-1 == "macros" : DashboardMacroCard {
+                        height: root.slot-height(root.left-slot-0);
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
                         empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
                     if root.left-slot-1 == "music" : DashboardMusicCard {
+                        height: root.slot-height(root.left-slot-0);
                         title: root.music-title != "" ? root.music-title : root.loc("no_song");
                         artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
                         levels: root.cava-bars;
@@ -1369,67 +1371,17 @@ export component App inherits Window {
                 }
                 VerticalLayout {
                     spacing: 8px;
+                    alignment: start;
                     width: (root.width - 28px) / 2;
-                    if root.right-slot-0 == "interactions" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 5px;
-                                                if root.dashboard-interactions.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.loc("no_interactions");
-                                                        color: Theme.muted;
-                                                        font-size: 13px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                if root.dashboard-interactions.length > 0 : ScrollView {
-                                                    vertical-stretch: 1;
-                                                    VerticalLayout {
-                                                        spacing: 5px;
-                                                        for item[i] in root.dashboard-interactions : Rectangle {
-                                                            height: 50px;
-                                                            border-radius: 12px;
-                                                            background: item.active ? Theme.elevated : Theme.raised;
-                                                            Rectangle {
-                                                                height: 3px;
-                                                                y: parent.height - self.height;
-                                                                x: 0px;
-                                                                width: parent.width * max(0, min(1, item.progress));
-                                                                border-radius: 2px;
-                                                                background: Theme.success;
-                                                                visible: item.active;
-                                                            }
-                                                            HorizontalLayout {
-                                                                padding-left: 10px;
-                                                                padding-right: 6px;
-                                                                spacing: 8px;
-                                                                Rectangle {
-                                                                    width: 8px;
-                                                                    height: 8px;
-                                                                    border-radius: 4px;
-                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
-                                                                }
-                                                                VerticalLayout {
-                                                                    horizontal-stretch: 1;
-                                                                    spacing: 1px;
-                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
-                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
-                                                                }
-                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                    if root.right-slot-0 == "interactions" : DashboardInteractionsCard {
+                        height: root.slot-height(root.right-slot-1);
+                        items: root.dashboard-interactions;
+                        empty-label: root.loc("no_interactions");
+                        meta(item) => { return root.interaction-meta(item); }
+                        remove(uuid) => { root.remove-interaction(uuid); }
+                    }
                     if root.right-slot-0 == "auto_macros" : DashboardMacroCard {
+                        height: root.slot-height(root.right-slot-1);
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
@@ -1437,12 +1389,14 @@ export component App inherits Window {
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.right-slot-0 == "macros" : DashboardMacroCard {
+                        height: root.slot-height(root.right-slot-1);
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
                         empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
                     if root.right-slot-0 == "music" : DashboardMusicCard {
+                        height: root.slot-height(root.right-slot-1);
                         title: root.music-title != "" ? root.music-title : root.loc("no_song");
                         artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
                         levels: root.cava-bars;
@@ -1456,66 +1410,15 @@ export component App inherits Window {
                         duration: root.music-duration;
                         action(name) => { root.music-action(name); }
                     }
-                    if root.right-slot-1 == "interactions" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 5px;
-                                                if root.dashboard-interactions.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.loc("no_interactions");
-                                                        color: Theme.muted;
-                                                        font-size: 13px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                if root.dashboard-interactions.length > 0 : ScrollView {
-                                                    vertical-stretch: 1;
-                                                    VerticalLayout {
-                                                        spacing: 5px;
-                                                        for item[i] in root.dashboard-interactions : Rectangle {
-                                                            height: 50px;
-                                                            border-radius: 12px;
-                                                            background: item.active ? Theme.elevated : Theme.raised;
-                                                            Rectangle {
-                                                                height: 3px;
-                                                                y: parent.height - self.height;
-                                                                x: 0px;
-                                                                width: parent.width * max(0, min(1, item.progress));
-                                                                border-radius: 2px;
-                                                                background: Theme.success;
-                                                                visible: item.active;
-                                                            }
-                                                            HorizontalLayout {
-                                                                padding-left: 10px;
-                                                                padding-right: 6px;
-                                                                spacing: 8px;
-                                                                Rectangle {
-                                                                    width: 8px;
-                                                                    height: 8px;
-                                                                    border-radius: 4px;
-                                                                    background: item.active ? Theme.success : (item.failed ? #ffb4ab : #8e9099);
-                                                                }
-                                                                VerticalLayout {
-                                                                    horizontal-stretch: 1;
-                                                                    spacing: 1px;
-                                                                    Text { text: item.name; color: Theme.text; font-size: 11px; font-weight: 600; overflow: elide; }
-                                                                    Text { text: root.interaction-meta(item); color: item.failed ? #ffb4ab : Theme.muted; font-size: 8px; overflow: elide; }
-                                                                    if item.uuid != "" : Text { text: item.uuid; color: #8e9099; font-size: 7px; overflow: elide; }
-                                                                }
-                                                                MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove-interaction(item.uuid); } }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                    if root.right-slot-1 == "interactions" : DashboardInteractionsCard {
+                        height: root.slot-height(root.right-slot-0);
+                        items: root.dashboard-interactions;
+                        empty-label: root.loc("no_interactions");
+                        meta(item) => { return root.interaction-meta(item); }
+                        remove(uuid) => { root.remove-interaction(uuid); }
+                    }
                     if root.right-slot-1 == "auto_macros" : DashboardMacroCard {
+                        height: root.slot-height(root.right-slot-0);
                         enabled: root.connection == "Connected";
                         automatic: root.dashboard-auto-macros;
                         auto-mode: true;
@@ -1523,12 +1426,14 @@ export component App inherits Window {
                         toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
                     }
                     if root.right-slot-1 == "macros" : DashboardMacroCard {
+                        height: root.slot-height(root.right-slot-0);
                         enabled: root.connection == "Connected";
                         macros: root.dashboard-macro-list;
                         empty-label: root.loc("dashboard_no_macros");
                         run(name) => { root.trigger-macro(name); }
                     }
                     if root.right-slot-1 == "music" : DashboardMusicCard {
+                        height: root.slot-height(root.right-slot-0);
                         title: root.music-title != "" ? root.music-title : root.loc("no_song");
                         artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
                         levels: root.cava-bars;
@@ -1550,18 +1455,17 @@ export component App inherits Window {
                 HorizontalLayout {
                     spacing: 8px;
                     Rectangle { horizontal-stretch: 1; }
-                    PillButton { width: 170px; label: root.wallpaper-label == "" ? root.loc("dashboard_wallpaper_none") : root.wallpaper-label; clicked => { root.dashboard-open-picker("wallpaper"); } }
-                    PillButton { width: 82px; label: root.loc("dashboard_reset"); clicked => { root.dashboard-editor-reset(); } }
-                    PillButton { width: 82px; label: root.loc("cancel"); clicked => { root.dashboard-cancel(); root.dashboard-editing = false; } }
-                    PillButton { width: 82px; label: root.loc("save"); selected: true; clicked => { root.dashboard-save(root.edit-left-0, root.edit-left-1, root.edit-right-0, root.edit-right-1); } }
+                    PillButton { min-width: 120px; max-width: 220px; label: root.wallpaper-label == "" ? root.loc("dashboard_wallpaper_none") : root.wallpaper-label; clicked => { root.dashboard-open-picker("wallpaper"); } }
+                    PillButton { label: root.loc("dashboard_reset"); clicked => { root.dashboard-editor-reset(); } }
+                    PillButton { label: root.loc("cancel"); clicked => { root.dashboard-cancel(); root.dashboard-editing = false; } }
+                    PillButton { label: root.loc("save"); selected: true; clicked => { root.dashboard-save(root.edit-left-0, root.edit-left-1, root.edit-right-0, root.edit-right-1); } }
                 }
                 if root.feedback != "" : Text { text: root.feedback; color: Theme.muted; font-size: 11px; }
                 HorizontalLayout {
                     spacing: 8px;
-                    Rectangle {
+                    GlassCard {
                         horizontal-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
+                        tint-opacity: 0.88;
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
@@ -1584,10 +1488,9 @@ export component App inherits Window {
                             Rectangle { vertical-stretch: 1; background: transparent; }
                         }
                     }
-                    Rectangle {
+                    GlassCard {
                         horizontal-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
+                        tint-opacity: 0.88;
                         VerticalLayout {
                             padding: 14px;
                             spacing: 8px;
@@ -1617,8 +1520,7 @@ export component App inherits Window {
                 if root.audio-interfaces.length == 0 : DrawerEmpty {
                     text: root.loc("audio_no_outputs");
                 }
-                if root.audio-interfaces.length > 0 : ScrollView {
-                    horizontal-scrollbar-policy: always-off;
+                if root.audio-interfaces.length > 0 : Scroller {
                     VerticalLayout {
                         spacing: 8px;
                         alignment: start;
@@ -1651,9 +1553,9 @@ export component App inherits Window {
                 spacing: 8px;
                 HorizontalLayout {
                     spacing: 8px;
-                    PillButton { width: 132px; label: root.loc("macros"); selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
-                    PillButton { width: 132px; label: root.loc("auto_macros"); selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
-                    PillButton { width: 160px; label: root.loc("channel_points"); selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
+                    PillButton { min-width: 132px; label: root.loc("macros"); selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
+                    PillButton { min-width: 132px; label: root.loc("auto_macros"); selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
+                    PillButton { min-width: 160px; label: root.loc("channel_points"); selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
                 }
                 KioskSearch {
                     background: Theme.raised.with-alpha(0.94);
@@ -1663,7 +1565,7 @@ export component App inherits Window {
                     activated => { root.touch-keyboard-open = true; }
                     accepted => { root.hide-keyboard(); }
                 }
-                ScrollView {
+                Scroller {
                     vertical-stretch: 1;
                     VerticalLayout {
                         spacing: 6px;
@@ -1777,10 +1679,8 @@ export component App inherits Window {
                                 SystemDetail { title: root.loc("system_storage_total"); value: root.system-storage.total; }
                             }
                             Rectangle { height: 1px; background: Theme.raised; }
-                            ScrollView {
+                            Scroller {
                                 min-height: 0px;
-                                horizontal-scrollbar-policy: always-off;
-                                mouse-drag-pan-enabled: true;
                                 VerticalLayout {
                                     spacing: 2px;
                                     for row in root.system-storage.rows : SystemDetail {
@@ -1837,10 +1737,8 @@ export component App inherits Window {
                                 text: root.loc("system_updates_no_state");
                                 font-size: 12px;
                             }
-                            if root.updates.length > 0 : ScrollView {
+                            if root.updates.length > 0 : Scroller {
                                 min-height: 0px;
-                                horizontal-scrollbar-policy: always-off;
-                                mouse-drag-pan-enabled: true;
                                 VerticalLayout {
                                     spacing: 2px;
                                     alignment: start;
@@ -2061,7 +1959,7 @@ export component App inherits Window {
                             padding: 14px;
                             spacing: 8px;
                             DrawerTitle { text: root.loc("ethernet"); }
-                            ScrollView {
+                            Scroller {
                                 VerticalLayout {
                                     spacing: 6px;
                                     for row in root.ethernet : HorizontalLayout {
@@ -2111,11 +2009,9 @@ export component App inherits Window {
                                     : root.wifi-available ? root.loc("wifi_disabled")
                                         : root.loc("wifi_unavailable");
                             }
-                            if root.wifi-enabled && root.wifi.length > 0 : ScrollView {
+                            if root.wifi-enabled && root.wifi.length > 0 : Scroller {
                                 vertical-stretch: 1;
                                 min-height: 0px;
-                                vertical-scrollbar-policy: always-off;
-                                horizontal-scrollbar-policy: always-off;
                                 VerticalLayout {
                                     spacing: 5px;
                                     for row in root.wifi : Md3Card {
@@ -2207,11 +2103,9 @@ export component App inherits Window {
                                     : root.loc("bluetooth_no_paired");
                             }
                             if root.bluetooth-powered && (root.paired-devices.length > 0 ||
-                                (root.bluetooth-scanning && root.discovered-devices.length > 0)) : ScrollView {
+                                (root.bluetooth-scanning && root.discovered-devices.length > 0)) : Scroller {
                                 vertical-stretch: 1;
                                 min-height: 0px;
-                                vertical-scrollbar-policy: always-off;
-                                horizontal-scrollbar-policy: always-off;
                                 VerticalLayout {
                                     alignment: start;
                                     spacing: 6px;
@@ -2348,11 +2242,9 @@ export component App inherits Window {
                 if root.saved-wifi.length == 0 : DrawerEmpty {
                     text: root.loc("no_saved_wifi");
                 }
-                if root.saved-wifi.length > 0 : ScrollView {
+                if root.saved-wifi.length > 0 : Scroller {
                     vertical-stretch: 1;
                     min-height: 0px;
-                    vertical-scrollbar-policy: always-off;
-                    horizontal-scrollbar-policy: always-off;
                     VerticalLayout {
                         spacing: 8px;
                         for row in root.saved-wifi : Md3Card {
@@ -2440,9 +2332,8 @@ export component App inherits Window {
                     if device.links.length == 0 : DrawerEmpty {
                         text: root.loc("audio_no_physical_outputs");
                     }
-                    if device.links.length > 0 : ScrollView {
+                    if device.links.length > 0 : Scroller {
                         min-height: 0;
-                        horizontal-scrollbar-policy: always-off;
                         VerticalLayout {
                             alignment: start;
                             spacing: 6px;
@@ -2529,7 +2420,7 @@ export component App inherits Window {
                         font-weight: 600;
                         horizontal-stretch: 1;
                     }
-                    PillButton { width: 68px; label: root.loc("close"); clicked => { root.dashboard-picker-open = false; root.touch-keyboard-open = false; } }
+                    PillButton { min-width: 68px; label: root.loc("close"); clicked => { root.dashboard-picker-open = false; root.touch-keyboard-open = false; } }
                 }
                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
                     spacing: 8px;
@@ -2546,10 +2437,10 @@ export component App inherits Window {
                 if root.wallpaper-picker-loading && root.dashboard-picker-kind == "wallpaper" : DrawerEmpty {
                     text: root.loc("dashboard_wallpaper_loading");
                 }
-                ListView {
+                Scroller {
                     vertical-stretch: 1;
-                    horizontal-scrollbar-policy: always-off;
-                    mouse-drag-pan-enabled: true;
+                    VerticalLayout {
+                    alignment: start;
                     for item[i] in root.dashboard-picker-items : Rectangle {
                             height: root.dashboard-picker-kind == "wallpaper" ? 90px : 46px;
                             background: item.selected ? Theme.elevated : transparent;
@@ -2582,10 +2473,11 @@ export component App inherits Window {
                             }
                             TouchArea { clicked => { root.dashboard-select-option(item.name); } }
                         }
+                    }
                 }
                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
                     Text { text: root.loc("dashboard_selection_limit"); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
-                    PillButton { label: root.loc("apply"); selected: true; width: 90px; clicked => { root.dashboard-apply-picker(); } }
+                    PillButton { label: root.loc("apply"); selected: true; min-width: 90px; clicked => { root.dashboard-apply-picker(); } }
                 }
             }
         }
@@ -2702,7 +2594,7 @@ export component App inherits Window {
         width: min(520px,parent.width); height: 58px; border-radius: 16px; background: Theme.raised;
         HorizontalLayout { padding: 6px; spacing: 8px;
             Text { text: root.osd-item.label; color: Theme.text; vertical-alignment: center; }
-            PillButton { width: 74px; label: root.osd-item.muted ? root.loc("audio_unmute") : root.loc("audio_mute"); clicked => {root.change-volume(root.osd-item,root.osd-item.muted ? root.osd-item.restore : 0,true);} }
+            PillButton { min-width: 74px; label: root.osd-item.muted ? root.loc("audio_unmute") : root.loc("audio_mute"); clicked => {root.change-volume(root.osd-item,root.osd-item.muted ? root.osd-item.restore : 0,true);} }
             Slider { minimum: root.osd-item.minimum; maximum: root.osd-item.maximum; value: root.osd-item.volume; released(v) => {root.change-volume(root.osd-item,v,false);} }
             PillButton { width: 40px; label: "×"; clicked => {root.osd-visible=false;} }
         }
@@ -2748,7 +2640,7 @@ export component App inherits Window {
                     }
                     TouchArea { clicked => { root.power-action("restart-backend"); } }
                 }
-                HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { width: 108px; label: root.loc("cancel"); clicked => { root.power-menu-open = false; } } }
+                HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { min-width: 108px; label: root.loc("cancel"); clicked => { root.power-menu-open = false; } } }
             }
         }
     }
