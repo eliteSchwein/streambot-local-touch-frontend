@@ -27,7 +27,41 @@ pub(crate) fn install(ui: &App, command_tx: mpsc::UnboundedSender<(String, Value
         });
     }
     let tx = command_tx.clone();
-    ui.on_trigger_macro(move |name| send(&tx, "trigger_macro", json!({"macro":name.as_str()})));
+    let weak = ui.as_weak();
+    let ticket = std::cell::Cell::new(0i32);
+    ui.on_trigger_macro(move |name| {
+        let Some(app) = weak
+            .upgrade()
+            .filter(|app| app.get_connection() == "Connected")
+        else {
+            return;
+        };
+        if app
+            .get_dashboard_macro_list()
+            .iter()
+            .any(|row| row.name == name && row.state == "loading")
+        {
+            return;
+        }
+        let run_ticket = ticket.get().wrapping_add(1);
+        ticket.set(run_ticket);
+        crate::state::models::macro_run_state(&app, &name, run_ticket, "loading");
+        send(
+            &tx,
+            "trigger_macro",
+            json!({"macro":name.as_str(), "_kiosk_ticket":run_ticket}),
+        );
+        let weak = weak.clone();
+        slint::Timer::single_shot(std::time::Duration::from_secs(10), move || {
+            if let Some(app) = weak.upgrade() {
+                if app.get_dashboard_macro_list().iter().any(|row| {
+                    row.name == name && row.ticket == run_ticket && row.state == "loading"
+                }) {
+                    complete_macro(&app, name, run_ticket, false);
+                }
+            }
+        });
+    });
     let tx = command_tx.clone();
     ui.on_toggle_auto_macro(move |name, enable| {
         send(
@@ -58,7 +92,33 @@ pub(crate) fn install(ui: &App, command_tx: mpsc::UnboundedSender<(String, Value
     }
     {
         let tx = command_tx.clone();
-        ui.on_speedtest_start(move || send(&tx, "speedtest", json!({"action":"start"})));
+        let weak = ui.as_weak();
+        let generation = std::rc::Rc::new(std::cell::Cell::new(0u64));
+        ui.on_speedtest_start(move || {
+            let Some(app) = weak.upgrade() else { return };
+            if app.get_connection() != "Connected"
+                || app.get_speedtest_starting()
+                || app.get_speedtest_running()
+            {
+                return;
+            }
+            send(&tx, "speedtest", json!({"action":"start"}));
+            app.set_speedtest_starting(true);
+            app.set_speedtest_error("".into());
+            let ticket = generation.get().wrapping_add(1);
+            generation.set(ticket);
+            let current = generation.clone();
+            let weak = weak.clone();
+            slint::Timer::single_shot(std::time::Duration::from_secs(3), move || {
+                if current.get() == ticket {
+                    if let Some(app) = weak.upgrade() {
+                        app.set_speedtest_starting(false);
+                    }
+                }
+            });
+        });
+        let tx = command_tx.clone();
+        ui.on_speedtest_status(move || send(&tx, "speedtest", json!({"action":"status"})));
     }
     {
         let tx = command_tx.clone();
@@ -105,6 +165,21 @@ pub(crate) fn install(ui: &App, command_tx: mpsc::UnboundedSender<(String, Value
             "set_link_volume",
             json!({"interface":id.as_str(),"output":output.as_str(),"volume":volume}),
         )
+    });
+}
+
+pub(crate) fn complete_macro(app: &App, name: slint::SharedString, ticket: i32, success: bool) {
+    crate::state::models::macro_run_state(
+        app,
+        &name,
+        ticket,
+        if success { "success" } else { "error" },
+    );
+    let weak = app.as_weak();
+    slint::Timer::single_shot(std::time::Duration::from_millis(2500), move || {
+        if let Some(app) = weak.upgrade() {
+            crate::state::models::macro_run_state(&app, &name, ticket, "");
+        }
     });
 }
 

@@ -1,7 +1,7 @@
 use crate::state::presentation::string_field;
-use crate::{AutoMacroEntry, InteractionEntry};
+use crate::{App, AutoMacroEntry, DashboardMacroEntry, InteractionEntry};
 use serde_json::Value;
-use slint::VecModel;
+use slint::{Model, SharedString, VecModel};
 
 pub(crate) fn interaction_rows(items: &[Value]) -> slint::ModelRc<InteractionEntry> {
     let rows: Vec<InteractionEntry> = items
@@ -49,13 +49,20 @@ pub(crate) fn interaction_rows(items: &[Value]) -> slint::ModelRc<InteractionEnt
 
 pub(crate) fn auto_macro_rows(items: &[Value]) -> slint::ModelRc<AutoMacroEntry> {
     let selected = crate::config::dashboard::selected_names("auto_macro_names");
-    let rows: Vec<AutoMacroEntry> = items
-        .iter()
-        .filter(|item| {
-            item.get("name")
-                .and_then(Value::as_str)
-                .is_some_and(|name| selected.iter().any(|s| s == name))
-        })
+    let visible = if selected.is_empty() {
+        items.iter().take(4).collect::<Vec<_>>()
+    } else {
+        selected
+            .iter()
+            .filter_map(|name| {
+                items
+                    .iter()
+                    .find(|item| item["name"].as_str() == Some(name))
+            })
+            .collect()
+    };
+    let rows: Vec<AutoMacroEntry> = visible
+        .into_iter()
         .take(4)
         .map(|item| {
             let enabled = item
@@ -89,4 +96,44 @@ pub(crate) fn auto_macro_rows(items: &[Value]) -> slint::ModelRc<AutoMacroEntry>
         })
         .collect();
     slint::ModelRc::new(VecModel::from(rows))
+}
+
+pub(crate) fn dashboard_macros(app: &App, names: Vec<SharedString>) {
+    let previous = app.get_dashboard_macro_list();
+    let entries: Vec<_> = names
+        .into_iter()
+        .map(|name| {
+            previous
+                .iter()
+                .find(|row| row.name == name)
+                .unwrap_or_else(|| DashboardMacroEntry {
+                    name,
+                    ..Default::default()
+                })
+        })
+        .collect();
+    if previous.iter().ne(entries.iter().cloned()) {
+        app.set_dashboard_macro_list(slint::ModelRc::new(VecModel::from(entries)));
+    }
+}
+
+pub(crate) fn macro_run_state(app: &App, name: &str, ticket: i32, state: &str) {
+    let model = app.get_dashboard_macro_list();
+    let Some(rows) = model
+        .as_any()
+        .downcast_ref::<VecModel<DashboardMacroEntry>>()
+    else {
+        return;
+    };
+    if let Some((index, mut row)) = rows
+        .iter()
+        .enumerate()
+        .find(|(_, row)| row.name.as_str() == name)
+    {
+        if state == "loading" || row.ticket == ticket {
+            row.ticket = ticket;
+            row.state = state.into();
+            rows.set_row_data(index, row);
+        }
+    }
 }

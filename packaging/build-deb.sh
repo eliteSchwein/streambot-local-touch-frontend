@@ -46,7 +46,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: ${SHLIBS}, libwayland-client0, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libxcursor1, libxi6, libxrandr2, fonts-dejavu-core, network-manager, bluez, pulseaudio-utils, procps, python3, qrencode, iproute2
+Depends: ${SHLIBS}, libwayland-client0, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libxcursor1, libxi6, libxrandr2, fonts-dejavu-core, network-manager, bluez, pulseaudio-utils, procps, python3, iproute2
 Suggests: matugen
 Maintainer: Thomas Ludwig
 Description: Streambot Touch native kiosk

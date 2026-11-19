@@ -1,6 +1,6 @@
 use crate::{
     state::{
-        models::{auto_macro_rows, interaction_rows},
+        models::{auto_macro_rows, dashboard_macros, interaction_rows},
         presentation::{self, string_field, time_label},
         store::Store,
     },
@@ -9,6 +9,11 @@ use crate::{
 use serde_json::Value;
 use slint::{Model, SharedString, VecModel};
 pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) {
+    let params = if method == "notify_speedtest_update" {
+        params.get("speedtest").unwrap_or(params)
+    } else {
+        params
+    };
     let state = guard.accept(method, params);
     match method {
         "notify_music_update" => {
@@ -78,15 +83,32 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
         "notify_interaction" => {
             app.set_dashboard_interactions(interaction_rows(&guard.interactions));
         }
-        "notify_system_info" => app.set_system_summary(presentation::system(&state).into()),
-        "notify_storage_update" => app.set_storage_summary(presentation::storage(&state).into()),
+        "notify_system_info" => app.set_system_stats(presentation::system(&state)),
+        "notify_storage_update" => app.set_system_storage(presentation::storage(&state)),
         "notify_update_manager" => {
-            app.set_updates(presentation::updates(&state));
+            let updates = presentation::updates(&state);
+            app.set_updates_available(updates.iter().any(|row| row.available));
+            app.set_updates_checking(updates.iter().any(|row| row.checking));
+            app.set_updates_running(updates.iter().any(|row| row.updating));
+            app.set_backend_update_running(
+                updates
+                    .iter()
+                    .any(|row| row.id == "backend" && row.updating),
+            );
+            app.set_updates(updates);
             app.invoke_advance_updates();
         }
         "notify_speedtest_update" => {
-            app.set_speedtest_running(state["running"] == true);
-            app.set_speedtest_summary(presentation::speedtest(&state).into());
+            presentation::speedtest(app, &state);
+            if params.is_null()
+                || params["running"] == true
+                || matches!(
+                    params["stage"].as_str(),
+                    Some("ping" | "download" | "upload" | "finished" | "error" | "failed")
+                )
+            {
+                app.set_speedtest_starting(false);
+            }
         }
         "notify_audio_update" | "notify_audio_outputs_update" => {
             let rows = crate::audio::rows(&guard.audio, &guard.outputs);
@@ -116,15 +138,17 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
                     }
                 }
             }
-            app.set_audio_interfaces(rows);
+            crate::audio::update_rows(app, rows);
         }
         "notify_settings_update" => {
             let settings = state.get("system_config").unwrap_or(&state);
             if let Some(lang @ ("en" | "de")) = settings["language"].as_str() {
                 app.set_language(lang.into());
             }
-            if let Some(wallpaper) = settings["touch_wallpaper"].as_str() {
-                crate::dashboard_editor::set_wallpaper_image(app, wallpaper);
+            if !app.get_dashboard_editing() {
+                if let Some(wallpaper) = settings["touch_wallpaper"].as_str() {
+                    crate::dashboard_editor::set_wallpaper_image(app, wallpaper);
+                }
             }
         }
         "notify_macro_update" => {
@@ -136,13 +160,14 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
                     .collect::<Vec<_>>(),
             )));
             let configured = crate::config::dashboard::selected_names("macro_names");
-            app.set_dashboard_macro_list(slint::ModelRc::new(VecModel::from(
+            dashboard_macros(
+                app,
                 configured
                     .iter()
                     .filter(|name| guard.macros.contains(name))
                     .map(|name| SharedString::from(name.as_str()))
-                    .collect::<Vec<_>>(),
-            )));
+                    .collect(),
+            );
         }
         "notify_auto_macros_update" => {
             app.set_dashboard_auto_macros(auto_macro_rows(&guard.auto_macros));

@@ -1,4 +1,4 @@
-import { LineEdit, ScrollView, Slider } from "std-widgets.slint";
+import { LineEdit, ListView, ScrollView, Slider, Spinner } from "std-widgets.slint";
 
 // Original Quickshell Material 3 fallback palette (Md3Theme.qml).
 export global Theme {
@@ -6,18 +6,35 @@ export global Theme {
     in-out property <color> surface: #1d2024;
     in-out property <color> elevated: #282a2f;
     in-out property <color> raised: #33353a;
+    in-out property <color> outline-variant: #44474f;
     in-out property <color> primary: #a8c7fa;
+    in-out property <color> primary-container: #062e6f;
+    in-out property <color> error: #ffb4ab;
+    in-out property <color> on-error: #690005;
     in-out property <color> on-primary: #062e6f;
     in-out property <color> text: #e2e2e9;
     in-out property <color> muted: #c4c6d0;
     in-out property <color> success: #a8d5a2;
 }
 
+export struct EthernetRow { id: string, connected: bool, enabled: bool }
+export struct WifiRow { id: string, name: string, device: string, secured: bool, connected: bool, signal: int, profile: string }
+export struct SavedWifiRow { id: string, name: string, ssid: string, connected: bool }
+export struct BluetoothRow { id: string, name: string, kind: string, connected: bool }
+
 export struct ActionRow { label: string, id: string, active: bool }
-export struct UpdateEntry { label: string, id: string, active: bool, busy: bool }
-export struct AudioLink { id: string, label: string, linked: bool, volume: float }
+export struct SystemStats { cpu: float, temperature: float, ram: float, swap: float, has-swap: bool, storage: float }
+export struct StorageEntry { label: string, german: string, size: string, tint: color, fraction: float, offset: float }
+export struct SystemStorage { used: string, free: string, total: string, usage: float, other: float, rows: [StorageEntry] }
+export struct UpdateEntry {
+    id: string, active: bool, busy: bool, git: bool, available: bool, updating: bool, checking: bool,
+    version: string, count: int, preview: string, error: string, stage: string, message: string, progress: float,
+    package: string, package-progress: float,
+}
+struct SystemMetric { label: string, tint: color, value: float, empty: string }
+export struct AudioLink { id: string, label: string, linked: bool, present: bool, default-output: bool, volume: float }
 export struct AudioEntry {
-    id: string, label: string, physical: bool, volume: float, minimum: float, maximum: float,
+    id: string, label: string, subtitle: string, physical: bool, volume: float, minimum: float, maximum: float,
     step: float, muted: bool, restore: float, routable: bool, per-link: bool, links: [AudioLink],
 }
 export struct InteractionEntry {
@@ -29,6 +46,8 @@ export struct InteractionEntry {
     progress: float,
 }
 
+export struct DashboardMacroEntry { name: string, state: string, ticket: int }
+
 export struct AutoMacroEntry {
     name: string,
     enabled: bool,
@@ -38,6 +57,7 @@ export struct AutoMacroEntry {
 component DashboardSwitch inherits Rectangle {
     in property <bool> checked: false;
     callback toggled();
+    in property <bool> enabled: true;
     width: 52px;
     height: 32px;
     border-radius: 16px;
@@ -52,7 +72,616 @@ component DashboardSwitch inherits Rectangle {
         background: root.checked ? Theme.on-primary : Theme.muted;
         border-radius: self.width / 2;
     }
-    TouchArea { clicked => { root.toggled(); } }
+    TouchArea { enabled: root.enabled; clicked => { root.toggled(); } }
+}
+
+component Md3Card inherits Rectangle {
+    background: Theme.surface;
+    border-radius: 16px;
+    min-width: 0px;
+}
+
+component GlassCard inherits Md3Card {
+    in property <float> tint-opacity: 0.94;
+    in property <color> tint: Theme.surface;
+    background: root.tint.with-alpha(root.tint-opacity);
+    border-width: 1px;
+    border-color: Theme.outline-variant;
+}
+
+component DrawerTitle inherits Text {
+    color: Theme.text;
+    font-size: 16px;
+    font-weight: 600;
+    overflow: elide;
+}
+
+component DrawerEmpty inherits Text {
+    color: Theme.muted;
+    font-size: 13px;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    wrap: word-wrap;
+    vertical-stretch: 1;
+}
+
+component Md3Button inherits Rectangle {
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <bool> filled: false;
+    callback clicked();
+    height: 34px;
+    width: max(34px, caption.preferred-width + 20px);
+    border-radius: 17px;
+    border-width: root.filled ? 0px : 1px;
+    border-color: root.enabled ? Theme.muted : Theme.raised;
+    background: root.filled ? (root.enabled ? Theme.primary : Theme.raised) : hit.pressed ? Theme.elevated : transparent;
+    caption := Text {
+        text: root.label;
+        color: !root.enabled ? Theme.muted : root.filled ? Theme.on-primary : Theme.primary;
+        font-size: 12px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    hit := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+}
+
+component DrawerRowText inherits VerticalLayout {
+    in property <string> title;
+    in property <string> detail;
+    in property <bool> active;
+    horizontal-stretch: 1;
+    min-width: 0px;
+    alignment: center;
+    spacing: 1px;
+    Text { text: root.title; color: Theme.text; font-size: 12px; font-weight: 600; overflow: elide; }
+    if root.detail != "" : Text { text: root.detail; color: root.active ? Theme.success : Theme.muted; font-size: 10px; overflow: elide; }
+}
+
+component DrawerBluetoothDevice inherits Md3Card {
+    in property <BluetoothRow> device;
+    in property <string> status;
+    in property <bool> paired: false;
+    in property <bool> enabled: true;
+    callback activated();
+    callback removed();
+    height: root.paired ? 60px : 54px;
+    background: root.device.connected ? Theme.primary-container : Theme.raised;
+    HorizontalLayout {
+        padding: 10px;
+        spacing: 10px;
+        Rectangle {
+            width: 28px;
+            if root.device.kind == "SPK" : Image {
+                source: @image-url("icons/mdi/volume-high.svg");
+                colorize: Theme.text;
+                width: 22px;
+                height: 22px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
+            if root.device.kind != "SPK" : Text {
+                text: root.device.kind; color: Theme.text; font-size: 9px; font-weight: 600;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+        }
+        DrawerRowText { title: root.device.name; detail: root.paired ? root.status : ""; active: root.device.connected; }
+        if !root.paired : Text { text: root.status; color: Theme.primary; font-size: 10px; vertical-alignment: center; }
+    }
+    TouchArea {
+        x: 0px;
+        width: root.paired ? parent.width - 42px : parent.width;
+        enabled: root.enabled;
+        clicked => { root.activated(); }
+    }
+    if root.paired : Md3Button {
+        x: parent.width - self.width - 8px;
+        y: (parent.height - self.height) / 2;
+        label: "×";
+        enabled: root.enabled;
+        clicked => { root.removed(); }
+    }
+}
+
+component SystemHeading inherits Text {
+    color: Theme.text;
+    font-size: 12px;
+    font-weight: 600;
+    overflow: elide;
+    vertical-alignment: center;
+}
+
+component SystemRing inherits Rectangle {
+    in property <length> diameter;
+    in property <float> progress;
+    in property <color> tint;
+    width: root.diameter;
+    height: root.diameter;
+    border-radius: self.width / 2;
+    border-width: 6px;
+    border-color: Theme.raised;
+    if root.progress >= 1 : Rectangle {
+        border-radius: self.width / 2;
+        border-width: 6px;
+        border-color: root.tint;
+    }
+    if root.progress > 0 && root.progress < 1 : Path {
+        private property <float> edge: root.diameter / 1px;
+        private property <float> center: self.edge / 2;
+        private property <float> radius: self.center - 3;
+        viewbox-width: self.edge;
+        viewbox-height: self.edge;
+        stroke-width: 6px;
+        stroke: root.tint;
+        MoveTo { x: center; y: 3; }
+        ArcTo {
+            radius-x: radius;
+            radius-y: radius;
+            x: center + radius * sin(root.progress * 360deg);
+            y: center - radius * cos(root.progress * 360deg);
+            sweep: true;
+            large-arc: root.progress > 0.5;
+        }
+    }
+}
+
+component SystemDetail inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> value;
+    in property <color> tint: transparent;
+    in property <color> value-color: Theme.text;
+    in property <length> font-size: 12px;
+    in property <length> marker-size: 9px;
+    in property <length> marker-radius: 5px;
+    spacing: 8px;
+    if root.tint != transparent : Rectangle {
+        width: root.marker-size;
+        Rectangle {
+            width: root.marker-size;
+            height: root.marker-size;
+            border-radius: root.marker-radius;
+            background: root.tint;
+        }
+    }
+    Text {
+        text: root.title;
+        color: Theme.muted;
+        font-size: root.font-size;
+        vertical-alignment: center;
+        overflow: elide;
+        horizontal-stretch: 1;
+    }
+    Text {
+        text: root.value;
+        color: root.value-color;
+        font-weight: 500;
+        font-size: 12px;
+        vertical-alignment: center;
+    }
+}
+
+component SystemProgress inherits VerticalLayout {
+    in property <string> label;
+    in property <float> value;
+    alignment: start;
+    spacing: 3px;
+    HorizontalLayout {
+        spacing: 6px;
+        Text { text: root.label; horizontal-stretch: 1; color: Theme.muted; font-size: 10px; overflow: elide; }
+        if root.value >= 0 : Text { text: round(root.value) + "%"; color: Theme.text; font-size: 10px; }
+    }
+    if root.value >= 0 : Rectangle {
+        height: 5px;
+        border-radius: 3px;
+        background: Theme.raised;
+        Rectangle {
+            x: 0px;
+            width: parent.width * root.value / 100;
+            border-radius: 3px;
+            background: Theme.primary;
+        }
+    }
+}
+
+component SystemLanguage inherits Rectangle {
+    in property <string> language;
+    in property <string> english;
+    in property <string> german;
+    callback selected(string);
+    height: 44px;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: Theme.muted;
+    background: Theme.elevated;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        Text {
+            text: root.language == "de" ? root.german : root.english;
+            color: Theme.text; vertical-alignment: center; font-size: 13px; horizontal-stretch: 1;
+        }
+        Text { text: "▼"; color: Theme.muted; font-size: 11px; vertical-alignment: center; }
+    }
+    accessible-role: combobox;
+    accessible-value: root.language == "de" ? root.german : root.english;
+    accessible-action-expand => { choices.show(); }
+    TouchArea { clicked => { choices.show(); } }
+    choices := PopupWindow {
+        x: 0px;
+        y: -96px;
+        width: root.width;
+        height: 92px;
+        close-policy: close-on-click-outside;
+        Md3Card {
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.raised;
+            VerticalLayout {
+                padding: 4px;
+                for option in [{code: "en", label: root.english}, {code: "de", label: root.german}] : Rectangle {
+                    background: option.code == root.language || option-hit.has-hover ? Theme.elevated : transparent;
+                    Text {
+                        x: 10px;
+                        width: parent.width - 20px;
+                        text: option.label;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                        font-size: 13px;
+                    }
+                    option-hit := TouchArea { clicked => { choices.close(); root.selected(option.code); } }
+                }
+            }
+        }
+    }
+}
+
+component DashboardMacroCard inherits GlassCard {
+    tint-opacity: 0.88;
+    in property <[DashboardMacroEntry]> macros;
+    in property <[AutoMacroEntry]> automatic;
+    in property <bool> auto-mode;
+    in property <bool> enabled: true;
+    in property <string> empty-label;
+    callback run(string);
+    callback toggle(string, bool);
+    vertical-stretch: 1;
+    preferred-height: 180px;
+    card-content := Rectangle {
+        x: 14px;
+        y: 14px;
+        width: parent.width - 28px;
+        height: parent.height - 28px;
+        clip: true;
+        property <int> count: root.auto-mode ? root.automatic.length : root.macros.length;
+        property <length> row-height: clamp((self.height + 4px) / max(1, self.count) - 4px,
+            root.auto-mode ? 32px : 30px, root.auto-mode ? 42px : 46px);
+        if self.count == 0 : Text {
+            text: root.empty-label;
+            color: Theme.muted;
+            font-size: 10px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        rows := VerticalLayout {
+            spacing: 4px;
+            alignment: start;
+            for item in (root.auto-mode ? root.automatic : []) : Rectangle {
+                height: card-content.row-height;
+                border-radius: 12px;
+                background: Theme.raised;
+                Rectangle {
+                    x: 0px;
+                    width: parent.width * item.progress;
+                    border-radius: 12px;
+                    background: Theme.elevated;
+                    animate width { duration: 950ms; }
+                    opacity: item.enabled ? 1 : 0;
+                    animate opacity { duration: 180ms; }
+                    Rectangle { border-radius: 12px; background: Theme.primary; opacity: 0.1; }
+                }
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 6px;
+                    spacing: 6px;
+                    Text {
+                        text: item.name;
+                        color: Theme.text;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                        font-size: 11px;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        width: 52px;
+                        DashboardSwitch {
+                            checked: item.enabled;
+                            enabled: root.enabled;
+                            toggled => { root.toggle(item.name, !item.enabled); }
+                        }
+                    }
+                }
+            }
+            for item in (root.auto-mode ? [] : root.macros) : Rectangle {
+                height: card-content.row-height;
+                border-radius: 12px;
+                background: macro-touch.pressed ? Theme.elevated : Theme.surface.with-alpha(0.94);
+                border-width: 1px;
+                border-color: Theme.outline-variant;
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 8px;
+                    spacing: 6px;
+                    Text {
+                        text: item.name;
+                        color: Theme.text;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                        font-size: 11px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                    Rectangle {
+                        width: 26px;
+                        if item.state != "loading" : Image {
+                            width: 16px;
+                            height: 16px;
+                            source: item.state == "success" ? @image-url("icons/mdi/check.svg")
+                                : item.state == "error" ? @image-url("icons/mdi/alert-circle.svg")
+                                : @image-url("icons/mdi/play.svg");
+                            colorize: Theme.text;
+                        }
+                        if item.state == "loading" : Spinner {
+                            width: 16px;
+                            height: 16px;
+                            indeterminate: true;
+                        }
+                    }
+                }
+                macro-touch := TouchArea { enabled: root.enabled && item.state != "loading"; clicked => { root.run(item.name); } }
+            }
+        }
+    }
+}
+
+component SpeedMetric inherits GlassCard {
+    in property <string> title;
+    in property <string> value;
+    in property <string> glyph;
+    in property <bool> active;
+    tint: root.active ? Theme.elevated : Theme.surface;
+    tint-opacity: root.active ? 0.92 : 0.88;
+    border-color: root.active ? Theme.primary : Theme.outline-variant;
+    HorizontalLayout {
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            spacing: 8px;
+            Text { text: root.glyph; color: Theme.text; font-size: 26px; horizontal-alignment: center; }
+            Text { text: root.title; color: Theme.muted; font-size: 14px; horizontal-alignment: center; }
+            Text { text: root.value; color: Theme.text; font-size: 24px; font-weight: 700; horizontal-alignment: center; }
+        }
+    }
+}
+
+component KioskSearch inherits LineEdit {
+    callback activated();
+    changed has-focus => { if self.has-focus { root.activated(); } }
+}
+
+component AudioIconControl inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <bool> enabled: true;
+    callback clicked();
+    width: 36px;
+    height: 34px;
+    border-radius: 17px;
+    background: hit.pressed ? Theme.elevated : Theme.raised;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    Image {
+        width: 17px;
+        height: 17px;
+        source: root.icon;
+        colorize: root.enabled ? Theme.text : Theme.muted;
+        opacity: root.enabled ? 1 : 0.55;
+    }
+    hit := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+}
+
+component AudioFader inherits Rectangle {
+    in property <float> minimum;
+    in property <float> maximum;
+    in property <float> step;
+    in-out property <float> value;
+    in property <bool> enabled: true;
+    callback committed(float);
+    out property <bool> dragging: hit.pressed;
+    accessible-role: slider;
+    accessible-value: round(root.value * 100) + "%";
+    accessible-enabled: root.enabled;
+    function update-position(position: length) {
+        let fraction = clamp((position - 8px) / max(1px, root.width - 16px), 0, 1);
+        let increment = max(0.0001, root.step);
+        root.value = clamp(root.minimum + round(fraction * (root.maximum - root.minimum) / increment) * increment,
+            root.minimum, root.maximum);
+    }
+    height: 26px;
+    horizontal-stretch: 1;
+    Rectangle {
+        height: 6px;
+        x: 8px;
+        width: parent.width - 16px;
+        border-radius: 3px;
+        background: Theme.raised;
+        opacity: root.enabled ? 1 : 0.5;
+        Rectangle {
+            x: 0px;
+            width: parent.width * clamp((root.value - root.minimum) / max(0.001, root.maximum - root.minimum), 0, 1);
+            border-radius: 3px;
+            background: Theme.primary;
+        }
+    }
+    Rectangle {
+        width: 16px;
+        height: 16px;
+        x: (parent.width - self.width) * clamp((root.value - root.minimum) / max(0.001, root.maximum - root.minimum), 0, 1);
+        border-radius: 8px;
+        background: root.enabled ? Theme.primary : Theme.muted;
+        border-width: fader-focus.has-focus ? 2px : 0px;
+        border-color: Theme.text;
+    }
+    fader-focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.LeftArrow || event.text == Key.RightArrow {
+                root.value = clamp(root.value + (event.text == Key.RightArrow ? root.step : -root.step), root.minimum, root.maximum);
+            } else if event.text == Key.Home || event.text == Key.End {
+                root.value = event.text == Key.Home ? root.minimum : root.maximum;
+            } else {
+                return reject;
+            }
+            root.committed(root.value);
+            return accept;
+        }
+    }
+    hit := TouchArea {
+        enabled: root.enabled;
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left {
+                if event.kind == PointerEventKind.down {
+                    fader-focus.focus();
+                    root.update-position(self.mouse-x);
+                } else if event.kind == PointerEventKind.up {
+                    root.update-position(self.mouse-x);
+                    root.committed(root.value);
+                }
+            }
+        }
+        moved => { if self.pressed { root.update-position(self.mouse-x); } }
+    }
+}
+
+component KioskAudioRow inherits GlassCard {
+    in property <AudioEntry> item;
+    in property <string> route-label;
+    in property <string> quieter;
+    in property <string> louder;
+    in property <string> mute-label;
+    in property <string> link-volume-label;
+    in property <string> levels-label;
+    in property <bool> ready;
+    property <float> draft: root.item.volume;
+    property <float> previous-volume: root.item.restore;
+    property <bool> fader-dragging;
+    callback volume(float);
+    callback mute(float);
+    callback routing();
+    function adjust(direction: int) {
+        root.draft = clamp(root.draft + direction * root.item.step, root.item.minimum, root.item.maximum);
+        root.volume(root.draft);
+    }
+    changed item => { if !root.fader-dragging { root.draft = root.item.volume; } }
+    changed draft => { if root.draft > root.item.minimum { root.previous-volume = root.draft; } }
+    function toggle-mute() {
+        let restore = root.item.volume > root.item.minimum ? root.item.volume : max(root.previous-volume, root.item.restore);
+        root.mute(root.item.muted ? clamp(restore, root.item.minimum, root.item.maximum) : 0);
+    }
+    height: 76px;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 12px;
+        HorizontalLayout {
+            width: 150px;
+            spacing: 5px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 1px;
+                Text { text: root.item.label; color: Theme.text; font-size: 13px; font-weight: 600; overflow: elide; }
+                Text { text: root.item.subtitle; color: Theme.muted; font-size: 9px; overflow: elide; }
+            }
+            if root.item.routable : AudioIconControl {
+                icon: @image-url("icons/mdi/link-variant.svg");
+                label: root.route-label;
+                enabled: root.ready;
+                clicked => { root.routing(); }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            if !root.item.per-link : AudioFader {
+                minimum: root.item.minimum;
+                maximum: root.item.maximum;
+                step: root.item.step;
+                enabled: root.ready && !root.item.muted;
+                value <=> root.draft;
+                changed dragging => { root.fader-dragging = self.dragging; }
+                committed(value) => { root.volume(value); }
+            }
+            if root.item.per-link : Text {
+                height: 26px;
+                text: root.link-volume-label;
+                color: Theme.muted; font-size: 10px;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+            HorizontalLayout {
+                alignment: center;
+                spacing: 12px;
+                if !root.item.per-link : AudioIconControl {
+                    icon: @image-url("icons/mdi/minus.svg");
+                    label: root.quieter;
+                    enabled: root.ready && !root.item.muted;
+                    clicked => { root.adjust(-1); }
+                }
+                Rectangle {
+                    width: 96px;
+                    height: 32px;
+                    border-radius: 16px;
+                    border-width: root.item.muted ? 0px : 1px;
+                    border-color: Theme.muted;
+                    background: root.item.muted ? Theme.primary : mute-touch.pressed ? Theme.elevated : Theme.raised;
+                    accessible-role: button;
+                    accessible-label: root.mute-label;
+                    accessible-action-default => { if root.ready { root.toggle-mute(); } }
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 6px;
+                        Image {
+                            width: 17px;
+                            height: 17px;
+                            source: root.item.muted ? @image-url("icons/mdi/volume-off.svg") : @image-url("icons/mdi/volume-high.svg");
+                            colorize: root.item.muted ? Theme.on-primary : Theme.text;
+                        }
+                        Text {
+                            text: root.item.per-link ? root.levels-label : round(root.draft * 100) + "%";
+                            color: root.item.muted ? Theme.on-primary : Theme.text;
+                            font-size: 11px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
+                    mute-touch := TouchArea { enabled: root.ready; clicked => { root.toggle-mute(); } }
+                }
+                if !root.item.per-link : AudioIconControl {
+                    icon: @image-url("icons/mdi/plus.svg");
+                    label: root.louder;
+                    enabled: root.ready && !root.item.muted;
+                    clicked => { root.adjust(1); }
+                }
+            }
+        }
+    }
 }
 
 component MusicIconButton inherits Rectangle {
@@ -181,10 +810,39 @@ export component App inherits Window {
     in-out property <string> track: "No track information";
     in-out property <string> music-state: "";
     in-out property <string> interaction-summary: "No interactions";
-    in-out property <string> system-summary: "No system statistics yet";
-    in-out property <string> storage-summary: "No storage information yet";
-    in-out property <string> speedtest-summary: "Not run";
-    in-out property <string> update-summary: "No update information yet";
+    in-out property <SystemStats> system-stats: { cpu: -1, temperature: -1, ram: -1, swap: -1, has-swap: false, storage: -1 };
+    in-out property <SystemStorage> system-storage: { used: "—", free: "—", total: "—", usage: -1, other: 0, rows: [] };
+    in-out property <bool> updates-available;
+    in-out property <bool> updates-checking;
+    in-out property <bool> updates-running;
+    in-out property <bool> backend-update-running;
+    property <[SystemMetric]> system-metrics: [
+        { label: root.tr("CPU usage", "CPU-Auslastung"), tint: #ef5350, value: root.system-stats.cpu, empty: "—" },
+        { label: root.tr("RAM usage", "RAM-Auslastung"), tint: #ffb300, value: root.system-stats.ram, empty: "—" },
+        { label: root.tr("Swap usage", "Swap-Auslastung"), tint: #ab47bc,
+            value: root.system-stats.has-swap ? root.system-stats.swap : -1, empty: root.system-stats.has-swap ? "—" : root.tr("No swap", "Kein Swap") },
+        { label: root.tr("Internal storage", "Interner Speicher"), tint: #26c6da,
+            value: root.system-stats.storage >= 0 ? root.system-stats.storage : root.system-storage.usage, empty: "—" },
+    ];
+    pure function update-stage(stage: string) -> string {
+        if stage == "preparing" { return root.tr("Preparing", "Vorbereiten"); }
+        if stage == "downloading" { return root.tr("Downloading", "Herunterladen"); }
+        if stage == "extracting" { return root.tr("Extracting", "Entpacken"); }
+        if stage == "installing" { return root.tr("Installing", "Installieren"); }
+        if stage == "configuring" { return root.tr("Configuring", "Konfigurieren"); }
+        if stage == "pulling" { return root.tr("Pulling changes", "Änderungen abrufen"); }
+        if stage == "dependencies" { return root.tr("Installing dependencies", "Abhängigkeiten installieren"); }
+        if stage == "verifying" { return root.tr("Verifying", "Überprüfen"); }
+        if stage == "restarting" { return root.tr("Restarting", "Neustarten"); }
+        return stage == "" ? root.tr("Updating…", "Wird aktualisiert…") : stage;
+    }
+    in-out property <string> speedtest-stage: "idle";
+    in-out property <string> speedtest-ping: "—";
+    in-out property <string> speedtest-download: "—";
+    in-out property <string> speedtest-upload: "—";
+    in-out property <string> speedtest-error;
+    in-out property <bool> speedtest-starting;
+    callback speedtest-status();
     in-out property <[string]> macros: [];
     in-out property <[ActionRow]> auto-macros: [];
     in-out property <[ActionRow]> channel-points: [];
@@ -203,24 +861,74 @@ export component App inherits Window {
     in-out property <string> edit-right-1: "";
     in-out property <bool> power-menu-open: false;
     in-out property <bool> network-drawer-open: false;
-    in-out property <bool> drawer-swipe-armed: false;
-    in-out property <string> drawer-network: "Checking network...";
-    in-out property <string> drawer-bluetooth: "Checking Bluetooth...";
+    property <bool> drawer-dragging: false;
+    property <length> drawer-delta: 0px;
+    property <duration> drawer-drag-start: 0ms;
+    property <bool> saved-wifi-open: false;
+    property <string> forget-name;
+    property <string> wifi-name;
+    property <string> drawer-pairing;
+    in-out property <string> drawer-network-error;
+    in-out property <string> drawer-error;
+    in-out property <bool> wifi-enabled;
+    in-out property <bool> wifi-available;
+    in-out property <bool> bluetooth-available;
+    in-out property <bool> bluetooth-powered;
+    in-out property <bool> bluetooth-scanning;
+    in-out property <bool> bluetooth-scan-le;
+    in-out property <int> bluetooth-connected-count;
     in-out property <bool> touch-keyboard-open: false;
     in-out property <bool> touch-keyboard-shift: false;
     in-out property <bool> touch-keyboard-symbols: false;
-    callback refresh-drawer();
+    callback drawer-visibility(bool);
     callback drawer-command(string,string,string);
     in-out property <bool> drawer-busy;
-    in-out property <[ActionRow]> wifi;
-    in-out property <[ActionRow]> ethernet;
-    in-out property <[ActionRow]> saved-wifi;
-    in-out property <[ActionRow]> devices;
+    in-out property <bool> drawer-refreshing;
+    in-out property <[WifiRow]> wifi;
+    in-out property <[EthernetRow]> ethernet;
+    in-out property <[SavedWifiRow]> saved-wifi;
+    in-out property <[BluetoothRow]> paired-devices;
+    in-out property <[BluetoothRow]> discovered-devices;
     in-out property <string> commander-url;
     in-out property <image> commander-qr;
     in-out property <string> wifi-target;
     in-out property <string> wifi-password;
-    in-out property <string> confirm-forget;
+    property <string> confirm-forget;
+
+    changed network-drawer-open => {
+        if !root.network-drawer-open {
+            root.saved-wifi-open = false;
+            root.confirm-forget = "";
+            if root.wifi-target != "" { root.close-wifi-password(); }
+        }
+        root.drawer-visibility(root.network-drawer-open);
+    }
+    pure function connection-status(connected: bool) -> string {
+        return connected ? root.tr("Connected", "Verbunden") : root.tr("Disconnected", "Getrennt");
+    }
+    function start-drawer-drag() {
+        root.drawer-delta = 0px;
+        root.drawer-drag-start = animation-tick();
+        root.drawer-dragging = true;
+    }
+    function settle-drawer(distance: length, opening: bool) {
+        let far-enough = distance > root.height * 0.28;
+        let fast-enough = distance > 20px && distance / 1px > (animation-tick() - root.drawer-drag-start) / 1s * 850;
+        let tap = abs(distance / 1px) < 8;
+        root.drawer-dragging = false;
+        root.network-drawer-open = (far-enough || fast-enough || (!opening && tap)) ? opening : !opening;
+    }
+    function close-wifi-password() {
+        root.touch-keyboard-open = false;
+        root.wifi-target = "";
+        root.wifi-password = "";
+    }
+    function submit-wifi-password() {
+        if root.wifi-password != "" && !root.drawer-busy {
+            root.drawer-command("wifi-connect", root.wifi-target, root.wifi-password);
+            root.close-wifi-password();
+        }
+    }
     in-out property <string> language: "en";
     callback choose-language(string);
     pure function tr(en:string,de:string)->string { return root.language == "de" ? de : en; }
@@ -230,6 +938,29 @@ export component App inherits Window {
     callback dashboard-cancel();
     callback power-action(string);
     in-out property <bool> dashboard-picker-open: false;
+    in-out property <bool> wallpaper-picker-loading;
+    callback wallpaper-picker-closed();
+    changed dashboard-picker-open => {
+        if !root.dashboard-picker-open {
+            root.touch-keyboard-open = false;
+            if root.dashboard-picker-kind == "wallpaper" {
+                root.wallpaper-picker-closed();
+                root.dashboard-picker-items = [];
+            }
+        }
+    }
+    changed page => {
+        root.touch-keyboard-open = false;
+        root.routing = "";
+        if root.page == 4 && root.connection == "Connected" { root.speedtest-status(); }
+    }
+    property <length> keyboard-height: root.touch-keyboard-symbols
+        ? min(300px, root.height * 0.50) : min(250px, root.height * 0.42);
+    function hide-keyboard() {
+        root.touch-keyboard-open = false;
+        keyboard-dismiss-focus.focus();
+    }
+    keyboard-dismiss-focus := FocusScope { width: 0px; height: 0px; }
     in-out property <string> dashboard-picker-kind: "";
     in-out property <string> dashboard-picker-search: "";
     in-out property <[PickerEntry]> dashboard-picker-items: [];
@@ -237,7 +968,7 @@ export component App inherits Window {
     in-out property <string> dashboard-selected-auto-macros: "None selected";
     in-out property <image> wallpaper-image;
     in-out property <string> wallpaper-label: "No wallpaper";
-    in-out property <[string]> dashboard-macro-list: [];
+    in-out property <[DashboardMacroEntry]> dashboard-macro-list: [];
     callback dashboard-open-picker(string);
     callback dashboard-filter(string);
     callback dashboard-select-option(string);
@@ -303,7 +1034,7 @@ export component App inherits Window {
                 spacing: 8px;
                 VerticalLayout {
                     spacing: 8px;
-                    horizontal-stretch: 1;
+                    width: (root.width - 28px) / 2;
                     if root.left-slot-0 == "interactions" : Rectangle {
                                             vertical-stretch: 1;
                                             background: Theme.surface;
@@ -363,69 +1094,18 @@ export component App inherits Window {
                                                 }
                                             }
                                         }
-                    if root.left-slot-0 == "auto_macros" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 4px;
-                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.tr("No auto macros","Keine Auto-Makros");
-                                                        color: Theme.muted;
-                                                        font-size: 10px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                for item[i] in root.dashboard-auto-macros : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    border-radius: 12px;
-                                                    background: Theme.raised;
-                                                    Rectangle {
-                                                        x: 0px;
-                                                        width: parent.width * max(0, min(1, item.progress));
-                                                        height: parent.height;
-                                                        border-radius: 12px;
-                                                        background: Theme.elevated;
-                                                        visible: item.enabled;
-                                                    }
-                                                    HorizontalLayout {
-                                                        padding-left: 10px;
-                                                        padding-right: 6px;
-                                                        spacing: 6px;
-                                                        Text {
-                                                            text: item.name;
-                                                            horizontal-stretch: 1;
-                                                            color: Theme.text;
-                                                            font-size: 11px;
-                                                            overflow: elide;
-                                                            vertical-alignment: center;
-                                                        }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
-                                                    }
-                                                }
-                                            }
-                                        }
-                    if root.left-slot-0 == "macros" : Rectangle {
-                        vertical-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
-                        VerticalLayout {
-                            padding: 14px;
-                            spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
-                            for item[i] in root.dashboard-macro-list : Rectangle {
-                                vertical-stretch: 1;
-                                background: Theme.raised;
-                                border-radius: 12px;
-                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-macro(item); } }
-                            }
-                        }
+                    if root.left-slot-0 == "auto_macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        automatic: root.dashboard-auto-macros;
+                        auto-mode: true;
+                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+                    }
+                    if root.left-slot-0 == "macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        macros: root.dashboard-macro-list;
+                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        run(name) => { root.trigger-macro(name); }
                     }
                     if root.left-slot-0 == "music" : Rectangle {
                                         horizontal-stretch: 1;
@@ -549,69 +1229,18 @@ export component App inherits Window {
                                                 }
                                             }
                                         }
-                    if root.left-slot-1 == "auto_macros" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 4px;
-                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.tr("No auto macros","Keine Auto-Makros");
-                                                        color: Theme.muted;
-                                                        font-size: 10px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                for item[i] in root.dashboard-auto-macros : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    border-radius: 12px;
-                                                    background: Theme.raised;
-                                                    Rectangle {
-                                                        x: 0px;
-                                                        width: parent.width * max(0, min(1, item.progress));
-                                                        height: parent.height;
-                                                        border-radius: 12px;
-                                                        background: Theme.elevated;
-                                                        visible: item.enabled;
-                                                    }
-                                                    HorizontalLayout {
-                                                        padding-left: 10px;
-                                                        padding-right: 6px;
-                                                        spacing: 6px;
-                                                        Text {
-                                                            text: item.name;
-                                                            horizontal-stretch: 1;
-                                                            color: Theme.text;
-                                                            font-size: 11px;
-                                                            overflow: elide;
-                                                            vertical-alignment: center;
-                                                        }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
-                                                    }
-                                                }
-                                            }
-                                        }
-                    if root.left-slot-1 == "macros" : Rectangle {
-                        vertical-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
-                        VerticalLayout {
-                            padding: 14px;
-                            spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
-                            for item[i] in root.dashboard-macro-list : Rectangle {
-                                vertical-stretch: 1;
-                                background: Theme.raised;
-                                border-radius: 12px;
-                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-macro(item); } }
-                            }
-                        }
+                    if root.left-slot-1 == "auto_macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        automatic: root.dashboard-auto-macros;
+                        auto-mode: true;
+                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+                    }
+                    if root.left-slot-1 == "macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        macros: root.dashboard-macro-list;
+                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        run(name) => { root.trigger-macro(name); }
                     }
                     if root.left-slot-1 == "music" : Rectangle {
                                         horizontal-stretch: 1;
@@ -679,7 +1308,7 @@ export component App inherits Window {
                 }
                 VerticalLayout {
                     spacing: 8px;
-                    horizontal-stretch: 1;
+                    width: (root.width - 28px) / 2;
                     if root.right-slot-0 == "interactions" : Rectangle {
                                             vertical-stretch: 1;
                                             background: Theme.surface;
@@ -739,69 +1368,18 @@ export component App inherits Window {
                                                 }
                                             }
                                         }
-                    if root.right-slot-0 == "auto_macros" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 4px;
-                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.tr("No auto macros","Keine Auto-Makros");
-                                                        color: Theme.muted;
-                                                        font-size: 10px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                for item[i] in root.dashboard-auto-macros : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    border-radius: 12px;
-                                                    background: Theme.raised;
-                                                    Rectangle {
-                                                        x: 0px;
-                                                        width: parent.width * max(0, min(1, item.progress));
-                                                        height: parent.height;
-                                                        border-radius: 12px;
-                                                        background: Theme.elevated;
-                                                        visible: item.enabled;
-                                                    }
-                                                    HorizontalLayout {
-                                                        padding-left: 10px;
-                                                        padding-right: 6px;
-                                                        spacing: 6px;
-                                                        Text {
-                                                            text: item.name;
-                                                            horizontal-stretch: 1;
-                                                            color: Theme.text;
-                                                            font-size: 11px;
-                                                            overflow: elide;
-                                                            vertical-alignment: center;
-                                                        }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
-                                                    }
-                                                }
-                                            }
-                                        }
-                    if root.right-slot-0 == "macros" : Rectangle {
-                        vertical-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
-                        VerticalLayout {
-                            padding: 14px;
-                            spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
-                            for item[i] in root.dashboard-macro-list : Rectangle {
-                                vertical-stretch: 1;
-                                background: Theme.raised;
-                                border-radius: 12px;
-                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-macro(item); } }
-                            }
-                        }
+                    if root.right-slot-0 == "auto_macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        automatic: root.dashboard-auto-macros;
+                        auto-mode: true;
+                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+                    }
+                    if root.right-slot-0 == "macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        macros: root.dashboard-macro-list;
+                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        run(name) => { root.trigger-macro(name); }
                     }
                     if root.right-slot-0 == "music" : Rectangle {
                                         horizontal-stretch: 1;
@@ -925,69 +1503,18 @@ export component App inherits Window {
                                                 }
                                             }
                                         }
-                    if root.right-slot-1 == "auto_macros" : Rectangle {
-                                            vertical-stretch: 1;
-                                            background: Theme.surface;
-                                            border-radius: 16px;
-                                            VerticalLayout {
-                                                padding: 14px;
-                                                spacing: 4px;
-                                                if root.dashboard-auto-macros.length == 0 : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    background: transparent;
-                                                    Text {
-                                                        text: root.tr("No auto macros","Keine Auto-Makros");
-                                                        color: Theme.muted;
-                                                        font-size: 10px;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                for item[i] in root.dashboard-auto-macros : Rectangle {
-                                                    vertical-stretch: 1;
-                                                    border-radius: 12px;
-                                                    background: Theme.raised;
-                                                    Rectangle {
-                                                        x: 0px;
-                                                        width: parent.width * max(0, min(1, item.progress));
-                                                        height: parent.height;
-                                                        border-radius: 12px;
-                                                        background: Theme.elevated;
-                                                        visible: item.enabled;
-                                                    }
-                                                    HorizontalLayout {
-                                                        padding-left: 10px;
-                                                        padding-right: 6px;
-                                                        spacing: 6px;
-                                                        Text {
-                                                            text: item.name;
-                                                            horizontal-stretch: 1;
-                                                            color: Theme.text;
-                                                            font-size: 11px;
-                                                            overflow: elide;
-                                                            vertical-alignment: center;
-                                                        }
-                                                        DashboardSwitch { checked: item.enabled; toggled => { root.toggle-auto-macro(item.name, !item.enabled); } }
-                                                    }
-                                                }
-                                            }
-                                        }
-                    if root.right-slot-1 == "macros" : Rectangle {
-                        vertical-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
-                        VerticalLayout {
-                            padding: 14px;
-                            spacing: 6px;
-                            if root.dashboard-macro-list.length == 0 : Text { text: root.tr("No macros","Keine Makros"); color: Theme.muted; font-size: 12px; }
-                            for item[i] in root.dashboard-macro-list : Rectangle {
-                                vertical-stretch: 1;
-                                background: Theme.raised;
-                                border-radius: 12px;
-                                Text { text: item; x: 12px; color: Theme.text; vertical-alignment: center; font-size: 12px; }
-                                TouchArea { clicked => { root.trigger-macro(item); } }
-                            }
-                        }
+                    if root.right-slot-1 == "auto_macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        automatic: root.dashboard-auto-macros;
+                        auto-mode: true;
+                        empty-label: root.tr("No auto macros", "Keine Auto-Makros");
+                        toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+                    }
+                    if root.right-slot-1 == "macros" : DashboardMacroCard {
+                        enabled: root.connection == "Connected";
+                        macros: root.dashboard-macro-list;
+                        empty-label: root.tr("No macros selected", "Keine Makros ausgewählt");
+                        run(name) => { root.trigger-macro(name); }
                     }
                     if root.right-slot-1 == "music" : Rectangle {
                                         horizontal-stretch: 1;
@@ -1124,29 +1651,32 @@ export component App inherits Window {
             }
             if root.page == 1 : VerticalLayout {
                 padding: 10px;
-                spacing: 8px;
-                ScrollView {
-                    vertical-stretch: 1;
+                if root.audio-interfaces.length == 0 : DrawerEmpty {
+                    text: root.tr("No audio outputs", "Keine Audioausgänge");
+                }
+                if root.audio-interfaces.length > 0 : ScrollView {
+                    horizontal-scrollbar-policy: always-off;
                     VerticalLayout {
                         spacing: 8px;
-                        for item in root.audio-interfaces : VerticalLayout {
-                            spacing: 5px;
-                            HorizontalLayout {
-                                height: 58px;
-                                spacing: 6px;
-                                Text { text: item.label; width: 145px; overflow: elide; color: Theme.text; vertical-alignment: center; }
-                                PillButton { width: 70px; label: item.muted ? root.tr("Unmute","Ton an") : root.tr("Mute","Stumm"); clicked => { root.change-volume(item,item.muted ? item.restore : 0,true); } }
-                                Slider { minimum: item.minimum; maximum: item.maximum; value: item.volume; enabled: !item.per-link; released(v) => { root.change-volume(item,v,false); } }
-                                Text { text: round(item.volume * 100) + "%"; color: Theme.text; vertical-alignment: center; }
-                                if item.routable : PillButton { width: 76px; label: root.tr("Outputs","Ausgänge"); clicked => { root.routing = root.routing == item.id ? "" : item.id; } }
+                        alignment: start;
+                        for item[index] in root.audio-interfaces : VerticalLayout {
+                            spacing: 8px;
+                            if index > 0 && item.physical && !root.audio-interfaces[index - 1].physical : Rectangle {
+                                height: 1px;
+                                background: Theme.raised;
                             }
-                            if item.routable && root.routing == item.id : VerticalLayout {
-                                PillButton { label: root.tr("Per-output volume","Lautstärke pro Ausgang"); selected: item.per-link; clicked => { root.per-link-control(item.id,!item.per-link); } }
-                                for link in item.links : HorizontalLayout {
-                                    height: 44px;
-                                    PillButton { horizontal-stretch: 1; label: link.label; selected: link.linked; clicked => { root.link-output(item.id,link.id,!link.linked); } }
-                                    if item.per-link && link.linked : Slider { minimum: item.minimum; maximum: item.maximum; value: link.volume; released(v) => { root.link-volume(item.id,link.id,v); } }
-                                }
+                            KioskAudioRow {
+                                item: item;
+                                ready: root.connection == "Connected";
+                                quieter: root.tr("Volume down", "Leiser");
+                                louder: root.tr("Volume up", "Lauter");
+                                route-label: root.tr("Link audio outputs", "Audioausgänge verknüpfen");
+                                mute-label: item.muted ? root.tr("Unmute", "Ton an") : root.tr("Mute", "Stumm");
+                                link-volume-label: root.tr("Volume is set per output", "Lautstärke wird pro Ausgang eingestellt");
+                                levels-label: root.tr("Per output", "Pro Ausgang");
+                                volume(value) => { root.change-volume(item, value, false); }
+                                mute(value) => { root.change-volume(item, value, true); }
+                                routing => { root.routing = item.id; }
                             }
                         }
                     }
@@ -1154,6 +1684,7 @@ export component App inherits Window {
             }
             if root.page == 2 : VerticalLayout {
                 padding: 10px;
+                padding-bottom: root.touch-keyboard-open ? max(10px, root.keyboard-height - 42px) : 10px;
                 spacing: 8px;
                 HorizontalLayout {
                     spacing: 8px;
@@ -1161,7 +1692,12 @@ export component App inherits Window {
                     PillButton { width: 132px; label: root.tr("Auto Macros","Auto-Makros"); selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
                     PillButton { width: 160px; label: root.tr("Channel Points","Kanalpunkte"); selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
                 }
-                HorizontalLayout { LineEdit { horizontal-stretch: 1; placeholder-text: root.tr("Search","Suchen"); text <=> root.search; } PillButton { width: 70px; label: "⌨"; clicked => { root.touch-keyboard-open = !root.touch-keyboard-open; } } }
+                KioskSearch {
+                    placeholder-text: root.tr("Search", "Suchen");
+                    text <=> root.search;
+                    activated => { root.touch-keyboard-open = true; }
+                    accepted => { root.hide-keyboard(); }
+                }
                 ScrollView {
                     vertical-stretch: 1;
                     VerticalLayout {
@@ -1207,80 +1743,255 @@ export component App inherits Window {
                 spacing: 8px;
                 VerticalLayout {
                     spacing: 8px;
-                    horizontal-stretch: 1;
-                    Rectangle {
+                    width: (root.width - 28px) / 2;
+                    Md3Card {
                         height: 165px;
-                        background: Theme.surface;
-                        border-radius: 16px;
                         VerticalLayout {
-                            padding: 14px;
-                            spacing: 12px;
-                            Text { text: root.tr("System statistics","Systemstatistik"); color: Theme.text; font-size: 16px; font-weight: 600; }
-                            Text { text: root.system-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                            padding: 12px;
+                            spacing: 6px;
+                            HorizontalLayout {
+                                SystemHeading { text: root.tr("System", "System"); horizontal-stretch: 1; }
+                                SystemHeading {
+                                    font-size: 11px;
+                                    text: root.tr("CPU temperature", "CPU-Temperatur") + "  "
+                                        + (root.system-stats.temperature >= 0 ? round(root.system-stats.temperature) + " °C" : "—");
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 14px;
+                                Rectangle {
+                                    width: 126px;
+                                    height: 126px;
+                                    for metric[index] in root.system-metrics : SystemRing {
+                                        diameter: (114 - index * 22) * 1px;
+                                        progress: metric.value / 100;
+                                        tint: metric.tint;
+                                    }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 8px;
+                                    horizontal-stretch: 1;
+                                    for metric in root.system-metrics : SystemDetail {
+                                        title: metric.label;
+                                        value: metric.value >= 0 ? round(metric.value) + "%" : metric.empty;
+                                        tint: metric.tint;
+                                        value-color: metric.value >= 90 ? Theme.error : metric.value >= 80 ? #ff9800 : Theme.text;
+                                        font-size: 11px;
+                                    }
+                                }
+                            }
                         }
                     }
-                    Rectangle {
+                    GlassCard {
                         vertical-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
                         VerticalLayout {
-                            padding: 14px;
-                            spacing: 10px;
-                            Text { text: root.tr("Storage","Speicher"); color: Theme.text; font-size: 16px; font-weight: 600; }
-                            ScrollView { Text { text: root.storage-summary; color: Theme.muted; font-size: 13px; wrap: word-wrap; } }
+                            padding: 12px;
+                            spacing: 8px;
+                            SystemHeading { text: root.tr("Storage", "Speicher"); }
+                            Rectangle {
+                                height: 10px;
+                                background: Theme.raised;
+                                clip: true;
+                                for row in root.system-storage.rows : Rectangle {
+                                    x: parent.width * row.offset;
+                                    width: parent.width * row.fraction;
+                                    background: row.tint;
+                                }
+                                Rectangle {
+                                    x: parent.width * max(0, root.system-storage.usage / 100 - root.system-storage.other);
+                                    width: parent.width * root.system-storage.other;
+                                    background: #9e9e9e;
+                                    animate x, width { duration: 300ms; }
+                                }
+                            }
+                            VerticalLayout {
+                                spacing: 3px;
+                                SystemDetail { title: root.tr("Used Storage", "Belegter Speicher"); value: root.system-storage.used; }
+                                SystemDetail { title: root.tr("Free Storage", "Freier Speicher"); value: root.system-storage.free; }
+                                SystemDetail { title: root.tr("Total Storage", "Gesamter Speicher"); value: root.system-storage.total; }
+                            }
+                            Rectangle { height: 1px; background: Theme.raised; }
+                            ScrollView {
+                                min-height: 0px;
+                                horizontal-scrollbar-policy: always-off;
+                                mouse-drag-pan-enabled: true;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    for row in root.system-storage.rows : SystemDetail {
+                                        height: 26px;
+                                        title: root.tr(row.label, row.german);
+                                        value: row.size;
+                                        tint: row.tint;
+                                        marker-size: 12px;
+                                        marker-radius: 3px;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
                 VerticalLayout {
                     spacing: 8px;
-                    horizontal-stretch: 1;
-                    Rectangle {
+                    width: (root.width - 28px) / 2;
+                    Md3Card {
                         vertical-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
                         VerticalLayout {
-                            padding: 14px;
-                            spacing: 10px;
-                            Text { text: "Updates"; color: Theme.text; font-size: 16px; font-weight: 600; }
-                            ScrollView { VerticalLayout { for item in root.updates : PillButton {
-                                label: item.label; selected: item.active; clicked => { if item.active && root.updating-manager == "" { root.run-update(item.id); } }
-                            } } }
+                            padding: 12px;
+                            spacing: 6px;
                             HorizontalLayout {
-                                PillButton { label: root.tr("Refresh","Aktualisieren"); clicked => { root.update-refresh(); } }
-                                PillButton { label: root.tr("Update all","Alle aktualisieren"); clicked => { root.update-all(); } }
+                                spacing: 8px;
+                                SystemHeading { text: "Updates"; horizontal-stretch: 1; }
+                                Md3Button {
+                                    filled: true;
+                                    label: root.updating-manager != "" ? root.tr("Updating…", "Wird aktualisiert…") : root.tr("Update all", "Alle aktualisieren");
+                                    enabled: root.updates-available && !root.updates-running && !root.updates-checking && root.updating-manager == "";
+                                    clicked => { root.update-all(); }
+                                }
+                                Rectangle {
+                                    width: 34px;
+                                    height: 34px;
+                                    border-radius: 17px;
+                                    background: refresh-hit.pressed ? Theme.elevated : transparent;
+                                    Image {
+                                        source: @image-url("icons/mdi/refresh.svg");
+                                        width: 18px;
+                                        height: 18px;
+                                        colorize: Theme.text;
+                                        transform-rotation: root.updates-checking ? 360deg * mod(animation-tick(), 900ms) / 900ms : 0deg;
+                                    }
+                                    accessible-role: button;
+                                    accessible-label: root.tr("Check for updates", "Updates neu prüfen");
+                                    refresh-hit := TouchArea {
+                                        enabled: !root.updates-running && root.updating-manager == "";
+                                        clicked => { root.update-refresh(); }
+                                    }
+                                }
+                            }
+                            if root.updates.length == 0 : DrawerEmpty {
+                                text: root.tr("No update status yet", "Noch kein Update-Status verfügbar");
+                                font-size: 12px;
+                            }
+                            if root.updates.length > 0 : ScrollView {
+                                min-height: 0px;
+                                horizontal-scrollbar-policy: always-off;
+                                mouse-drag-pan-enabled: true;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    alignment: start;
+                                    for item in root.updates : Rectangle {
+                                        border-radius: 12px;
+                                        background: item.available ? Theme.elevated : transparent;
+                                        min-height: update-content.min-height;
+                                        preferred-height: update-content.preferred-height;
+                                        update-content := VerticalLayout {
+                                            alignment: start;
+                                            padding: 3px;
+                                            spacing: 3px;
+                                            HorizontalLayout {
+                                                min-height: item.id == "system" && item.preview != "" ? 64px : 46px;
+                                                spacing: 6px;
+                                                Image {
+                                                    width: 18px;
+                                                    height: 18px;
+                                                    colorize: Theme.text;
+                                                    source: item.git ? @image-url("icons/mdi/git.svg") : @image-url("icons/mdi/package-variant.svg");
+                                                }
+                                                VerticalLayout {
+                                                    horizontal-stretch: 1;
+                                                    spacing: 2px;
+                                                    HorizontalLayout {
+                                                        alignment: start;
+                                                        spacing: 6px;
+                                                        SystemHeading { text: item.id; }
+                                                        Rectangle {
+                                                            width: update-status.preferred-width + 14px;
+                                                            height: 20px;
+                                                            border-radius: 10px;
+                                                            background: item.updating ? Theme.primary : item.available ? Theme.error : Theme.raised;
+                                                            update-status := Text {
+                                                                text: item.updating ? root.tr("Updating…", "Wird aktualisiert…")
+                                                                    : item.checking ? root.tr("Checking…", "Wird geprüft…")
+                                                                    : item.available ? root.tr("Update available", "Update verfügbar") : root.tr("Up to date", "Aktuell");
+                                                                color: item.updating ? Theme.on-primary : item.available ? Theme.on-error : Theme.muted;
+                                                                font-size: 12px;
+                                                                font-weight: 600;
+                                                                horizontal-alignment: center;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                    Text {
+                                                        text: item.error != "" ? item.error : item.id == "system" ? item.count + root.tr(" packages", " Pakete") : item.version;
+                                                        color: item.error != "" ? Theme.error : Theme.muted;
+                                                        font-size: 12px;
+                                                        overflow: elide;
+                                                    }
+                                                    if item.preview != "" : Text { text: item.preview; color: Theme.muted; font-size: 12px; overflow: elide; }
+                                                }
+                                                Md3Button {
+                                                    label: root.tr("Update", "Aktualisieren");
+                                                    height: 28px;
+                                                    filled: true;
+                                                    enabled: item.active && root.updating-manager == ""
+                                                        && !(item.id == "backend" ? root.updates-running : root.backend-update-running);
+                                                    clicked => { root.run-update(item.id); }
+                                                }
+                                            }
+                                            if item.updating && (item.stage != "" || item.progress >= 0) : SystemProgress {
+                                                label: root.update-stage(item.stage);
+                                                value: item.progress;
+                                            }
+                                            if item.updating && item.package != "" : SystemProgress { label: item.package; value: item.package-progress; }
+                                            if item.updating && item.message != "" : Text {
+                                                text: item.message; color: Theme.muted; font-size: 10px; wrap: word-wrap;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    Rectangle {
+                    Md3Card {
                         height: 118px;
-                        background: Theme.surface;
-                        border-radius: 16px;
                         VerticalLayout {
                             padding: 14px;
-                            Text { text: root.tr("Language","Sprache"); color: Theme.text; font-size: 16px; font-weight: 600; }
-                            HorizontalLayout {
-                                PillButton { label: root.tr("English","Englisch"); selected: root.language=="en"; clicked => { root.choose-language("en"); } }
-                                PillButton { label: "Deutsch"; selected: root.language=="de"; clicked => { root.choose-language("de"); } }
+                            spacing: 8px;
+                            alignment: start;
+                            DrawerTitle { text: root.tr("Language", "Sprache"); }
+                            SystemLanguage {
+                                language: root.language;
+                                english: root.tr("English", "Englisch");
+                                german: root.tr("German", "Deutsch");
+                                selected(code) => { root.choose-language(code); }
                             }
                         }
                     }
                 }
             }
             if root.page == 4 : VerticalLayout {
-                padding: 10px;
-                spacing: 10px;
-                Rectangle {
+                padding: 12px;
+                spacing: 8px;
+                HorizontalLayout {
+                    spacing: 8px;
                     vertical-stretch: 1;
-                    background: Theme.surface;
-                    border-radius: 16px;
-                    VerticalLayout {
-                        padding: 18px;
-                        spacing: 16px;
-                        Text { text: "Speedtest"; color: Theme.text; font-size: 20px; font-weight: 600; }
-                        Text { text: root.speedtest-summary; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
-                        PillButton { width: 180px; label: root.speedtest-running ? root.tr("Running…","Läuft …") : root.tr("Start speedtest","Speedtest starten"); selected: true; clicked => { if !root.speedtest-running { root.speedtest-start(); } } }
-                        Rectangle { vertical-stretch: 1; background: transparent; }
-                    }
+                    SpeedMetric { width: (root.width - 40px) / 3; title: "Ping"; glyph: "◷"; value: root.speedtest-ping; active: root.speedtest-stage == "ping"; }
+                    SpeedMetric { width: (root.width - 40px) / 3; title: "Download"; glyph: "↓"; value: root.speedtest-download; active: root.speedtest-stage == "download"; }
+                    SpeedMetric { width: (root.width - 40px) / 3; title: "Upload"; glyph: "↑"; value: root.speedtest-upload; active: root.speedtest-stage == "upload"; }
+                }
+                if root.speedtest-error != "" : Text {
+                    text: root.speedtest-error; color: Theme.error; font-size: 12px; wrap: word-wrap;
+                }
+                Md3Button {
+                    height: 44px;
+                    width: parent.width - 24px;
+                    border-radius: 22px;
+                    filled: true;
+                    enabled: root.connection == "Connected" && !root.speedtest-running && !root.speedtest-starting;
+                    label: root.speedtest-running ? root.tr("Speedtest running…", "Speedtest läuft …")
+                        : root.speedtest-starting ? root.tr("Starting…", "Wird gestartet …")
+                        : root.tr("Run Speedtest", "Speedtest starten");
+                    clicked => { root.speedtest-start(); }
                 }
             }
             if root.connection != "Connected" : Rectangle {
@@ -1341,108 +2052,446 @@ export component App inherits Window {
         }
     }
 
-    // Quickshell-style top-edge swipe. The visible grip also opens on tap.
+    // Keep the gesture areas stationary while the sheet follows the finger.
     Rectangle {
         width: parent.width;
-        height: 26px;
-        background: transparent;
-        Rectangle {
-            width: 72px;
+        height: parent.height;
+        y: root.drawer-dragging
+            ? clamp((root.network-drawer-open ? 0px : -self.height) + root.drawer-delta, -self.height, 0px)
+            : root.network-drawer-open ? 0px : -self.height;
+        animate y { duration: root.drawer-dragging ? 0ms : 190ms; easing: cubic-bezier(0.33, 1, 0.68, 1); }
+        visible: self.y > -self.height;
+        background: Theme.background;
+        TouchArea { }
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 10px;
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 10px;
+                    if root.ethernet.length > 0 : Md3Card {
+                        height: min(max(100px, 50px + root.ethernet.length * 38px), max(100px, root.height * 0.36));
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 8px;
+                            DrawerTitle { text: "Ethernet"; }
+                            ScrollView {
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    for row in root.ethernet : HorizontalLayout {
+                                        height: 32px;
+                                        spacing: 8px;
+                                        DrawerRowText {
+                                            title: row.id;
+                                            detail: root.connection-status(row.connected);
+                                            active: row.connected;
+                                        }
+                                        DashboardSwitch {
+                                            checked: row.enabled;
+                                            enabled: !root.drawer-busy;
+                                            toggled => { root.drawer-command(row.enabled ? "ethernet-off" : "ethernet-on", row.id, ""); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Md3Card {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 8px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                DrawerTitle { text: root.tr("Wi-Fi", "WLAN"); horizontal-stretch: 1; }
+                                Md3Button {
+                                    label: root.tr("Saved Wi-Fi", "Gespeichertes WLAN");
+                                    clicked => { root.saved-wifi-open = true; }
+                                }
+                                DashboardSwitch {
+                                    checked: root.wifi-enabled;
+                                    enabled: root.wifi-available && !root.drawer-busy;
+                                    toggled => { root.drawer-command(root.wifi-enabled ? "wifi-off" : "wifi-on", "", ""); }
+                                }
+                            }
+                            if root.drawer-network-error != "" : Text {
+                                text: root.drawer-network-error;
+                                color: Theme.error;
+                                font-size: 11px;
+                                overflow: elide;
+                            }
+                            if !root.wifi-enabled || root.wifi.length == 0 : DrawerEmpty {
+                                text: root.wifi-enabled ? root.tr("No Wi-Fi networks found", "Keine WLAN-Netze gefunden")
+                                    : root.wifi-available ? root.tr("Wi-Fi is disabled", "WLAN ist deaktiviert")
+                                        : root.tr("Wi-Fi unavailable", "WLAN nicht verfügbar");
+                            }
+                            if root.wifi-enabled && root.wifi.length > 0 : ScrollView {
+                                VerticalLayout {
+                                    spacing: 5px;
+                                    for row in root.wifi : Md3Card {
+                                        height: 46px;
+                                        border-radius: 12px;
+                                        background: row.connected ? Theme.primary-container : Theme.raised;
+                                        HorizontalLayout {
+                                            padding: 9px;
+                                            spacing: 8px;
+                                            DrawerRowText {
+                                                title: row.name;
+                                                detail: row.connected ? root.connection-status(true)
+                                                    : row.profile != "" ? root.tr("Saved", "Gespeichert") : "";
+                                                active: row.connected;
+                                            }
+                                            Text { text: row.signal + "%"; color: Theme.muted; font-size: 10px; vertical-alignment: center; }
+                                        }
+                                        TouchArea {
+                                            enabled: !root.drawer-busy;
+                                            clicked => {
+                                                if row.connected {
+                                                    root.drawer-command("wifi-disconnect", row.device, "");
+                                                } else if row.profile != "" {
+                                                    root.drawer-command("wifi-saved", row.profile, "");
+                                                } else if !row.secured {
+                                                    root.drawer-command("wifi-connect", row.id, "");
+                                                } else {
+                                                    root.wifi-target = row.id;
+                                                    root.wifi-name = row.name;
+                                                    root.wifi-password = "";
+                                                    root.touch-keyboard-open = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 10px;
+                    Md3Card {
+                        height: min(244px, max(160px, root.height - 178px));
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 7px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                DrawerTitle { text: "Bluetooth"; horizontal-stretch: 1; }
+                                Md3Button {
+                                    label: root.bluetooth-scanning ? root.tr("Stop", "Stopp") : root.tr("Scan", "Suchen");
+                                    enabled: root.bluetooth-powered && !root.drawer-busy;
+                                    clicked => { root.drawer-command(root.bluetooth-scanning ? "bt-stop-scan" : "bt-scan", "", ""); }
+                                }
+                                DashboardSwitch {
+                                    checked: root.bluetooth-powered;
+                                    enabled: root.bluetooth-available && !root.drawer-busy;
+                                    toggled => { root.drawer-command(root.bluetooth-powered ? "bluetooth-off" : "bluetooth-on", "", ""); }
+                                }
+                            }
+                            Text {
+                                text: !root.bluetooth-available ? root.tr("Bluetooth unavailable", "Bluetooth nicht verfügbar")
+                                    : !root.bluetooth-powered ? root.tr("Bluetooth is disabled", "Bluetooth ist deaktiviert")
+                                    : root.bluetooth-scanning
+                                        ? (root.bluetooth-scan-le ? root.tr("Scanning Bluetooth LE devices…", "Suche nach Bluetooth-LE-Geräten …")
+                                            : root.tr("Scanning Classic Bluetooth devices…", "Suche nach Classic-Bluetooth-Geräten …"))
+                                        : root.paired-devices.length + root.tr(" paired • ", " gekoppelt • ")
+                                            + root.bluetooth-connected-count + root.tr(" connected", " verbunden");
+                                color: root.bluetooth-scanning ? Theme.primary : Theme.muted;
+                                font-size: 10px;
+                                overflow: elide;
+                            }
+                            if root.bluetooth-powered && root.paired-devices.length == 0 &&
+                                (!root.bluetooth-scanning || root.discovered-devices.length == 0) : DrawerEmpty {
+                                text: root.bluetooth-scanning ? root.tr("Scanning for devices…", "Suche nach Geräten …")
+                                    : root.tr("No paired devices", "Keine gekoppelten Geräte");
+                            }
+                            if root.bluetooth-powered && (root.paired-devices.length > 0 ||
+                                (root.bluetooth-scanning && root.discovered-devices.length > 0)) : ScrollView {
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    if root.paired-devices.length > 0 : Text {
+                                        text: root.tr("Paired", "Gekoppelt"); color: Theme.muted; font-size: 10px;
+                                    }
+                                    for row in root.paired-devices : DrawerBluetoothDevice {
+                                        device: row;
+                                        status: root.connection-status(row.connected);
+                                        paired: true;
+                                        enabled: !root.drawer-busy;
+                                        activated => { root.drawer-command(row.connected ? "bt-disconnect" : "bt-connect", row.id, ""); }
+                                        removed => { root.drawer-command("bt-remove", row.id, ""); }
+                                    }
+                                    if root.bluetooth-scanning && root.discovered-devices.length > 0 : Text {
+                                        text: root.tr("Available devices", "Verfügbare Geräte"); color: Theme.muted; font-size: 10px;
+                                    }
+                                    if root.bluetooth-scanning : VerticalLayout {
+                                        spacing: 6px;
+                                        for row in root.discovered-devices : DrawerBluetoothDevice {
+                                            device: row;
+                                            status: root.drawer-busy && root.drawer-pairing == row.id
+                                                ? root.tr("Pairing…", "Wird gekoppelt …") : root.tr("Pair", "Koppeln");
+                                            enabled: !root.drawer-busy;
+                                            activated => {
+                                                root.drawer-pairing = row.id;
+                                                root.drawer-command("bt-pair", row.id, "");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Md3Card {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 4px;
+                            DrawerTitle { text: root.tr("Web access", "Webzugriff"); }
+                            Rectangle {
+                                if root.commander-url != "" : Image {
+                                    width: max(0px, min(260px, min(parent.width - 8px, parent.height - 4px)));
+                                    height: self.width;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    source: root.commander-qr;
+                                    image-fit: contain;
+                                    image-rendering: pixelated;
+                                }
+                            }
+                            Text {
+                                text: root.commander-url != "" ? root.commander-url : root.tr("No network connection", "Keine Netzwerkverbindung");
+                                color: Theme.muted;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                wrap: char-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+            Rectangle { height: 28px; }
+        }
+        if root.drawer-error != "" : Rectangle {
+            x: 14px;
+            y: parent.height - self.height - 52px;
+            width: parent.width - 28px;
+            height: 44px;
+            border-radius: 12px;
+            background: Theme.elevated;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 8px;
+                spacing: 8px;
+                Text { text: root.drawer-error; color: Theme.error; font-size: 12px; vertical-alignment: center; wrap: word-wrap; overflow: elide; horizontal-stretch: 1; }
+                Md3Button { label: "×"; clicked => { root.drawer-error = ""; } }
+            }
+        }
+        if root.network-drawer-open : Rectangle {
+            width: 48px;
             height: 5px;
             x: (parent.width - self.width) / 2;
-            y: 5px;
+            y: parent.height - (28px + self.height) / 2;
             border-radius: 3px;
             background: Theme.muted;
-            opacity: 0.8;
         }
-        top-grip := TouchArea {
-            clicked => { root.network-drawer-open = true; root.refresh-drawer(); }
-            moved => {
-                if self.pressed && self.mouse-y - self.pressed-y > 24px {
-                    root.network-drawer-open = true;
-                    root.refresh-drawer();
+    }
+    TouchArea {
+        y: 0px;
+        width: parent.width;
+        height: 20px;
+        enabled: !root.network-drawer-open && !root.touch-keyboard-open && !root.dashboard-picker-open;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                root.start-drawer-drag();
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left && root.drawer-dragging {
+                root.settle-drawer(self.mouse-y - self.pressed-y, true);
+            } else if event.kind == PointerEventKind.cancel && root.drawer-dragging {
+                root.drawer-dragging = false;
+            }
+        }
+        moved => { if root.drawer-dragging { root.drawer-delta = self.mouse-y - self.pressed-y; } }
+    }
+    TouchArea {
+        y: parent.height - 28px;
+        width: parent.width;
+        height: 28px;
+        enabled: root.network-drawer-open && !root.touch-keyboard-open;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                root.start-drawer-drag();
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left && root.drawer-dragging {
+                root.settle-drawer(self.pressed-y - self.mouse-y, false);
+            } else if event.kind == PointerEventKind.cancel && root.drawer-dragging {
+                root.drawer-dragging = false;
+            }
+        }
+        moved => { if root.drawer-dragging { root.drawer-delta = self.mouse-y - self.pressed-y; } }
+    }
+
+    if root.network-drawer-open && root.saved-wifi-open : Rectangle {
+        background: #aa000000;
+        TouchArea { }
+        Md3Card {
+            width: min(520px, parent.width - 32px);
+            height: min(parent.height - 32px, 102px + clamp(root.saved-wifi.length * 62px, 100px, 360px));
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                DrawerTitle { text: root.tr("Saved Wi-Fi", "Gespeichertes WLAN"); }
+                if root.saved-wifi.length == 0 : DrawerEmpty {
+                    text: root.tr("No saved Wi-Fi connections", "Keine gespeicherten WLAN-Verbindungen");
+                }
+                if root.saved-wifi.length > 0 : ScrollView {
+                    VerticalLayout {
+                        spacing: 8px;
+                        for row in root.saved-wifi : Md3Card {
+                            height: 54px;
+                            border-radius: 12px;
+                            background: Theme.raised;
+                            HorizontalLayout {
+                                padding: 10px;
+                                spacing: 10px;
+                                DrawerRowText { title: row.name; detail: root.connection-status(row.connected); active: row.connected; }
+                                Md3Button {
+                                    label: root.tr("Delete", "Löschen");
+                                    enabled: !root.drawer-busy;
+                                    clicked => { root.confirm-forget = row.id; root.forget-name = row.name; }
+                                }
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    Md3Button { label: root.tr("Cancel", "Abbrechen"); clicked => { root.saved-wifi-open = false; } }
+                }
+            }
+        }
+    }
+    if root.network-drawer-open && root.confirm-forget != "" : Rectangle {
+        background: #aa000000;
+        TouchArea { }
+        Md3Card {
+            width: min(440px, parent.width - 32px);
+            height: 148px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+                DrawerTitle { text: root.tr("Delete saved Wi-Fi?", "Gespeichertes WLAN löschen?"); }
+                Text {
+                    text: root.tr("The saved connection for “", "Die gespeicherte Verbindung für „")
+                        + root.forget-name + root.tr("” will be removed.", "“ wird entfernt.");
+                    color: Theme.muted;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+                    Md3Button { label: root.tr("Cancel", "Abbrechen"); clicked => { root.confirm-forget = ""; } }
+                    Md3Button {
+                        label: root.tr("Delete", "Löschen");
+                        filled: true;
+                        clicked => { root.drawer-command("wifi-forget", root.confirm-forget, ""); root.confirm-forget = ""; }
+                    }
                 }
             }
         }
     }
 
-    if root.network-drawer-open : Rectangle {
-        width: parent.width;
-        height: parent.height;
-        background: #bb000000;
-        TouchArea { clicked => { root.network-drawer-open = false; } }
-        Rectangle {
-            width: parent.width;
-            height: parent.height - 34px;
-            background: Theme.background;
-            VerticalLayout {
-                padding: 14px;
-                spacing: 12px;
-                HorizontalLayout {
-                    Text { text: root.tr("Connection & devices","Verbindungen und Geräte"); color: Theme.text; font-size: 22px; font-weight: 600; horizontal-stretch: 1; }
-                    PillButton { label: root.tr("Refresh","Aktualisieren"); width: 90px; clicked => { root.refresh-drawer(); } }
-                    PillButton { label: "Close"; width: 90px; clicked => { root.network-drawer-open = false; } }
-                }
-                HorizontalLayout {
+    if root.page == 1 && root.routing != "" : Rectangle {
+        background: #aa000000;
+        TouchArea { clicked => { root.routing = ""; } }
+        for device in root.audio-interfaces : Rectangle {
+            visible: device.routable && device.id == root.routing;
+            if device.routable && device.id == root.routing : Md3Card {
+                width: min(560px, parent.width - 36px);
+                height: min(parent.height - 36px, 364px);
+                TouchArea { }
+                VerticalLayout {
+                    padding: 16px;
                     spacing: 10px;
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
-                        VerticalLayout {
-                            padding: 14px;
-                            spacing: 12px;
-                            Text { text: root.tr("Network / Wi-Fi","Netzwerk / WLAN"); font-size: 18px; font-weight: 600; color: Theme.text; }
-                            Text { text: root.drawer-network; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
-                            HorizontalLayout {
-                                PillButton { horizontal-stretch: 1; label: root.tr("Wi-Fi on","WLAN ein"); clicked => { root.drawer-command("wifi-on","",""); } }
-                                PillButton { horizontal-stretch: 1; label: root.tr("Wi-Fi off","WLAN aus"); clicked => { root.drawer-command("wifi-off","",""); } }
-                            }
-                            ScrollView { VerticalLayout {
-                                for row in root.ethernet : PillButton { label: row.label; selected: row.active; clicked => {root.drawer-command(row.active ? "ethernet-off" : "ethernet-on",row.id,"");} }
-                                PillButton { label: root.tr("Scan Wi-Fi","WLAN suchen"); clicked => {root.drawer-command("wifi-rescan","","");} }
-                                for row in root.wifi : PillButton { label: row.label; selected: row.active; clicked => { root.wifi-target=row.id; root.wifi-password=""; root.touch-keyboard-open=true; } }
-                                for row in root.saved-wifi : HorizontalLayout {
-                                    PillButton { label: row.label; horizontal-stretch: 1; clicked => { root.drawer-command("wifi-saved",row.id,""); } }
-                                    PillButton { width: 75px; label: root.confirm-forget==row.id ? root.tr("Confirm","Bestätigen") : root.tr("Forget","Entfernen"); clicked => { if root.confirm-forget==row.id { root.drawer-command("wifi-forget",row.id,""); root.confirm-forget=""; } else { root.confirm-forget=row.id; } } }
-                                }
-                            } }
-
+                    DrawerTitle { text: device.label + " · " + root.tr("Audio outputs", "Audioausgänge"); }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: root.tr("Volume per output", "Lautstärke pro Ausgang");
+                            color: Theme.text;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+                        DashboardSwitch {
+                            checked: device.per-link;
+                            toggled => { root.per-link-control(device.id, !device.per-link); }
                         }
                     }
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        background: Theme.surface;
-                        border-radius: 16px;
+                    if device.links.length == 0 : DrawerEmpty {
+                        text: root.tr("No physical audio outputs", "Keine physischen Audioausgänge");
+                    }
+                    if device.links.length > 0 : ScrollView {
+                        min-height: 0;
+                        horizontal-scrollbar-policy: always-off;
                         VerticalLayout {
-                            padding: 14px;
-                            spacing: 12px;
-                            Text { text: "Bluetooth"; font-size: 18px; font-weight: 600; color: Theme.text; }
-                            Text { text: root.drawer-bluetooth; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
-                            HorizontalLayout {
-                                PillButton { horizontal-stretch: 1; label: root.tr("Bluetooth on","Bluetooth ein"); clicked => { root.drawer-command("bluetooth-on","",""); } }
-                                PillButton { horizontal-stretch: 1; label: root.tr("Bluetooth off","Bluetooth aus"); clicked => { root.drawer-command("bluetooth-off","",""); } }
-                            }
-                            PillButton { label: root.tr("Scan","Suchen"); clicked => { root.drawer-command("bt-scan","",""); } }
-                            ScrollView { VerticalLayout {
-                                for row in root.devices : HorizontalLayout {
-                                    PillButton { horizontal-stretch: 1; label: row.label; selected: row.active; clicked => { root.drawer-command(row.active ? "bt-disconnect" : "bt-connect",row.id,""); } }
-                                    PillButton { width: 60px; label: root.tr("Pair","Koppeln"); clicked => { root.drawer-command("bt-pair",row.id,""); } }
-                                    PillButton { width: 66px; label: root.confirm-forget==row.id ? root.tr("Confirm","Bestätigen") : root.tr("Forget","Entfernen"); clicked => { if root.confirm-forget==row.id { root.drawer-command("bt-remove",row.id,""); root.confirm-forget=""; } else { root.confirm-forget=row.id; } } }
+                            alignment: start;
+                            spacing: 6px;
+                            for link in device.links : Md3Card {
+                                height: device.per-link && link.linked && link.present ? 80px : 48px;
+                                border-radius: 12px;
+                                background: Theme.elevated;
+                                VerticalLayout {
+                                    padding: 8px;
+                                    spacing: 2px;
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Image {
+                                            width: 18px;
+                                            height: 18px;
+                                            source: link.linked ? @image-url("icons/mdi/link-variant.svg") : @image-url("icons/mdi/link-variant-off.svg");
+                                            colorize: link.linked ? Theme.primary : Theme.muted;
+                                        }
+                                        DrawerRowText {
+                                            title: link.label;
+                                            detail: !link.present ? root.tr("Disconnected", "Getrennt")
+                                                : link.linked ? root.tr("Linked", "Verknüpft") : root.tr("Not linked", "Nicht verknüpft");
+                                            active: link.linked;
+                                        }
+                                        if link.default-output : Text {
+                                            text: "★";
+                                            color: Theme.primary;
+                                            vertical-alignment: center;
+                                            accessible-label: root.tr("Default audio output", "Standard-Audioausgang");
+                                        }
+                                        DashboardSwitch {
+                                            checked: link.linked;
+                                            toggled => { root.link-output(device.id, link.id, !link.linked); }
+                                        }
+                                    }
+                                    if device.per-link && link.linked && link.present : HorizontalLayout {
+                                        spacing: 8px;
+                                        fader := AudioFader {
+                                            minimum: device.minimum;
+                                            maximum: device.maximum;
+                                            step: device.step;
+                                            value: link.volume;
+                                            committed(value) => { root.link-volume(device.id, link.id, value); }
+                                        }
+                                        Text { text: round(fader.value * 100) + "%"; color: Theme.text; vertical-alignment: center; }
+                                    }
                                 }
-                            } }
-
+                            }
                         }
                     }
-                }
-                HorizontalLayout {
-                    if root.commander-url != "" : Image { width: 92px; height: 92px; source: root.commander-qr; }
-                    VerticalLayout {
-                        Text { text: root.commander-url; color: Theme.text; }
-                        Text { text: root.drawer-busy ? root.tr("Working…","In Arbeit …") : root.feedback; color: Theme.muted; wrap: word-wrap; }
+                    HorizontalLayout {
+                        alignment: end;
+                        Md3Button { label: root.tr("Close", "Schließen"); clicked => { root.routing = ""; } }
                     }
                 }
-
             }
         }
     }
@@ -1476,21 +2525,24 @@ export component App inherits Window {
                 }
                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
                     spacing: 8px;
-                    search-entry := LineEdit {
+                    search-entry := KioskSearch {
                         horizontal-stretch: 1;
                         placeholder-text: root.tr("Search...","Suchen …");
                         text <=> root.dashboard-picker-search;
                         edited(search) => { root.dashboard-filter(search); }
-                        changed has-focus => {
-                            if self.has-focus { root.touch-keyboard-open = true; }
-                        }
+                        activated => { root.touch-keyboard-open = true; }
+                        accepted => { root.hide-keyboard(); }
+                        init => { self.focus(); }
                     }
                 }
-                ScrollView {
+                if root.wallpaper-picker-loading && root.dashboard-picker-kind == "wallpaper" : DrawerEmpty {
+                    text: root.tr("Loading wallpapers…", "Hintergrundbilder werden geladen …");
+                }
+                ListView {
                     vertical-stretch: 1;
-                    VerticalLayout {
-                        spacing: 4px;
-                        for item[i] in root.dashboard-picker-items : Rectangle {
+                    horizontal-scrollbar-policy: always-off;
+                    mouse-drag-pan-enabled: true;
+                    for item[i] in root.dashboard-picker-items : Rectangle {
                             height: root.dashboard-picker-kind == "wallpaper" ? 90px : 46px;
                             background: item.selected ? Theme.elevated : transparent;
                             border-radius: 10px;
@@ -1516,7 +2568,6 @@ export component App inherits Window {
                             }
                             TouchArea { clicked => { root.dashboard-select-option(item.name); } }
                         }
-                    }
                 }
                 if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
                     Text { text: root.tr("Choose at most four items","Höchstens vier Einträge wählen"); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
@@ -1527,21 +2578,45 @@ export component App inherits Window {
     }
 
     if root.network-drawer-open && root.wifi-target != "" : Rectangle {
-        background: #cc000000; TouchArea { }
-        VerticalLayout {
-            padding: 18px; alignment: start; spacing: 8px;
-            Text { text: root.tr("Wi-Fi password","WLAN-Passwort"); color: Theme.text; }
-            LineEdit { text <=> root.wifi-password; input-type: password; }
-            HorizontalLayout {
-                PillButton { label: root.tr("Connect","Verbinden"); clicked => { root.drawer-command("wifi-connect",root.wifi-target,root.wifi-password); root.wifi-target=""; root.wifi-password=""; root.touch-keyboard-open=false; } }
-                PillButton { label: root.tr("Cancel","Abbrechen"); clicked => { root.wifi-target=""; root.wifi-password=""; root.touch-keyboard-open=false; } }
+        background: #aa000000;
+        TouchArea { }
+        Md3Card {
+            width: min(parent.width - 32px, 420px);
+            height: 170px;
+            x: (parent.width - self.width) / 2;
+            y: root.touch-keyboard-open ? max(8px, (parent.height - min(250px, parent.height * 0.42) - self.height) / 2)
+                : (parent.height - self.height) / 2;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+                DrawerTitle { text: root.tr("Connect to Wi-Fi", "Mit WLAN verbinden"); }
+                Text { text: root.wifi-name; color: Theme.muted; font-size: 13px; overflow: elide; }
+                password := LineEdit {
+                    text <=> root.wifi-password;
+                    placeholder-text: root.tr("Wi-Fi password", "WLAN-Passwort");
+                    input-type: InputType.password;
+                    accepted => { root.submit-wifi-password(); }
+                    changed has-focus => { if self.has-focus { root.touch-keyboard-open = true; } }
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+                    Md3Button { label: root.tr("Cancel", "Abbrechen"); clicked => { root.close-wifi-password(); } }
+                    Md3Button {
+                        label: root.tr("Connect", "Verbinden");
+                        filled: true;
+                        enabled: root.wifi-password != "" && !root.drawer-busy;
+                        clicked => { root.submit-wifi-password(); }
+                    }
+                }
             }
+            init => { password.focus(); }
         }
     }
     // Md3Keyboard: automatic on search focus, in-process, German QWERTZ.
     if (root.dashboard-picker-open || root.wifi-target != "" || root.page == 2) && root.touch-keyboard-open : Rectangle {
         width: parent.width;
-        height: root.touch-keyboard-symbols ? min(300px, parent.height * 0.50) : min(250px, parent.height * 0.42);
+        height: root.keyboard-height;
         y: parent.height - self.height;
         background: Theme.surface;
         border-width: 1px;
@@ -1596,7 +2671,7 @@ export component App inherits Window {
                 TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "[" : ","; clicked => { root.keyboard-input(self.label); } }
                 TouchKey { horizontal-stretch: 1; label: root.touch-keyboard-symbols ? "Symbols" : "Deutsch"; clicked => { root.keyboard-input(" "); } }
                 TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "]" : "."; clicked => { root.keyboard-input(self.label); } }
-                TouchKey { width: 58px; accent: true; label: "⌄"; clicked => { root.touch-keyboard-open = false; } }
+                TouchKey { width: 58px; accent: true; label: "⌄"; clicked => { root.hide-keyboard(); } }
             }
         }
     }

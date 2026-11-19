@@ -13,6 +13,7 @@ mod state;
 mod theme;
 mod ui_bridge;
 mod ui_handlers;
+mod wallpaper;
 
 use crate::{config::Settings, state::store::Store};
 use serde_json::Value;
@@ -30,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ui = App::new()?;
     let store = Arc::new(Mutex::new(Store::default()));
     dashboard_editor::install(&ui, store.clone());
-    drawer::install(&ui, config.rest_port);
+    let _drawer_refresh = drawer::install(&ui, config.rest_port);
     let weak = ui.as_weak();
     let (command_tx, command_rx) = mpsc::unbounded_channel::<(String, Value)>();
     let rt = tokio::runtime::Builder::new_multi_thread()

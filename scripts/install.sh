@@ -106,7 +106,6 @@ install_packages() {
     pipewire-pulse \
     wireplumber \
     libspa-0.2-bluetooth \
-    qrencode \
     iproute2 \
     libgl1-mesa-dri \
     libegl-mesa0 \

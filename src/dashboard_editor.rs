@@ -58,30 +58,7 @@ fn summaries(ui: &App, draft: &Editor) {
     ui.set_wallpaper_label(label.into());
 }
 
-/// Decode image formats including WebP in Rust, rather than relying on Slint's
-/// file loader (which does not necessarily include a WebP decoder).
-fn load_asset(path: &std::path::Path) -> slint::Image {
-    use slint::{Rgb8Pixel, SharedPixelBuffer};
-    let Ok(reader) = image::ImageReader::open(path) else {
-        return slint::Image::default();
-    };
-    let Ok(decoded) = reader.decode() else {
-        return slint::Image::default();
-    };
-    // Limit large wallpapers to the actual touch display size, avoiding huge buffers.
-    let scaled = decoded.resize(1920, 1080, image::imageops::FilterType::Triangle);
-    let rgb = scaled.to_rgb8();
-    let pixels =
-        SharedPixelBuffer::<Rgb8Pixel>::clone_from_slice(rgb.as_raw(), rgb.width(), rgb.height());
-    slint::Image::from_rgb8(pixels)
-}
-
-pub(crate) fn set_wallpaper_image(ui: &App, wallpaper: &str) {
-    let path = dashboard::wallpaper_path(wallpaper);
-    crate::theme::wallpaper(ui, path.clone());
-    let img = path.map(|p| load_asset(&p)).unwrap_or_default();
-    ui.set_wallpaper_image(img);
-}
+pub(crate) use crate::wallpaper::set as set_wallpaper_image;
 
 fn candidates(kind: &str, store: &Arc<Mutex<Store>>) -> Vec<String> {
     if kind.starts_with("slot:") {
@@ -89,11 +66,6 @@ fn candidates(kind: &str, store: &Arc<Mutex<Store>>) -> Vec<String> {
             .into_iter()
             .map(str::to_owned)
             .collect();
-    }
-    if kind == "wallpaper" {
-        let mut files = vec!["No wallpaper".to_owned()];
-        files.extend(dashboard::wallpaper_files());
-        return files;
     }
     let Ok(store) = store.lock() else {
         return vec![];
@@ -129,27 +101,17 @@ fn display(ui: &App, editor: &Editor, store: &Arc<Mutex<Store>>) {
         .iter()
         .filter(|name| search.is_empty() || name.to_ascii_lowercase().contains(&search))
         .map(|name| {
-            let selected = if editor.kind == "wallpaper" {
-                (name == "No wallpaper" && editor.draft_wallpaper.is_empty())
-                    || *name == editor.draft_wallpaper
-            } else if editor.kind.starts_with("slot:") {
+            let selected = if editor.kind.starts_with("slot:") {
                 let index = slot_index(&editor.kind).unwrap_or(0);
                 let raw = slots(ui)[index].clone();
                 name == card_label(&raw)
             } else {
                 editor.picker_selection.contains(name)
             };
-            let thumbnail = if editor.kind == "wallpaper" {
-                dashboard::wallpaper_path(name)
-                    .map(|path| load_asset(&path))
-                    .unwrap_or_default()
-            } else {
-                slint::Image::default()
-            };
             PickerEntry {
                 name: SharedString::from(name.as_str()),
                 selected,
-                thumbnail,
+                thumbnail: slint::Image::default(),
             }
         })
         .collect();
@@ -189,6 +151,9 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
     let initial = dashboard::load();
     set_slots(ui, &initial);
     let editor = Rc::new(RefCell::new(Editor::default()));
+    let wallpaper_picker = crate::wallpaper::Picker::new();
+    let cancel = wallpaper_picker.clone();
+    ui.on_wallpaper_picker_closed(move || cancel.cancel());
     {
         let weak = ui.as_weak();
         let draft = editor.clone();
@@ -243,11 +208,14 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                     vec![]
                 };
                 ui.set_dashboard_picker_search("".into());
-                let needs_keyboard = kind == "macros" || kind == "auto_macros";
+                let wallpaper = kind == "wallpaper";
                 ui.set_dashboard_picker_kind(kind);
-                display(&ui, &state, &source);
-                ui.set_touch_keyboard_open(needs_keyboard);
                 ui.set_dashboard_picker_open(true);
+                if wallpaper {
+                    wallpaper_picker.open(&ui, &state.draft_wallpaper);
+                } else {
+                    display(&ui, &state, &source);
+                }
             }
         });
     }
@@ -390,7 +358,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                                 .filter(|name| guard.macros.contains(name))
                                 .map(|s| SharedString::from(s.as_str()))
                                 .collect();
-                            ui.set_dashboard_macro_list(ModelRc::new(VecModel::from(names)));
+                            crate::state::models::dashboard_macros(&ui, names);
                             ui.set_dashboard_auto_macros(crate::state::models::auto_macro_rows(
                                 &guard.auto_macros,
                             ));
@@ -413,12 +381,13 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
         });
     }
     set_wallpaper_image(ui, &dashboard::wallpaper());
-    ui.set_dashboard_macro_list(ModelRc::new(VecModel::from(
+    crate::state::models::dashboard_macros(
+        ui,
         dashboard::selected_names("macro_names")
-            .iter()
-            .map(|s| SharedString::from(s.as_str()))
-            .collect::<Vec<_>>(),
-    )));
+            .into_iter()
+            .map(SharedString::from)
+            .collect(),
+    );
     let weak = ui.as_weak();
     ui.on_power_action(move |action| {
         let result = match action.as_str() {

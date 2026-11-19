@@ -31,7 +31,12 @@ pub(crate) const ENDPOINTS: &[&str] = &[
     "notify_speedtest_update",
 ];
 
-type Pending = HashMap<u64, (String, time::Instant)>;
+struct PendingRequest {
+    method: String,
+    sent: time::Instant,
+    macro_run: Option<(String, i32)>,
+}
+type Pending = HashMap<u64, PendingRequest>;
 
 fn handle_packet(
     packet: Value,
@@ -46,13 +51,27 @@ fn handle_packet(
         let Some(id) = packet["id"].as_u64() else {
             return;
         };
-        let Some((request, _)) = pending.get(&id) else {
+        let Some(entry) = pending.get(&id) else {
             return;
         };
-        if !method.is_empty() && method != format!("result_{request}") {
+        if !method.is_empty() && method != format!("result_{}", entry.method) {
             return;
         }
-        let (request, _) = pending.remove(&id).unwrap();
+        let PendingRequest {
+            method: request,
+            macro_run,
+            ..
+        } = pending.remove(&id).unwrap();
+        if let Some((name, ticket)) = macro_run {
+            let body = ["result", "params", "data", "payload"]
+                .iter()
+                .find_map(|key| packet.get(*key));
+            let success = packet.get("error").is_none_or(Value::is_null)
+                && !body.is_some_and(|body| body["success"] == false);
+            ui_event(ui, move |app| {
+                crate::ui_handlers::complete_macro(&app, name.into(), ticket, success)
+            });
+        }
         if let Some(error) = packet.get("error").filter(|e| !e.is_null()) {
             let detail = error["message"]
                 .as_str()
@@ -62,6 +81,10 @@ fn handle_packet(
                 app.set_feedback(format!("{request}: {detail}").into());
                 if request == "update" {
                     app.invoke_cancel_updates();
+                }
+                if request == "speedtest" {
+                    app.set_speedtest_starting(false);
+                    app.set_speedtest_error(detail.into());
                 }
             });
             return;
@@ -153,7 +176,14 @@ pub(crate) async fn run(
                 if sink.send(Message::text(status.to_string())).await.is_err() {
                     continue;
                 }
-                pending.insert(speed_id, ("speedtest".into(), time::Instant::now()));
+                pending.insert(
+                    speed_id,
+                    PendingRequest {
+                        method: "speedtest".into(),
+                        sent: time::Instant::now(),
+                        macro_run: None,
+                    },
+                );
                 ui_event(&ui, |app| app.set_connection("Connected".into()));
                 let cava = cava::cava_client(config.clone(), ui.clone());
                 tokio::pin!(cava);
@@ -161,9 +191,16 @@ pub(crate) async fn run(
                     tokio::select! {
                         _ = &mut cava => break,
                         command = command_rx.recv() => {
-                            let Some((method, params)) = command else { return };
-                            pending.retain(|_, (_, sent)| sent.elapsed() < Duration::from_secs(60));
-                            pending.insert(next_id, (method.clone(), time::Instant::now()));
+                            let Some((method, mut params)) = command else { return };
+                            let macro_run = if method == "trigger_macro" {
+                                params.as_object_mut().and_then(|params| {
+                                    let name = params.get("macro")?.as_str()?.to_owned();
+                                    let ticket = params.remove("_kiosk_ticket")?.as_i64()? as i32;
+                                    Some((name, ticket))
+                                })
+                            } else { None };
+                            pending.retain(|_, request| request.sent.elapsed() < Duration::from_secs(60));
+                            pending.insert(next_id, PendingRequest { method: method.clone(), sent: time::Instant::now(), macro_run });
                             let message = json!({"jsonrpc":"2.0", "id":next_id, "method":method, "params":params});
                             next_id += 1;
                             if sink.send(Message::Text(message.to_string().into())).await.is_err() { break; }

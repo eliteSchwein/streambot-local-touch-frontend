@@ -119,12 +119,17 @@ pub(crate) fn wallpaper_path(relative: &str) -> Option<PathBuf> {
     }
 }
 
-pub(crate) fn wallpaper_files() -> Vec<String> {
-    fn scan(dir: &std::path::Path, root: &std::path::Path, out: &mut Vec<String>) {
+pub(crate) fn wallpaper_files(keep_scanning: impl Fn() -> bool) -> Vec<String> {
+    fn scan(
+        dir: &std::path::Path,
+        root: &std::path::Path,
+        out: &mut Vec<String>,
+        keep_scanning: &impl Fn() -> bool,
+    ) {
         let Ok(entries) = fs::read_dir(dir) else {
             return;
         };
-        for entry in entries.flatten() {
+        for entry in entries.flatten().take_while(|_| keep_scanning()) {
             let path = entry.path();
             if path
                 .file_name()
@@ -133,7 +138,7 @@ pub(crate) fn wallpaper_files() -> Vec<String> {
                 continue;
             }
             if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
-                scan(&path, root, out);
+                scan(&path, root, out, keep_scanning);
             } else if path.extension().is_some_and(|ext| {
                 ["png", "jpg", "jpeg", "webp"]
                     .contains(&ext.to_string_lossy().to_ascii_lowercase().as_str())
@@ -146,7 +151,7 @@ pub(crate) fn wallpaper_files() -> Vec<String> {
     }
     let root = assets_dir();
     let mut results = Vec::new();
-    scan(&root, &root, &mut results);
+    scan(&root, &root, &mut results, &keep_scanning);
     results.sort();
     results
 }
