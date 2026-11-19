@@ -310,7 +310,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
             }
         });
     }
-    set_wallpaper_image(ui, &dashboard::wallpaper());
+    crate::wallpaper::restore(ui, &dashboard::wallpaper());
     crate::state::models::dashboard_macros(
         ui,
         dashboard::selected_names("macro_names")
