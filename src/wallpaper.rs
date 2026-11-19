@@ -164,7 +164,8 @@ pub(crate) fn set(app: &App, name: &str) {
                     continue;
                 }
                 let path = dashboard::wallpaper_path(&request.name);
-                let image = path.as_deref().and_then(|path| decode(path, 1920, 1080));
+                // The kiosk panel is at most 1280×800; larger decodes only cost memory.
+                let image = path.as_deref().and_then(|path| decode(path, 1280, 800));
                 let name = request.name.clone();
                 let shown = image.clone();
                 ui_event(&request.app, move |app| {
@@ -262,7 +263,7 @@ impl Picker {
                     };
                     let modified = path.metadata().ok().and_then(|meta| meta.modified().ok());
                     let key = (path, modified);
-                    if thumbnails.len() >= 128 && !thumbnails.contains_key(&key) {
+                    if thumbnails.len() >= 48 && !thumbnails.contains_key(&key) {
                         thumbnails.clear();
                     }
                     // `None` (undecodable file) still clears the tile's spinner.

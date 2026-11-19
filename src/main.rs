@@ -26,7 +26,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 slint::include_modules!();
 
@@ -44,7 +44,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     ui_handlers::install(&ui, command_tx);
 
-    rt.spawn(backend::run(config, weak, store, command_rx));
+    let (music_visible_tx, music_visible) = watch::channel(ui.get_music_visible());
+    ui.on_music_visible_changed(move |visible| {
+        let _ = music_visible_tx.send(visible);
+    });
+    rt.spawn(backend::run(config, weak, store, command_rx, music_visible));
     #[cfg(unix)]
     {
         use tokio::signal::unix::{signal, SignalKind};

@@ -11,7 +11,10 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tokio::{sync::mpsc, time};
+use tokio::{
+    sync::{mpsc, watch},
+    time,
+};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 pub(crate) const ENDPOINTS: &[&str] = &[
@@ -116,6 +119,7 @@ pub(crate) async fn run(
     ui: slint::Weak<App>,
     store: Arc<Mutex<Store>>,
     mut command_rx: mpsc::UnboundedReceiver<(String, Value)>,
+    music_visible: watch::Receiver<bool>,
 ) {
     let client = match reqwest::Client::builder()
         .timeout(Duration::from_secs(2))
@@ -189,7 +193,7 @@ pub(crate) async fn run(
                     },
                 );
                 ui_event(&ui, |app| app.set_connection("Connected".into()));
-                let cava = cava::cava_client(config.clone(), ui.clone());
+                let cava = cava::cava_client(config.clone(), ui.clone(), music_visible.clone());
                 tokio::pin!(cava);
                 loop {
                     tokio::select! {

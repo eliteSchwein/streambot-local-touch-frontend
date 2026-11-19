@@ -1419,6 +1419,12 @@ export component App inherits Window {
     in-out property <bool> dashboard-picker-open: false;
     in-out property <bool> wallpaper-picker-loading;
     callback wallpaper-picker-closed();
+    // The visualizer stream is only needed while a music card is on screen.
+    out property <bool> music-visible: root.page == 0
+        && (root.view-left-0 == "music" || root.view-left-1 == "music"
+            || root.view-right-0 == "music" || root.view-right-1 == "music");
+    callback music-visible-changed(bool);
+    changed music-visible => { root.music-visible-changed(self.music-visible); }
     changed dashboard-picker-open => {
         if !root.dashboard-picker-open {
             root.touch-keyboard-open = false;
