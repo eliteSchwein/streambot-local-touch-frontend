@@ -55,6 +55,24 @@ fn summaries(ui: &App, draft: &Editor) {
 
 pub(crate) use crate::wallpaper::set as set_wallpaper_image;
 
+/// The dashboard doubles as the editor, so the macro cards show the draft selection.
+fn preview(ui: &App, draft: &Editor, store: &Arc<Mutex<Store>>) {
+    let Ok(guard) = store.lock() else {
+        return;
+    };
+    let names: Vec<SharedString> = draft
+        .draft_macros
+        .iter()
+        .filter(|name| guard.macros.contains(name))
+        .map(|s| SharedString::from(s.as_str()))
+        .collect();
+    crate::state::models::dashboard_macros(ui, names);
+    ui.set_dashboard_auto_macros(crate::state::models::auto_macro_rows_for(
+        &guard.auto_macros,
+        &draft.draft_auto_macros,
+    ));
+}
+
 fn candidates(kind: &str, store: &Arc<Mutex<Store>>) -> Vec<String> {
     if kind.starts_with("slot:") {
         return vec!["", "interactions", "auto_macros", "macros", "music"]
@@ -107,6 +125,7 @@ fn display(ui: &App, editor: &Editor, store: &Arc<Mutex<Store>>) {
                 name: SharedString::from(name.as_str()),
                 selected,
                 thumbnail: slint::Image::default(),
+                loading: false,
             }
         })
         .collect();
@@ -148,6 +167,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
     {
         let weak = ui.as_weak();
         let draft = editor.clone();
+        let source = store.clone();
         ui.on_dashboard_editor_reset(move || {
             if let Some(ui) = weak.upgrade() {
                 set_draft_slots(
@@ -164,6 +184,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                 state.draft_auto_macros.clear();
                 state.draft_wallpaper.clear();
                 summaries(&ui, &state);
+                preview(&ui, &state, &source);
                 set_wallpaper_image(&ui, "");
             }
         });
@@ -219,21 +240,13 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                 if let Some(index) = slot_index(&state.kind) {
                     let mut values = slots(&ui);
                     let selected = name;
-                    // Keep one occurrence per card and reserve a whole column for Music.
+                    // Keep one occurrence per card; Music turns compact when it shares a column.
                     for (i, value) in values.iter_mut().enumerate() {
                         if i != index && *value == selected && !selected.is_empty() {
                             value.clear();
                         }
                     }
-                    if selected == "music" {
-                        values[index / 2 * 2] = "music".into();
-                        values[index / 2 * 2 + 1].clear();
-                    } else {
-                        if values[index / 2 * 2] == "music" {
-                            values[index / 2 * 2].clear();
-                        }
-                        values[index] = selected;
-                    }
+                    values[index] = selected;
                     set_draft_slots(&ui, &values);
                     ui.set_dashboard_picker_open(false);
                     ui.set_touch_keyboard_open(false);
@@ -257,6 +270,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
     {
         let weak = ui.as_weak();
         let draft = editor.clone();
+        let source = store.clone();
         ui.on_dashboard_apply_picker(move || {
             if let Some(ui) = weak.upgrade() {
                 let mut state = draft.borrow_mut();
@@ -267,6 +281,7 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                     state.draft_auto_macros = selection;
                 }
                 summaries(&ui, &state);
+                preview(&ui, &state, &source);
                 ui.set_dashboard_picker_open(false);
             }
         });
@@ -286,18 +301,8 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                 ) {
                     Ok(saved) => {
                         set_slots(&ui, &saved);
-                        if let Ok(guard) = source.lock() {
-                            let names: Vec<SharedString> = state
-                                .draft_macros
-                                .iter()
-                                .filter(|name| guard.macros.contains(name))
-                                .map(|s| SharedString::from(s.as_str()))
-                                .collect();
-                            crate::state::models::dashboard_macros(&ui, names);
-                            ui.set_dashboard_auto_macros(crate::state::models::auto_macro_rows(
-                                &guard.auto_macros,
-                            ));
-                        }
+                        preview(&ui, &state, &source);
+                        ui.set_feedback("".into());
                         ui.set_dashboard_editing(false);
                     }
                     Err(err) => {
@@ -306,15 +311,6 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                         ui.set_feedback(format!("{label}: {err}").into());
                     }
                 }
-            }
-        });
-    }
-    {
-        let weak = ui.as_weak();
-        ui.on_dashboard_cancel(move || {
-            if let Some(ui) = weak.upgrade() {
-                set_wallpaper_image(&ui, &dashboard::wallpaper());
-                ui.set_dashboard_picker_open(false);
             }
         });
     }

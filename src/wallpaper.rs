@@ -116,6 +116,7 @@ impl Picker {
                         .enumerate()
                         .map(|(index, name)| PickerEntry {
                             selected: (index == 0 && selected.is_empty()) || name == selected,
+                            loading: index > 0,
                             name: name.into(),
                             thumbnail: slint::Image::default(),
                         })
@@ -135,13 +136,11 @@ impl Picker {
                     if thumbnails.len() >= 128 && !thumbnails.contains_key(&key) {
                         thumbnails.clear();
                     }
-                    let Some(thumbnail) = thumbnails
+                    // `None` (undecodable file) still clears the tile's spinner.
+                    let thumbnail = thumbnails
                         .entry(key.clone())
-                        .or_insert_with(|| decode(&key.0, 160, 96))
-                        .clone()
-                    else {
-                        continue;
-                    };
+                        .or_insert_with(|| decode(&key.0, 360, 224))
+                        .clone();
                     let epoch = current.clone();
                     ui_event(&app, move |app| {
                         if epoch.load(Ordering::Relaxed) != request {
@@ -153,7 +152,10 @@ impl Picker {
                             return;
                         };
                         if let Some(mut row) = rows.row_data(index + 1) {
-                            row.thumbnail = slint::Image::from_rgb8(thumbnail);
+                            if let Some(thumbnail) = thumbnail {
+                                row.thumbnail = slint::Image::from_rgb8(thumbnail);
+                            }
+                            row.loading = false;
                             rows.set_row_data(index + 1, row);
                         }
                     });

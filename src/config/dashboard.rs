@@ -45,13 +45,9 @@ fn normalize(input: [String; 4]) -> [String; 4] {
     let allowed = ["interactions", "auto_macros", "macros", "music"];
     let mut columns = [Vec::<String>::new(), Vec::<String>::new()];
     for (col, slots) in columns.iter_mut().zip(input.as_chunks::<2>().0) {
-        if slots.iter().any(|slot| slot == "music") {
-            col.push("music".into());
-        } else {
-            for slot in slots {
-                if allowed.contains(&slot.as_str()) && !col.contains(slot) {
-                    col.push(slot.clone());
-                }
+        for slot in slots {
+            if allowed.contains(&slot.as_str()) && !col.contains(slot) {
+                col.push(slot.clone());
             }
         }
     }

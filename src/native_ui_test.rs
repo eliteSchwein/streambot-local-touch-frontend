@@ -216,12 +216,22 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
             position: LogicalPosition::new(x, y),
         })
     };
+    let saved = Rc::new(std::cell::Cell::new(false));
+    {
+        let saved = saved.clone();
+        let weak = app.as_weak();
+        app.on_dashboard_save(move |_, _, _, _| {
+            saved.set(true);
+            weak.unwrap().set_dashboard_editing(false);
+        });
+    }
     app.set_page(0);
     press(30., 471.);
     release(30., 471.);
     assert!(app.get_dashboard_editing());
     press(30., 471.);
     release(30., 471.);
+    assert!(saved.get(), "the checkmark saves the dashboard");
     assert!(!app.get_dashboard_editing());
     press(770., 471.);
     release(770., 471.);

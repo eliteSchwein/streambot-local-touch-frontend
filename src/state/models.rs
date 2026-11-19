@@ -47,7 +47,16 @@ pub(crate) fn interaction_rows(items: &[Value]) -> slint::ModelRc<InteractionEnt
 }
 
 pub(crate) fn auto_macro_rows(items: &[Value]) -> slint::ModelRc<AutoMacroEntry> {
-    let selected = crate::config::dashboard::selected_names("auto_macro_names");
+    auto_macro_rows_for(
+        items,
+        &crate::config::dashboard::selected_names("auto_macro_names"),
+    )
+}
+
+pub(crate) fn auto_macro_rows_for(
+    items: &[Value],
+    selected: &[String],
+) -> slint::ModelRc<AutoMacroEntry> {
     let visible = if selected.is_empty() {
         items.iter().take(4).collect::<Vec<_>>()
     } else {
