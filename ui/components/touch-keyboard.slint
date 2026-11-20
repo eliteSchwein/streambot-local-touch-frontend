@@ -1,0 +1,73 @@
+import { Theme } from "../theme.slint";
+import { TouchKey } from "common.slint";
+
+export component TouchKeyboard inherits Rectangle {
+    in-out property <bool> touch-keyboard-shift;
+    in-out property <bool> touch-keyboard-symbols;
+    in property <string> language;
+    callback keyboard-input(string);
+    pure callback loc(string) -> string;
+    callback hide-keyboard();
+
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.elevated;
+    // Keyboard surface eats touches so nav controls cannot fire underneath.
+    TouchArea { }
+    VerticalLayout {
+        padding: 6px;
+        spacing: 5px;
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 4px;
+            for key in (root.touch-keyboard-symbols ? ["1","2","3","4","5","6","7","8","9","0"] : ["q","w","e","r","t",root.language == "de" ? "z" : "y","u","i","o","p"]) : TouchKey {
+                horizontal-stretch: 1;
+                label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
+                clicked => {
+                    root.keyboard-input(self.label);
+                    root.touch-keyboard-shift = false;
+                }
+            }
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 4px;
+            Rectangle { width: 18px; background: transparent; }
+            for key in (root.touch-keyboard-symbols ? ["@","#","$","%","&","-","+","(",")","/"] : (root.language == "de" ? ["a","s","d","f","g","h","j","k","l","ö"] : ["a","s","d","f","g","h","j","k","l"])) : TouchKey {
+                horizontal-stretch: 1;
+                label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
+                clicked => { root.keyboard-input(self.label); root.touch-keyboard-shift = false; }
+            }
+            Rectangle { width: 18px; background: transparent; }
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 4px;
+            TouchKey { width: 58px; accent: true; label: "⇧"; clicked => { root.touch-keyboard-shift = !root.touch-keyboard-shift; } }
+            for key in (root.touch-keyboard-symbols ? ["*","\"","'",";",":","!","?","=","_","\\"] : (root.language == "de" ? ["y","x","c","v","b","n","m","ä","ü"] : ["z","x","c","v","b","n","m"])) : TouchKey {
+                horizontal-stretch: 1;
+                label: root.touch-keyboard-shift && !root.touch-keyboard-symbols ? key.to-uppercase() : key;
+                clicked => { root.keyboard-input(self.label); root.touch-keyboard-shift = false; }
+            }
+            TouchKey { width: 58px; accent: true; label: "⌫"; clicked => { root.keyboard-input("backspace"); } }
+        }
+        if root.touch-keyboard-symbols : HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 4px;
+            for key in ["{", "}", "<", ">", "^", "~", "`", "|"] : TouchKey {
+                horizontal-stretch: 1;
+                label: key;
+                clicked => { root.keyboard-input(key); }
+            }
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 4px;
+            TouchKey { width: 64px; accent: true; label: root.touch-keyboard-symbols ? "ABC" : "?123"; clicked => { root.touch-keyboard-symbols = !root.touch-keyboard-symbols; } }
+            TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "[" : ","; clicked => { root.keyboard-input(self.label); } }
+            TouchKey { horizontal-stretch: 1; label: root.touch-keyboard-symbols ? root.loc("keyboard_symbols") : root.loc(root.language == "de" ? "german" : "english"); clicked => { root.keyboard-input(" "); } }
+            TouchKey { width: 48px; label: root.touch-keyboard-symbols ? "]" : "."; clicked => { root.keyboard-input(self.label); } }
+            TouchKey { width: 58px; accent: true; label: "⌄"; clicked => { root.hide-keyboard(); } }
+        }
+    }
+}

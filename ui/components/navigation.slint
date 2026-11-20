@@ -1,0 +1,92 @@
+import { Theme } from "../theme.slint";
+import { NavItem, PillButton } from "common.slint";
+
+export component ConnectionOverlay inherits Rectangle {
+    in property <string> backend-stage;
+    in property <bool> backend-ready;
+    in property <string> language;
+    pure callback startup-stage(string, string) -> string;
+    pure callback loc(string) -> string;
+
+    background: Theme.background;
+    TouchArea {}
+    VerticalLayout {
+        alignment: center;
+        spacing: 14px;
+        Text {
+            text: root.loc(root.backend-ready ? "connect_connection_lost" : "connect_starting_title");
+            color: Theme.text; font-size: 22px; font-weight: 600; horizontal-alignment: center;
+        }
+        Text {
+            text: root.loc(root.backend-ready ? "connect_connection_lost_text" : "connect_starting_text");
+            color: Theme.muted; font-size: 14px; horizontal-alignment: center; wrap: word-wrap;
+        }
+        Text {
+            text: root.backend-ready ? root.loc("connect_reconnecting") : root.startup-stage(root.language, root.backend-stage);
+            color: Theme.primary; font-size: 12px; horizontal-alignment: center;
+        }
+    }
+}
+
+export component BottomNavigation inherits Rectangle {
+    in property <int> page;
+    in property <bool> dashboard-editing;
+    callback navigate(int);
+    callback toggle-dashboard-editor();
+    callback open-wallpaper-picker();
+    callback reset-dashboard();
+    callback open-power-menu();
+    pure callback loc(string) -> string;
+
+    height: 52px;
+    background: Theme.surface;
+    if root.dashboard-editing : HorizontalLayout {
+        width: self.preferred-width;
+        height: 40px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        spacing: 10px;
+        PillButton {
+            label: root.loc("dashboard_wallpaper");
+            clicked => { root.open-wallpaper-picker(); }
+        }
+        PillButton { label: root.loc("dashboard_reset"); clicked => { root.reset-dashboard(); } }
+    }
+    if !root.dashboard-editing : HorizontalLayout {
+        width: self.preferred-width;
+        height: 42px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        spacing: 10px;
+        NavItem { label: root.loc("page_home"); icon: @image-url("../icons/mdi/home.svg"); active-icon: @image-url("../icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.navigate(0); } }
+        NavItem { label: root.loc("audio"); icon: @image-url("../icons/mdi/volume-high.svg"); active-icon: @image-url("../icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.navigate(1); } }
+        NavItem { label: root.loc("page_controls"); icon: @image-url("../icons/mdi/tune.svg"); active-icon: @image-url("../icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.navigate(2); } }
+        NavItem { label: root.loc("page_system"); icon: @image-url("../icons/mdi/server.svg"); active-icon: @image-url("../icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.navigate(3); } }
+        NavItem { label: root.loc("page_speedtest"); icon: @image-url("../icons/mdi/speedometer.svg"); active-icon: @image-url("../icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.navigate(4); } }
+    }
+    if root.page == 0 : Rectangle {
+        width: 40px;
+        height: 40px;
+        x: 10px;
+        y: (parent.height - self.height) / 2;
+        border-radius: 20px;
+        background: root.dashboard-editing ? Theme.primary : transparent;
+        Text {
+            text: root.dashboard-editing ? "✓" : "✎";
+            color: root.dashboard-editing ? Theme.on-primary : Theme.muted;
+            font-size: 20px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        TouchArea { clicked => { root.toggle-dashboard-editor(); } }
+    }
+    Rectangle {
+        width: 40px;
+        height: 40px;
+        x: parent.width - self.width - 10px;
+        y: (parent.height - self.height) / 2;
+        border-radius: 20px;
+        Image { width: 21px; height: 21px; source: @image-url("../icons/mdi/power.svg"); }
+        TouchArea { clicked => { root.open-power-menu(); } }
+    }
+}

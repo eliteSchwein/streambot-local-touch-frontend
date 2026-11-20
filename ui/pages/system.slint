@@ -1,0 +1,262 @@
+import { Theme } from "../theme.slint";
+import { SystemMetric, SystemStats, SystemStorage, UpdateEntry } from "../types.slint";
+import { DrawerEmpty, DrawerTitle, GlassCard, Md3Button, Scroller } from "../components/common.slint";
+import { SystemDetail, SystemHeading, SystemLanguage, SystemProgress, SystemRing } from "../components/system.slint";
+
+export component SystemPage inherits HorizontalLayout {
+    in property <SystemStats> system-stats;
+    in property <SystemStorage> system-storage;
+    in property <bool> updates-available;
+    in property <bool> updates-checking;
+    in property <bool> updates-running;
+    in property <bool> backend-update-running;
+    in property <string> language;
+    in property <string> updating-manager;
+    in property <[UpdateEntry]> updates;
+    pure callback fill-text(string, string, string) -> string;
+    callback choose-language(string);
+    callback update-refresh();
+    callback run-update(string);
+    callback update-all();
+    pure callback loc(string) -> string;
+
+    property <[SystemMetric]> system-metrics: [
+        { label: root.loc("system_cpu_usage"), tint: #ef5350, value: root.system-stats.cpu, empty: "—" },
+        { label: root.loc("system_ram_usage"), tint: #ffb300, value: root.system-stats.ram, empty: "—" },
+        { label: root.loc("system_swap_usage"), tint: #ab47bc,
+            value: root.system-stats.has-swap ? root.system-stats.swap : -1, empty: root.system-stats.has-swap ? "—" : root.loc("system_no_swap") },
+        { label: root.loc("system_internal_storage_usage"), tint: #26c6da,
+            value: root.system-stats.storage >= 0 ? root.system-stats.storage : root.system-storage.usage, empty: "—" },
+    ];
+    pure function update-stage(stage: string) -> string {
+        let key = "system_updates_stage_" + stage;
+        let translation = root.loc(key);
+        return stage == "" ? root.loc("system_updates_updating") : translation == key ? stage : translation;
+    }
+
+    padding: 10px;
+    spacing: 8px;
+    VerticalLayout {
+        spacing: 8px;
+        width: (root.width - 28px) / 2;
+        GlassCard {
+            height: 165px;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 6px;
+                HorizontalLayout {
+                    SystemHeading { text: root.loc("system_stats"); horizontal-stretch: 1; }
+                    SystemHeading {
+                        font-size: 11px;
+                        text: root.loc("system_cpu_temp") + "  "
+                            + (root.system-stats.temperature >= 0 ? round(root.system-stats.temperature) + " °C" : "—");
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 14px;
+                    Rectangle {
+                        width: 126px;
+                        height: 126px;
+                        for metric[index] in root.system-metrics : SystemRing {
+                            diameter: (114 - index * 22) * 1px;
+                            progress: metric.value / 100;
+                            tint: metric.tint;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 8px;
+                        horizontal-stretch: 1;
+                        for metric in root.system-metrics : SystemDetail {
+                            title: metric.label;
+                            value: metric.value >= 0 ? round(metric.value) + "%" : metric.empty;
+                            tint: metric.tint;
+                            value-color: metric.value >= 90 ? Theme.error : metric.value >= 80 ? #ff9800 : Theme.text;
+                            font-size: 11px;
+                        }
+                    }
+                }
+            }
+        }
+        GlassCard {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                SystemHeading { text: root.loc("system_storage"); }
+                Rectangle {
+                    height: 10px;
+                    background: Theme.raised;
+                    clip: true;
+                    for row in root.system-storage.rows : Rectangle {
+                        x: parent.width * row.offset;
+                        width: parent.width * row.fraction;
+                        background: row.tint;
+                    }
+                    Rectangle {
+                        x: parent.width * max(0, root.system-storage.usage / 100 - root.system-storage.other);
+                        width: parent.width * root.system-storage.other;
+                        background: #9e9e9e;
+                        animate x, width { duration: 300ms; }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 3px;
+                    SystemDetail { title: root.loc("system_storage_used"); value: root.system-storage.used; }
+                    SystemDetail { title: root.loc("system_storage_free"); value: root.system-storage.free; }
+                    SystemDetail { title: root.loc("system_storage_total"); value: root.system-storage.total; }
+                }
+                Rectangle { height: 1px; background: Theme.raised; }
+                Scroller {
+                    min-height: 0px;
+                    VerticalLayout {
+                        spacing: 2px;
+                        for row in root.system-storage.rows : SystemDetail {
+                            height: 26px;
+                            title: root.loc(row.label-key);
+                            value: row.size;
+                            tint: row.tint;
+                            marker-size: 12px;
+                            marker-radius: 3px;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    VerticalLayout {
+        spacing: 8px;
+        width: (root.width - 28px) / 2;
+        GlassCard {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 6px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    SystemHeading { text: root.loc("system_updates"); horizontal-stretch: 1; }
+                    Md3Button {
+                        filled: true;
+                        label: root.updating-manager != "" ? root.loc("system_updates_updating") : root.loc("system_updates_update_all");
+                        enabled: root.updates-available && !root.updates-running && !root.updates-checking && root.updating-manager == "";
+                        clicked => { root.update-all(); }
+                    }
+                    Rectangle {
+                        width: 34px;
+                        height: 34px;
+                        border-radius: 17px;
+                        background: refresh-hit.pressed ? Theme.elevated : transparent;
+                        Image {
+                            source: @image-url("../icons/mdi/refresh.svg");
+                            width: 18px;
+                            height: 18px;
+                            colorize: Theme.text;
+                            transform-rotation: root.updates-checking ? 360deg * mod(animation-tick(), 900ms) / 900ms : 0deg;
+                        }
+                        accessible-role: button;
+                        accessible-label: root.loc("system_updates_refresh");
+                        refresh-hit := TouchArea {
+                            enabled: !root.updates-running && root.updating-manager == "";
+                            clicked => { root.update-refresh(); }
+                        }
+                    }
+                }
+                if root.updates.length == 0 : DrawerEmpty {
+                    text: root.loc("system_updates_no_state");
+                    font-size: 12px;
+                }
+                if root.updates.length > 0 : Scroller {
+                    min-height: 0px;
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: start;
+                        for item in root.updates : Rectangle {
+                            border-radius: 12px;
+                            background: item.available ? Theme.elevated : transparent;
+                            min-height: update-content.min-height;
+                            preferred-height: update-content.preferred-height;
+                            update-content := VerticalLayout {
+                                alignment: start;
+                                padding: 3px;
+                                spacing: 3px;
+                                HorizontalLayout {
+                                    min-height: item.id == "system" && item.preview != "" ? 64px : 46px;
+                                    spacing: 6px;
+                                    Image {
+                                        width: 18px;
+                                        height: 18px;
+                                        colorize: Theme.text;
+                                        source: item.git ? @image-url("../icons/mdi/git.svg") : @image-url("../icons/mdi/package-variant.svg");
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 2px;
+                                        HorizontalLayout {
+                                            alignment: start;
+                                            spacing: 6px;
+                                            SystemHeading { text: item.id; }
+                                            Rectangle {
+                                                width: update-status.preferred-width + 14px;
+                                                height: 20px;
+                                                border-radius: 10px;
+                                                background: item.updating ? Theme.primary : item.available ? Theme.error : Theme.raised;
+                                                update-status := Text {
+                                                    text: item.updating ? root.loc("system_updates_updating")
+                                                        : item.checking ? root.loc("system_updates_checking")
+                                                        : item.available ? root.loc("system_updates_available") : root.loc("system_updates_up_to_date");
+                                                    color: item.updating ? Theme.on-primary : item.available ? Theme.on-error : Theme.muted;
+                                                    font-size: 12px;
+                                                    font-weight: 600;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                        Text {
+                                            text: item.error != "" ? item.error : item.id == "system" ? root.fill-text(root.loc("system_updates_package_count"), "{count}", item.count + "") : item.version;
+                                            color: item.error != "" ? Theme.error : Theme.muted;
+                                            font-size: 12px;
+                                            overflow: elide;
+                                        }
+                                        if item.preview != "" : Text { text: item.preview; color: Theme.muted; font-size: 12px; overflow: elide; }
+                                    }
+                                    Md3Button {
+                                        label: root.loc("system_updates_update");
+                                        height: 28px;
+                                        filled: true;
+                                        enabled: item.active && root.updating-manager == ""
+                                            && !(item.id == "backend" ? root.updates-running : root.backend-update-running);
+                                        clicked => { root.run-update(item.id); }
+                                    }
+                                }
+                                if item.updating && (item.stage != "" || item.progress >= 0) : SystemProgress {
+                                    label: root.update-stage(item.stage);
+                                    value: item.progress;
+                                }
+                                if item.updating && item.package != "" : SystemProgress { label: item.package; value: item.package-progress; }
+                                if item.updating && item.message != "" : Text {
+                                    text: item.message; color: Theme.muted; font-size: 10px; wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        GlassCard {
+            height: 118px;
+            VerticalLayout {
+                padding: 14px;
+                spacing: 8px;
+                alignment: start;
+                DrawerTitle { text: root.loc("language"); }
+                SystemLanguage {
+                    language: root.language;
+                    english: root.loc("english");
+                    german: root.loc("german");
+                    selected(code) => { root.choose-language(code); }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,488 @@
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { BluetoothRow, EthernetRow, SavedWifiRow, WifiRow } from "../types.slint";
+import { DashboardSwitch, DialogScrim, DrawerEmpty, DrawerRowText, DrawerTitle, Md3Button, Md3Card, Scroller } from "common.slint";
+import { DrawerBluetoothDevice } from "drawer.slint";
+
+export component NetworkDrawer inherits Rectangle {
+    in-out property <bool> network-drawer-open;
+    in-out property <string> wifi-name;
+    in property <string> drawer-network-error;
+    in-out property <string> drawer-error;
+    in property <bool> wifi-enabled;
+    in property <bool> wifi-available;
+    in property <bool> bluetooth-available;
+    in property <bool> bluetooth-powered;
+    in property <bool> bluetooth-scanning;
+    in property <bool> bluetooth-busy;
+    in-out property <string> bluetooth-error;
+    in property <int> bluetooth-connected-count;
+    in-out property <bool> touch-keyboard-open;
+    in property <bool> drawer-busy;
+    in property <[WifiRow]> wifi;
+    in property <[EthernetRow]> ethernet;
+    in property <[SavedWifiRow]> saved-wifi;
+    in property <[BluetoothRow]> paired-devices;
+    in property <[BluetoothRow]> discovered-devices;
+    in property <string> commander-url;
+    in property <image> commander-qr;
+    in-out property <string> wifi-target;
+    in-out property <string> wifi-password;
+    in property <bool> dashboard-picker-open;
+    in property <bool> gpu-effects;
+    pure callback fill-text(string, string, string) -> string;
+    callback drawer-command(string, string, string);
+    pure callback loc(string) -> string;
+
+    property <bool> drawer-dragging: false;
+    property <length> drawer-delta: 0px;
+    property <duration> drawer-drag-start: 0ms;
+    property <bool> saved-wifi-open: false;
+    property <string> forget-name;
+    property <string> drawer-pairing;
+    property <string> confirm-forget;
+
+    pure function connection-status(connected: bool) -> string {
+        return connected ? root.loc("connected") : root.loc("disconnected");
+    }
+    function start-drawer-drag() {
+        root.drawer-delta = 0px;
+        root.drawer-drag-start = animation-tick();
+        root.drawer-dragging = true;
+    }
+    function settle-drawer(distance: length, opening: bool) {
+        let far-enough = distance > root.height * 0.28;
+        let fast-enough = distance > 20px && distance / 1px > (animation-tick() - root.drawer-drag-start) / 1s * 850;
+        let tap = abs(distance / 1px) < 8;
+        root.drawer-dragging = false;
+        root.network-drawer-open = (far-enough || fast-enough || (!opening && tap)) ? opening : !opening;
+    }
+
+    changed network-drawer-open => {
+        if !root.network-drawer-open {
+            root.saved-wifi-open = false;
+            root.confirm-forget = "";
+        }
+    }
+
+    // The gesture areas stay stationary while the sheet follows the finger.
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        y: root.drawer-dragging
+            ? clamp((root.network-drawer-open ? 0px : -self.height) + root.drawer-delta, -self.height, 0px)
+            : root.network-drawer-open ? 0px : -self.height;
+        animate y { duration: root.drawer-dragging ? 0ms : 190ms; easing: cubic-bezier(0.33, 1, 0.68, 1); }
+        visible: self.y > -self.height;
+        background: Theme.background;
+        TouchArea { }
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 10px;
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 10px;
+                    if root.ethernet.length > 0 : Md3Card {
+                        height: min(max(100px, 50px + root.ethernet.length * 38px), max(100px, root.height * 0.36));
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 8px;
+                            DrawerTitle { text: root.loc("ethernet"); }
+                            Scroller {
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    for row in root.ethernet : HorizontalLayout {
+                                        height: 32px;
+                                        spacing: 8px;
+                                        DrawerRowText {
+                                            title: row.id;
+                                            detail: root.connection-status(row.connected);
+                                            active: row.connected;
+                                        }
+                                        DashboardSwitch {
+                                            checked: row.enabled;
+                                            enabled: !root.drawer-busy;
+                                            toggled => { root.drawer-command(row.enabled ? "ethernet-off" : "ethernet-on", row.id, ""); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Md3Card {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 8px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                DrawerTitle { text: root.loc("wifi"); horizontal-stretch: 1; }
+                                Md3Button {
+                                    label: root.loc("saved_wifi");
+                                    clicked => { root.saved-wifi-open = true; }
+                                }
+                                DashboardSwitch {
+                                    checked: root.wifi-enabled;
+                                    enabled: root.wifi-available && !root.drawer-busy;
+                                    toggled => { root.drawer-command(root.wifi-enabled ? "wifi-off" : "wifi-on", "", ""); }
+                                }
+                            }
+                            if root.drawer-network-error != "" : Text {
+                                text: root.drawer-network-error;
+                                color: Theme.error;
+                                font-size: 11px;
+                                overflow: elide;
+                            }
+                            if !root.wifi-enabled || root.wifi.length == 0 : DrawerEmpty {
+                                text: root.wifi-enabled ? root.loc("no_wifi_networks")
+                                    : root.wifi-available ? root.loc("wifi_disabled")
+                                        : root.loc("wifi_unavailable");
+                            }
+                            if root.wifi-enabled && root.wifi.length > 0 : Scroller {
+                                vertical-stretch: 1;
+                                min-height: 0px;
+                                VerticalLayout {
+                                    spacing: 5px;
+                                    for row in root.wifi : Md3Card {
+                                        height: 46px;
+                                        border-radius: 12px;
+                                        background: row.connected ? Theme.primary-container : Theme.raised;
+                                        HorizontalLayout {
+                                            padding: 9px;
+                                            spacing: 8px;
+                                            DrawerRowText {
+                                                title: row.name;
+                                                detail: row.connected ? root.connection-status(true)
+                                                    : row.profile != "" ? root.loc("saved") : "";
+                                                active: row.connected;
+                                            }
+                                            Text { text: row.signal + "%"; color: Theme.muted; font-size: 10px; vertical-alignment: center; }
+                                        }
+                                        TouchArea {
+                                            enabled: !root.drawer-busy;
+                                            clicked => {
+                                                if row.connected {
+                                                    root.drawer-command("wifi-disconnect", row.device, "");
+                                                } else if row.profile != "" {
+                                                    root.drawer-command("wifi-saved", row.profile, "");
+                                                } else if !row.secured {
+                                                    root.drawer-command("wifi-connect", row.id, "");
+                                                } else {
+                                                    root.wifi-target = row.id;
+                                                    root.wifi-name = row.name;
+                                                    root.wifi-password = "";
+                                                    root.touch-keyboard-open = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 10px;
+                    Md3Card {
+                        height: min(244px, max(160px, root.height - 178px));
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 7px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                DrawerTitle { text: root.loc("bluetooth"); horizontal-stretch: 1; }
+                                Md3Button {
+                                    label: root.bluetooth-scanning ? root.loc("bluetooth_stop_scan") : root.loc("bluetooth_scan");
+                                    enabled: root.bluetooth-powered && !root.bluetooth-busy;
+                                    clicked => { root.drawer-command(root.bluetooth-scanning ? "bt-stop-scan" : "bt-scan", "", ""); }
+                                }
+                                DashboardSwitch {
+                                    checked: root.bluetooth-powered;
+                                    enabled: root.bluetooth-available && !root.bluetooth-busy;
+                                    toggled => { root.drawer-command(root.bluetooth-powered ? "bluetooth-off" : "bluetooth-on", "", ""); }
+                                }
+                            }
+                            Text {
+                                text: !root.bluetooth-available ? root.loc("bluetooth_unavailable")
+                                    : !root.bluetooth-powered ? root.loc("bluetooth_disabled")
+                                    : root.bluetooth-scanning
+                                        ? root.loc("bluetooth_scanning")
+                                        : root.fill-text(root.fill-text(root.loc("bluetooth_device_counts"), "{paired}", root.paired-devices.length + ""), "{connected}", root.bluetooth-connected-count + "");
+                                color: root.bluetooth-scanning ? Theme.primary : Theme.muted;
+                                font-size: 10px;
+                                max-height: 12px;
+                                overflow: elide;
+                            }
+                            if root.bluetooth-error != "" : HorizontalLayout {
+                                spacing: 6px;
+                                Text {
+                                    text: root.loc(root.bluetooth-error);
+                                    color: Theme.error;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                                Md3Button { label: "×"; height: 28px; clicked => { root.bluetooth-error = ""; } }
+                            }
+                            if root.bluetooth-powered && root.paired-devices.length == 0 &&
+                                (!root.bluetooth-scanning || root.discovered-devices.length == 0) : DrawerEmpty {
+                                text: root.bluetooth-scanning ? root.loc("bluetooth_scanning")
+                                    : root.loc("bluetooth_no_paired");
+                            }
+                            if root.bluetooth-powered && (root.paired-devices.length > 0 ||
+                                (root.bluetooth-scanning && root.discovered-devices.length > 0)) : Scroller {
+                                vertical-stretch: 1;
+                                min-height: 0px;
+                                VerticalLayout {
+                                    alignment: start;
+                                    spacing: 6px;
+                                    if root.paired-devices.length > 0 : Text {
+                                        text: root.loc("bluetooth_paired"); color: Theme.muted; font-size: 10px;
+                                    }
+                                    for row in root.paired-devices : DrawerBluetoothDevice {
+                                        device: row;
+                                        status: root.connection-status(row.connected);
+                                        paired: true;
+                                        enabled: !root.bluetooth-busy;
+                                        activated => { root.drawer-command(row.connected ? "bt-disconnect" : "bt-connect", row.id, ""); }
+                                        removed => { root.drawer-command("bt-remove", row.id, ""); }
+                                    }
+                                    if root.bluetooth-scanning && root.discovered-devices.length > 0 : Text {
+                                        text: root.loc("bluetooth_discovered"); color: Theme.muted; font-size: 10px;
+                                    }
+                                    if root.bluetooth-scanning && root.discovered-devices.length > 0 : VerticalLayout {
+                                        spacing: 6px;
+                                        for row in root.discovered-devices : DrawerBluetoothDevice {
+                                            device: row;
+                                            status: root.bluetooth-busy && root.drawer-pairing == row.id
+                                                ? root.loc("bluetooth_pairing") : root.loc("bluetooth_pair");
+                                            enabled: !root.bluetooth-busy;
+                                            activated => {
+                                                root.drawer-pairing = row.id;
+                                                root.drawer-command("bt-pair", row.id, "");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Md3Card {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 4px;
+                            DrawerTitle { text: root.loc("web_access"); }
+                            Rectangle {
+                                if root.commander-url != "" : Image {
+                                    width: max(0px, min(260px, min(parent.width - 8px, parent.height - 4px)));
+                                    height: self.width;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    source: root.commander-qr;
+                                    image-fit: contain;
+                                    image-rendering: pixelated;
+                                }
+                            }
+                            Text {
+                                text: root.commander-url != "" ? root.commander-url : root.loc("no_ip");
+                                color: Theme.muted;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                wrap: char-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+            Rectangle { height: 28px; }
+        }
+        if root.drawer-error != "" : Rectangle {
+            x: 14px;
+            y: parent.height - self.height - 52px;
+            width: parent.width - 28px;
+            height: 44px;
+            border-radius: 12px;
+            background: Theme.elevated;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 8px;
+                spacing: 8px;
+                Text { text: root.drawer-error; color: Theme.error; font-size: 12px; vertical-alignment: center; wrap: word-wrap; overflow: elide; horizontal-stretch: 1; }
+                Md3Button { label: "×"; clicked => { root.drawer-error = ""; } }
+            }
+        }
+        if root.network-drawer-open : Rectangle {
+            width: 48px;
+            height: 5px;
+            x: (parent.width - self.width) / 2;
+            y: parent.height - (28px + self.height) / 2;
+            border-radius: 3px;
+            background: Theme.muted;
+        }
+    }
+    TouchArea {
+        y: 0px;
+        width: parent.width;
+        height: 20px;
+        enabled: !root.network-drawer-open && !root.touch-keyboard-open && !root.dashboard-picker-open;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                root.start-drawer-drag();
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left && root.drawer-dragging {
+                root.settle-drawer(self.mouse-y - self.pressed-y, true);
+            } else if event.kind == PointerEventKind.cancel && root.drawer-dragging {
+                root.drawer-dragging = false;
+            }
+        }
+        moved => { if root.drawer-dragging { root.drawer-delta = self.mouse-y - self.pressed-y; } }
+    }
+    TouchArea {
+        y: parent.height - 28px;
+        width: parent.width;
+        height: 28px;
+        enabled: root.network-drawer-open && !root.touch-keyboard-open;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                root.start-drawer-drag();
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left && root.drawer-dragging {
+                root.settle-drawer(self.pressed-y - self.mouse-y, false);
+            } else if event.kind == PointerEventKind.cancel && root.drawer-dragging {
+                root.drawer-dragging = false;
+            }
+        }
+        moved => { if root.drawer-dragging { root.drawer-delta = self.mouse-y - self.pressed-y; } }
+    }
+
+    if root.network-drawer-open && root.saved-wifi-open : saved-wifi-dialog := DialogScrim {
+        animated: root.gpu-effects;
+        TouchArea { }
+        Md3Card {
+            opacity: saved-wifi-dialog.progress;
+            transform-scale: 0.94 + 0.06 * saved-wifi-dialog.progress;
+            width: min(520px, parent.width - 32px);
+            height: min(parent.height - 32px, 102px + clamp(root.saved-wifi.length * 62px, 100px, 360px));
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                DrawerTitle { text: root.loc("saved_wifi"); }
+                if root.saved-wifi.length == 0 : DrawerEmpty {
+                    text: root.loc("no_saved_wifi");
+                }
+                if root.saved-wifi.length > 0 : Scroller {
+                    vertical-stretch: 1;
+                    min-height: 0px;
+                    VerticalLayout {
+                        spacing: 8px;
+                        for row in root.saved-wifi : Md3Card {
+                            height: 54px;
+                            border-radius: 12px;
+                            background: Theme.raised;
+                            HorizontalLayout {
+                                padding: 10px;
+                                spacing: 10px;
+                                DrawerRowText { title: row.name; detail: root.connection-status(row.connected); active: row.connected; }
+                                Md3Button {
+                                    label: root.loc("delete");
+                                    enabled: !root.drawer-busy;
+                                    clicked => { root.confirm-forget = row.id; root.forget-name = row.name; }
+                                }
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    Md3Button { label: root.loc("cancel"); clicked => { root.saved-wifi-open = false; } }
+                }
+            }
+        }
+    }
+    if root.network-drawer-open && root.confirm-forget != "" : forget-wifi-dialog := DialogScrim {
+        animated: root.gpu-effects;
+        TouchArea { }
+        Md3Card {
+            opacity: forget-wifi-dialog.progress;
+            transform-scale: 0.94 + 0.06 * forget-wifi-dialog.progress;
+            width: min(440px, parent.width - 32px);
+            height: 148px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+                DrawerTitle { text: root.loc("delete_saved_wifi"); }
+                Text {
+                    text: root.fill-text(root.loc("delete_saved_wifi_text"), "%1", root.forget-name);
+                    color: Theme.muted;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+                    Md3Button { label: root.loc("cancel"); clicked => { root.confirm-forget = ""; } }
+                    Md3Button {
+                        label: root.loc("delete");
+                        filled: true;
+                        clicked => { root.drawer-command("wifi-forget", root.confirm-forget, ""); root.confirm-forget = ""; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component WifiPasswordDialog inherits DialogScrim {
+    in property <string> wifi-name;
+    in-out property <bool> touch-keyboard-open;
+    in property <bool> drawer-busy;
+    in-out property <string> wifi-password;
+    in property <length> keyboard-height;
+    callback close-wifi-password();
+    callback submit-wifi-password();
+    pure callback loc(string) -> string;
+
+    TouchArea { }
+    Md3Card {
+        opacity: root.progress;
+        transform-scale: 0.94 + 0.06 * root.progress;
+        width: min(parent.width - 32px, 420px);
+        height: 170px;
+        x: (parent.width - self.width) / 2;
+        y: root.touch-keyboard-open ? max(8px, (parent.height - root.keyboard-height - self.height) / 2)
+            : (parent.height - self.height) / 2;
+        VerticalLayout {
+            padding: 16px;
+            spacing: 8px;
+            DrawerTitle { text: root.loc("wifi_connect"); }
+            Text { text: root.wifi-name; color: Theme.muted; font-size: 13px; overflow: elide; }
+            password := LineEdit {
+                text <=> root.wifi-password;
+                placeholder-text: root.loc("wifi_password_hint");
+                input-type: InputType.password;
+                accepted => { root.submit-wifi-password(); }
+                changed has-focus => { if self.has-focus { root.touch-keyboard-open = true; } }
+            }
+            HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+                Md3Button { label: root.loc("cancel"); clicked => { root.close-wifi-password(); } }
+                Md3Button {
+                    label: root.loc("connect");
+                    filled: true;
+                    enabled: root.wifi-password != "" && !root.drawer-busy;
+                    clicked => { root.submit-wifi-password(); }
+                }
+            }
+        }
+        init => { password.focus(); }
+    }
+}

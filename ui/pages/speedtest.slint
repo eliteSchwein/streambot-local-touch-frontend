@@ -1,0 +1,40 @@
+import { Theme } from "../theme.slint";
+import { Md3Button } from "../components/common.slint";
+import { SpeedMetric } from "../components/system.slint";
+
+export component SpeedtestPage inherits VerticalLayout {
+    in property <string> connection;
+    in property <string> speedtest-stage;
+    in property <string> speedtest-ping;
+    in property <string> speedtest-download;
+    in property <string> speedtest-upload;
+    in property <string> speedtest-error;
+    in property <bool> speedtest-starting;
+    in property <bool> speedtest-running;
+    callback speedtest-start();
+    pure callback loc(string) -> string;
+
+    padding: 12px;
+    spacing: 8px;
+    HorizontalLayout {
+        spacing: 8px;
+        vertical-stretch: 1;
+        SpeedMetric { width: (root.width - 40px) / 3; title: root.loc("speedtest_ping"); glyph: "◷"; value: root.speedtest-ping; active: root.speedtest-stage == "ping"; }
+        SpeedMetric { width: (root.width - 40px) / 3; title: root.loc("speedtest_download"); glyph: "↓"; value: root.speedtest-download; active: root.speedtest-stage == "download"; }
+        SpeedMetric { width: (root.width - 40px) / 3; title: root.loc("speedtest_upload"); glyph: "↑"; value: root.speedtest-upload; active: root.speedtest-stage == "upload"; }
+    }
+    if root.speedtest-error != "" : Text {
+        text: root.speedtest-error; color: Theme.error; font-size: 12px; wrap: word-wrap;
+    }
+    Md3Button {
+        height: 44px;
+        width: parent.width - 24px;
+        border-radius: 22px;
+        filled: true;
+        enabled: root.connection == "Connected" && !root.speedtest-running && !root.speedtest-starting;
+        label: root.speedtest-running ? root.loc("speedtest_running")
+            : root.speedtest-starting ? root.loc("speedtest_starting")
+            : root.loc("speedtest_run");
+        clicked => { root.speedtest-start(); }
+    }
+}

@@ -1,0 +1,120 @@
+import { Theme } from "../theme.slint";
+import { ActionRow, ChannelPointRow } from "../types.slint";
+import { DrawerEmpty, KioskSearch, ListTile, PillButton, Scroller } from "../components/common.slint";
+
+export component ControlsPage inherits VerticalLayout {
+    in property <string> connection;
+    in property <[string]> shown-macros;
+    in property <[ActionRow]> shown-auto-macros;
+    in property <[ChannelPointRow]> shown-channel-points;
+    in-out property <string> search;
+    in-out property <int> macro-tab;
+    in-out property <bool> touch-keyboard-open;
+    in property <length> keyboard-height;
+    callback trigger-macro(string);
+    callback toggle-auto-macro(string, bool);
+    callback toggle-channel-point(string);
+    pure callback loc(string) -> string;
+    callback hide-keyboard();
+
+    padding: 10px;
+    padding-bottom: root.touch-keyboard-open ? max(10px, root.keyboard-height - 42px) : 10px;
+    spacing: 8px;
+    HorizontalLayout {
+        spacing: 8px;
+        PillButton { min-width: 132px; label: root.loc("macros"); selected: root.macro-tab == 0; clicked => { root.macro-tab = 0; } }
+        PillButton { min-width: 132px; label: root.loc("auto_macros"); selected: root.macro-tab == 1; clicked => { root.macro-tab = 1; } }
+        PillButton { min-width: 160px; label: root.loc("channel_points"); selected: root.macro-tab == 2; clicked => { root.macro-tab = 2; } }
+    }
+    KioskSearch {
+        background: Theme.raised.with-alpha(0.94);
+        placeholder-text: root.loc(root.macro-tab == 0 ? "macro_search"
+            : root.macro-tab == 1 ? "auto_macro_search" : "channel_points_search");
+        text <=> root.search;
+        activated => { root.touch-keyboard-open = true; }
+        accepted => { root.hide-keyboard(); }
+    }
+    if root.macro-tab == 0 && root.shown-macros.length == 0 : DrawerEmpty {
+        text: root.loc("macro_no_results");
+    }
+    if root.macro-tab == 0 && root.shown-macros.length > 0 : Scroller {
+        vertical-stretch: 1;
+        VerticalLayout {
+            alignment: start;
+            grid-0 := Rectangle {
+                property <length> gap: 8px;
+                property <int> columns: self.width >= 640px ? 2 : 1;
+                property <length> tile-width: (self.width - (self.columns - 1) * self.gap) / self.columns;
+                height: ceil(root.shown-macros.length / self.columns) * (60px + self.gap) - self.gap;
+                for item[i] in root.shown-macros : ListTile {
+                    x: mod(i, grid-0.columns) * (grid-0.tile-width + grid-0.gap);
+                    y: floor(i / grid-0.columns) * (60px + grid-0.gap);
+                    width: grid-0.tile-width;
+                    title: item;
+                    trailing: "play";
+                    enabled: root.connection == "Connected";
+                    clicked => { root.trigger-macro(item); }
+                }
+            }
+        }
+    }
+    if root.macro-tab == 1 && root.shown-auto-macros.length == 0 : DrawerEmpty {
+        text: root.loc("auto_macro_no_results");
+    }
+    if root.macro-tab == 1 && root.shown-auto-macros.length > 0 : Scroller {
+        vertical-stretch: 1;
+        VerticalLayout {
+            alignment: start;
+            grid-1 := Rectangle {
+                property <length> gap: 8px;
+                property <int> columns: self.width >= 640px ? 2 : 1;
+                property <length> tile-width: (self.width - (self.columns - 1) * self.gap) / self.columns;
+                height: ceil(root.shown-auto-macros.length / self.columns) * (60px + self.gap) - self.gap;
+                for item[i] in root.shown-auto-macros : ListTile {
+                    x: mod(i, grid-1.columns) * (grid-1.tile-width + grid-1.gap);
+                    y: floor(i / grid-1.columns) * (60px + grid-1.gap);
+                    width: grid-1.tile-width;
+                    title: item.label;
+                    highlighted: item.active;
+                    trailing: "switch";
+                    checked: item.active;
+                    enabled: root.connection == "Connected";
+                    clicked => { root.toggle-auto-macro(item.id, !item.active); }
+                }
+            }
+        }
+    }
+    if root.macro-tab == 2 && root.shown-channel-points.length == 0 : DrawerEmpty {
+        text: root.loc("channel_points_no_results");
+    }
+    if root.macro-tab == 2 && root.shown-channel-points.length > 0 : Scroller {
+        vertical-stretch: 1;
+        VerticalLayout {
+            alignment: start;
+            grid-2 := Rectangle {
+                property <length> gap: 8px;
+                property <int> columns: self.width >= 640px ? 2 : 1;
+                property <length> tile-width: (self.width - (self.columns - 1) * self.gap) / self.columns;
+                height: ceil(root.shown-channel-points.length / self.columns) * (60px + self.gap) - self.gap;
+                for item[i] in root.shown-channel-points : ListTile {
+                    x: mod(i, grid-2.columns) * (grid-2.tile-width + grid-2.gap);
+                    y: floor(i / grid-2.columns) * (60px + grid-2.gap);
+                    width: grid-2.tile-width;
+                    title: item.label;
+                    subtitle: item.subtitle;
+                    show-leading: true;
+                    leading-image: item.image;
+                    leading-icon: @image-url("../icons/mdi/play.svg");
+                    leading-tint: item.tint;
+                    leading-loading: item.image-loading;
+                    leading-dim: !item.active;
+                    highlighted: item.active;
+                    trailing: "switch";
+                    checked: item.active;
+                    enabled: root.connection == "Connected";
+                    clicked => { root.toggle-channel-point(item.id); }
+                }
+            }
+        }
+    }
+}

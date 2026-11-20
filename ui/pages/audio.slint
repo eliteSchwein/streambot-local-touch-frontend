@@ -1,0 +1,43 @@
+import { Theme } from "../theme.slint";
+import { AudioEntry } from "../types.slint";
+import { DrawerEmpty, Scroller } from "../components/common.slint";
+import { KioskAudioRow } from "../components/audio.slint";
+
+export component AudioPage inherits VerticalLayout {
+    in property <string> connection;
+    in property <[AudioEntry]> audio-interfaces;
+    callback open-routing(string);
+    callback change-volume(AudioEntry, float, bool);
+    pure callback loc(string) -> string;
+
+    padding: 10px;
+    if root.audio-interfaces.length == 0 : DrawerEmpty {
+        text: root.loc("audio_no_outputs");
+    }
+    if root.audio-interfaces.length > 0 : Scroller {
+        VerticalLayout {
+            spacing: 8px;
+            alignment: start;
+            for item[index] in root.audio-interfaces : VerticalLayout {
+                spacing: 8px;
+                if index > 0 && item.physical && !root.audio-interfaces[index - 1].physical : Rectangle {
+                    height: 1px;
+                    background: Theme.raised;
+                }
+                KioskAudioRow {
+                    item: item;
+                    ready: root.connection == "Connected";
+                    quieter: root.loc("audio_volume_down");
+                    louder: root.loc("audio_volume_up");
+                    route-label: root.loc("audio_link_outputs");
+                    mute-label: item.muted ? root.loc("audio_unmute") : root.loc("audio_mute");
+                    link-volume-label: root.loc("audio_per_link_hint");
+                    levels-label: root.loc("audio_per_link_short");
+                    volume(value) => { root.change-volume(item, value, false); }
+                    mute(value) => { root.change-volume(item, value, true); }
+                    routing => { root.open-routing(item.id); }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,51 @@
+import { Theme } from "../theme.slint";
+import { DialogScrim, PillButton } from "common.slint";
+
+export component PowerMenu inherits DialogScrim {
+    callback close();
+    callback power-action(string);
+    pure callback loc(string) -> string;
+
+    dim: 0.6;
+    TouchArea { clicked => { root.close(); } }
+    Rectangle {
+        opacity: root.progress;
+        transform-scale: 0.94 + 0.06 * root.progress;
+        width: min(parent.width - 40px, 440px);
+        height: 378px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 22px;
+        background: Theme.surface;
+        VerticalLayout {
+            padding: 18px;
+            spacing: 9px;
+            Text { text: root.loc("power_menu"); font-size: 22px; font-weight: 600; color: Theme.text; }
+            Rectangle {
+                height: 74px; background: Theme.elevated; border-radius: 14px;
+                HorizontalLayout { padding: 12px; spacing: 12px;
+                    Image { source: @image-url("../icons/mdi/power-standby.svg"); width: 36px; height: 36px; }
+                    VerticalLayout { Text { text: root.loc("shutdown_device"); color: Theme.text; font-size: 15px; } Text { text: root.loc("shutdown_device_text"); color: Theme.muted; font-size: 11px; } }
+                }
+                TouchArea { clicked => { root.power-action("poweroff"); } }
+            }
+            Rectangle {
+                height: 74px; background: Theme.elevated; border-radius: 14px;
+                HorizontalLayout { padding: 12px; spacing: 12px;
+                    Image { source: @image-url("../icons/mdi/restart.svg"); width: 36px; height: 36px; }
+                    VerticalLayout { Text { text: root.loc("restart_device"); color: Theme.text; font-size: 15px; } Text { text: root.loc("restart_device_text"); color: Theme.muted; font-size: 11px; } }
+                }
+                TouchArea { clicked => { root.power-action("reboot"); } }
+            }
+            Rectangle {
+                height: 74px; background: Theme.elevated; border-radius: 14px;
+                HorizontalLayout { padding: 12px; spacing: 12px;
+                    Image { source: @image-url("../icons/mdi/server.svg"); width: 36px; height: 36px; }
+                    VerticalLayout { Text { text: root.loc("restart_backend"); color: Theme.text; font-size: 15px; } Text { text: root.loc("restart_backend_text"); color: Theme.muted; font-size: 11px; } }
+                }
+                TouchArea { clicked => { root.power-action("restart-backend"); } }
+            }
+            HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { min-width: 108px; label: root.loc("cancel"); clicked => { root.close(); } } }
+        }
+    }
+}

@@ -1,0 +1,133 @@
+import { Slider } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { AudioEntry } from "../types.slint";
+import { DashboardSwitch, DialogScrim, DrawerEmpty, DrawerRowText, DrawerTitle, Md3Button, Md3Card, PillButton, Scroller } from "common.slint";
+import { AudioFader } from "audio.slint";
+
+export component AudioRoutingDialog inherits DialogScrim {
+    in property <[AudioEntry]> audio-interfaces;
+    in property <string> routing;
+    callback close();
+    callback link-output(string, string, bool);
+    callback per-link-control(string, bool);
+    callback link-volume(string, string, float);
+    pure callback loc(string) -> string;
+
+    TouchArea { clicked => { root.close(); } }
+    for device in root.audio-interfaces : Rectangle {
+        opacity: root.progress;
+        transform-scale: 0.94 + 0.06 * root.progress;
+        visible: device.routable && device.id == root.routing;
+        if device.routable && device.id == root.routing : Md3Card {
+            width: min(560px, parent.width - 36px);
+            height: min(parent.height - 36px, 364px);
+            TouchArea { }
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                DrawerTitle { text: device.label + " · " + root.loc("audio_outputs"); }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: root.loc("audio_per_link_control");
+                        color: Theme.text;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    DashboardSwitch {
+                        checked: device.per-link;
+                        toggled => { root.per-link-control(device.id, !device.per-link); }
+                    }
+                }
+                if device.links.length == 0 : DrawerEmpty {
+                    text: root.loc("audio_no_physical_outputs");
+                }
+                if device.links.length > 0 : Scroller {
+                    min-height: 0;
+                    VerticalLayout {
+                        alignment: start;
+                        spacing: 6px;
+                        for link in device.links : Md3Card {
+                            height: device.per-link && link.linked && link.present ? 80px : 48px;
+                            border-radius: 12px;
+                            background: Theme.elevated;
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 2px;
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Image {
+                                        width: 18px;
+                                        height: 18px;
+                                        source: link.linked ? @image-url("../icons/mdi/link-variant.svg") : @image-url("../icons/mdi/link-variant-off.svg");
+                                        colorize: link.linked ? Theme.primary : Theme.muted;
+                                    }
+                                    DrawerRowText {
+                                        title: link.label;
+                                        detail: !link.present ? root.loc("disconnected")
+                                            : link.linked ? root.loc("audio_linked") : root.loc("audio_not_linked");
+                                        active: link.linked;
+                                    }
+                                    if link.default-output : Text {
+                                        text: "★";
+                                        color: Theme.primary;
+                                        vertical-alignment: center;
+                                        accessible-label: root.loc("audio_default");
+                                    }
+                                    DashboardSwitch {
+                                        checked: link.linked;
+                                        toggled => { root.link-output(device.id, link.id, !link.linked); }
+                                    }
+                                }
+                                if device.per-link && link.linked && link.present : HorizontalLayout {
+                                    spacing: 8px;
+                                    fader := AudioFader {
+                                        minimum: device.minimum;
+                                        maximum: device.maximum;
+                                        step: device.step;
+                                        value: link.volume;
+                                        committed(value) => { root.link-volume(device.id, link.id, value); }
+                                    }
+                                    Text { text: round(fader.value * 100) + "%"; color: Theme.text; vertical-alignment: center; }
+                                }
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    Md3Button { label: root.loc("close"); clicked => { root.close(); } }
+                }
+            }
+        }
+    }
+}
+
+export component VolumeOsd inherits Rectangle {
+    callback close();
+    in property <AudioEntry> osd-item;
+    callback change-volume(AudioEntry, float, bool);
+    pure callback loc(string) -> string;
+
+    border-radius: 16px;
+    background: Theme.raised;
+    HorizontalLayout {
+        padding: 6px;
+        spacing: 8px;
+        Text { text: root.osd-item.label; color: Theme.text; vertical-alignment: center; }
+        PillButton {
+            min-width: 74px;
+            label: root.osd-item.muted ? root.loc("audio_unmute") : root.loc("audio_mute");
+            clicked => {
+                root.change-volume(root.osd-item, root.osd-item.muted ? root.osd-item.restore : 0, true);
+            }
+        }
+        Slider {
+            minimum: root.osd-item.minimum;
+            maximum: root.osd-item.maximum;
+            value: root.osd-item.volume;
+            released(value) => { root.change-volume(root.osd-item, value, false); }
+        }
+        PillButton { width: 40px; label: "×"; clicked => { root.close(); } }
+    }
+}

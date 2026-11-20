@@ -1,0 +1,278 @@
+import { Theme } from "../theme.slint";
+import { AutoMacroEntry, DashboardMacroEntry, InteractionEntry } from "../types.slint";
+import { DashboardInteractionsCard, DashboardMacroCard, DashboardMusicCard, SlotEditOverlay } from "../components/dashboard.slint";
+
+export component DashboardPage inherits HorizontalLayout {
+    in property <string> connection;
+    in property <bool> dashboard-editing;
+    in property <string> view-left-0;
+    in property <string> view-left-1;
+    in property <string> view-right-0;
+    in property <string> view-right-1;
+    in property <int> dashboard-selected-macros;
+    in property <int> dashboard-selected-auto-macros;
+    in property <[DashboardMacroEntry]> dashboard-macro-list;
+    in property <[InteractionEntry]> dashboard-interactions;
+    in property <[AutoMacroEntry]> dashboard-auto-macros;
+    in property <string> music-title;
+    in property <string> music-artist;
+    in property <bool> music-playing;
+    in property <bool> music-shuffle;
+    in property <bool> music-loop;
+    in property <bool> music-song-requests;
+    in property <float> music-progress;
+    in property <string> music-position;
+    in property <string> music-duration;
+    in property <[float]> cava-bars;
+    pure callback fill-text(string, string, string) -> string;
+    callback dashboard-open-picker(string);
+    callback remove-interaction(string);
+    callback trigger-macro(string);
+    callback toggle-auto-macro(string, bool);
+    callback music-action(string);
+    pure callback loc(string) -> string;
+    pure callback stage(float, float) -> float;
+
+    pure function interaction-meta(item: InteractionEntry) -> string {
+        let source-key = "interaction_source_" + item.source;
+        let state-key = "interaction_state_" + item.state;
+        let source = root.loc(source-key);
+        let state = root.loc(state-key);
+        return (source == source-key ? item.source : source) + " · " + (state == state-key ? item.state : state)
+            + (item.eta > 0 ? " · " + item.eta + "s" : "")
+            + (item.alerts > 0 ? " · " + root.loc("interaction_alerts") + " " + item.alerts : "");
+    }
+    // Empty slots are available for editing.
+    pure function slot-shown(card: string) -> bool {
+        return card != "" || root.dashboard-editing;
+    }
+    // A single visible slot fills the column.
+    pure function slot-height(other: string) -> length {
+        let column = root.height - 20px;
+        return root.slot-shown(other) ? (column - 8px) / 2 : column;
+    }
+    pure function slot-macros-label(card: string) -> string {
+        return card == "macros"
+            ? root.fill-text(root.loc("dashboard_selected_count"), "%1", root.dashboard-selected-macros + "")
+            : card == "auto_macros"
+                ? root.fill-text(root.loc("dashboard_selected_count"), "%1", root.dashboard-selected-auto-macros + "")
+                : "";
+    }
+    pure function card-name(card: string) -> string {
+        return root.loc(card == "" ? "dashboard_empty" : "dashboard_card_" + card);
+    }
+
+    padding: 10px;
+    spacing: 8px;
+    VerticalLayout {
+        spacing: 8px;
+        alignment: start;
+        width: (root.width - 28px) / 2;
+        if root.slot-shown(root.view-left-0) : Rectangle {
+            height: root.slot-height(root.view-left-1);
+            opacity: root.stage(0.22, 0.62);
+            transform-scale: 0.92 + 0.08 * root.stage(0.22, 0.62);
+            if root.view-left-0 == "interactions" : DashboardInteractionsCard {
+                items: root.dashboard-interactions;
+                empty-label: root.loc("no_interactions");
+                meta(item) => { return root.interaction-meta(item); }
+                remove(uuid) => { root.remove-interaction(uuid); }
+            }
+            if root.view-left-0 == "auto_macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                automatic: root.dashboard-auto-macros;
+                auto-mode: true;
+                empty-label: root.loc("no_auto_macros");
+                toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+            }
+            if root.view-left-0 == "macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                macros: root.dashboard-macro-list;
+                empty-label: root.loc("dashboard_no_macros");
+                run(name) => { root.trigger-macro(name); }
+            }
+            if root.view-left-0 == "music" : DashboardMusicCard {
+                title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                levels: root.cava-bars;
+                playing: root.music-playing;
+                shuffle: root.music-shuffle;
+                looping: root.music-loop;
+                requests: root.music-song-requests;
+                requests-label: root.loc("song_requests");
+                progress: root.music-progress;
+                position: root.music-position;
+                duration: root.music-duration;
+                action(name) => { root.music-action(name); }
+            }
+            if root.dashboard-editing : SlotEditOverlay {
+                empty: root.view-left-0 == "";
+                card-label: root.view-left-0 == "" ? root.loc("dashboard_choose_card") : root.card-name(root.view-left-0);
+                macros-label: root.slot-macros-label(root.view-left-0);
+                change-card => { root.dashboard-open-picker("slot:left-0"); }
+                choose-macros => { root.dashboard-open-picker(root.view-left-0); }
+            }
+        }
+        if root.slot-shown(root.view-left-1) : Rectangle {
+            height: root.slot-height(root.view-left-0);
+            opacity: root.stage(0.38, 0.78);
+            transform-scale: 0.92 + 0.08 * root.stage(0.38, 0.78);
+            if root.view-left-1 == "interactions" : DashboardInteractionsCard {
+                items: root.dashboard-interactions;
+                empty-label: root.loc("no_interactions");
+                meta(item) => { return root.interaction-meta(item); }
+                remove(uuid) => { root.remove-interaction(uuid); }
+            }
+            if root.view-left-1 == "auto_macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                automatic: root.dashboard-auto-macros;
+                auto-mode: true;
+                empty-label: root.loc("no_auto_macros");
+                toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+            }
+            if root.view-left-1 == "macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                macros: root.dashboard-macro-list;
+                empty-label: root.loc("dashboard_no_macros");
+                run(name) => { root.trigger-macro(name); }
+            }
+            if root.view-left-1 == "music" : DashboardMusicCard {
+                title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                levels: root.cava-bars;
+                playing: root.music-playing;
+                shuffle: root.music-shuffle;
+                looping: root.music-loop;
+                requests: root.music-song-requests;
+                requests-label: root.loc("song_requests");
+                progress: root.music-progress;
+                position: root.music-position;
+                duration: root.music-duration;
+                action(name) => { root.music-action(name); }
+            }
+            if root.dashboard-editing : SlotEditOverlay {
+                empty: root.view-left-1 == "";
+                card-label: root.view-left-1 == "" ? root.loc("dashboard_choose_card") : root.card-name(root.view-left-1);
+                macros-label: root.slot-macros-label(root.view-left-1);
+                change-card => { root.dashboard-open-picker("slot:left-1"); }
+                choose-macros => { root.dashboard-open-picker(root.view-left-1); }
+            }
+        }
+    }
+    VerticalLayout {
+        spacing: 8px;
+        alignment: start;
+        width: (root.width - 28px) / 2;
+        if root.slot-shown(root.view-right-0) : Rectangle {
+            height: root.slot-height(root.view-right-1);
+            opacity: root.stage(0.3, 0.7);
+            transform-scale: 0.92 + 0.08 * root.stage(0.3, 0.7);
+            if root.view-right-0 == "interactions" : DashboardInteractionsCard {
+                items: root.dashboard-interactions;
+                empty-label: root.loc("no_interactions");
+                meta(item) => { return root.interaction-meta(item); }
+                remove(uuid) => { root.remove-interaction(uuid); }
+            }
+            if root.view-right-0 == "auto_macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                automatic: root.dashboard-auto-macros;
+                auto-mode: true;
+                empty-label: root.loc("no_auto_macros");
+                toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+            }
+            if root.view-right-0 == "macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                macros: root.dashboard-macro-list;
+                empty-label: root.loc("dashboard_no_macros");
+                run(name) => { root.trigger-macro(name); }
+            }
+            if root.view-right-0 == "music" : DashboardMusicCard {
+                title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                levels: root.cava-bars;
+                playing: root.music-playing;
+                shuffle: root.music-shuffle;
+                looping: root.music-loop;
+                requests: root.music-song-requests;
+                requests-label: root.loc("song_requests");
+                progress: root.music-progress;
+                position: root.music-position;
+                duration: root.music-duration;
+                action(name) => { root.music-action(name); }
+            }
+            if root.dashboard-editing : SlotEditOverlay {
+                empty: root.view-right-0 == "";
+                card-label: root.view-right-0 == "" ? root.loc("dashboard_choose_card") : root.card-name(root.view-right-0);
+                macros-label: root.slot-macros-label(root.view-right-0);
+                change-card => { root.dashboard-open-picker("slot:right-0"); }
+                choose-macros => { root.dashboard-open-picker(root.view-right-0); }
+            }
+        }
+        if root.slot-shown(root.view-right-1) : Rectangle {
+            height: root.slot-height(root.view-right-0);
+            opacity: root.stage(0.46, 0.86);
+            transform-scale: 0.92 + 0.08 * root.stage(0.46, 0.86);
+            if root.view-right-1 == "interactions" : DashboardInteractionsCard {
+                items: root.dashboard-interactions;
+                empty-label: root.loc("no_interactions");
+                meta(item) => { return root.interaction-meta(item); }
+                remove(uuid) => { root.remove-interaction(uuid); }
+            }
+            if root.view-right-1 == "auto_macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                automatic: root.dashboard-auto-macros;
+                auto-mode: true;
+                empty-label: root.loc("no_auto_macros");
+                toggle(name, enabled) => { root.toggle-auto-macro(name, enabled); }
+            }
+            if root.view-right-1 == "macros" : DashboardMacroCard {
+                enabled: root.connection == "Connected";
+                macros: root.dashboard-macro-list;
+                empty-label: root.loc("dashboard_no_macros");
+                run(name) => { root.trigger-macro(name); }
+            }
+            if root.view-right-1 == "music" : DashboardMusicCard {
+                title: root.music-title != "" ? root.music-title : root.loc("no_song");
+                artist: root.music-artist != "" ? root.music-artist : root.loc("unknown_artist");
+                levels: root.cava-bars;
+                playing: root.music-playing;
+                shuffle: root.music-shuffle;
+                looping: root.music-loop;
+                requests: root.music-song-requests;
+                requests-label: root.loc("song_requests");
+                progress: root.music-progress;
+                position: root.music-position;
+                duration: root.music-duration;
+                action(name) => { root.music-action(name); }
+            }
+            if root.dashboard-editing : SlotEditOverlay {
+                empty: root.view-right-1 == "";
+                card-label: root.view-right-1 == "" ? root.loc("dashboard_choose_card") : root.card-name(root.view-right-1);
+                macros-label: root.slot-macros-label(root.view-right-1);
+                change-card => { root.dashboard-open-picker("slot:right-1"); }
+                choose-macros => { root.dashboard-open-picker(root.view-right-1); }
+            }
+        }
+    }
+}
+
+export component DashboardFeedback inherits Rectangle {
+    in property <string> feedback;
+    in property <length> available-width;
+
+    y: 16px;
+    width: min(root.available-width - 32px, feedback-text.preferred-width + 28px);
+    height: 32px;
+    border-radius: 16px;
+    background: Theme.error;
+    feedback-text := Text {
+        x: 14px;
+        width: parent.width - 28px;
+        text: root.feedback;
+        color: Theme.on-error;
+        font-size: 11px;
+        font-weight: 600;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}

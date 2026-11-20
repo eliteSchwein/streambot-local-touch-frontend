@@ -116,7 +116,8 @@ mod tests {
 
     #[test]
     fn takes_the_newest_frame_and_ignores_other_targets() {
-        let packet = r#"{"params":{"target":"music_preview","raw":"1;2;3;4;5;\n10;20;30;40;50;60;\n"}}"#;
+        let packet =
+            r#"{"params":{"target":"music_preview","raw":"1;2;3;4;5;\n10;20;30;40;50;60;\n"}}"#;
         assert_eq!(parse(packet, 5), Some(vec![10.0, 20.0, 30.0, 40.0, 50.0]));
         let other = r#"{"params":{"target":"overlay","raw":"1;2;3;"}}"#;
         assert_eq!(parse(other, 5), None);

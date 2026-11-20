@@ -1,0 +1,161 @@
+import { Theme } from "../theme.slint";
+import { PickerEntry } from "../types.slint";
+import { DialogScrim, KioskSearch, ListTile, LoadingSpinner, PillButton, Scroller } from "common.slint";
+
+export component DashboardPicker inherits DialogScrim {
+    in-out property <bool> touch-keyboard-open;
+    callback close();
+    in property <bool> wallpaper-picker-loading;
+    in property <length> keyboard-height;
+    in property <string> dashboard-picker-kind;
+    in-out property <string> dashboard-picker-search;
+    in property <[PickerEntry]> dashboard-picker-items;
+    callback dashboard-filter(string);
+    callback dashboard-select-option(string);
+    callback dashboard-apply-picker();
+    pure callback loc(string) -> string;
+    callback hide-keyboard();
+
+    pure function card-name(card: string) -> string {
+        return root.loc(card == "" ? "dashboard_empty" : "dashboard_card_" + card);
+    }
+
+    TouchArea { clicked => { root.close(); } }
+    Rectangle {
+        opacity: root.progress;
+        transform-scale: 0.94 + 0.06 * root.progress;
+        property <bool> wallpapers: root.dashboard-picker-kind == "wallpaper";
+        width: self.wallpapers ? parent.width - 32px : min(parent.width - 44px, 600px);
+        height: self.wallpapers ? parent.height - 32px
+            : root.touch-keyboard-open ? min(parent.height - root.keyboard-height - 24px, 380px) : min(parent.height - 60px, 500px);
+        x: (parent.width - self.width) / 2;
+        y: root.touch-keyboard-open ? 12px : (parent.height - self.height) / 2;
+        border-radius: 20px;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.raised;
+        VerticalLayout {
+            padding: 16px;
+            spacing: 10px;
+            HorizontalLayout {
+                Text {
+                    text: root.loc(root.dashboard-picker-kind == "wallpaper" ? "dashboard_wallpaper_title"
+                        : root.dashboard-picker-kind == "macros" ? "dashboard_choose_macros"
+                        : root.dashboard-picker-kind == "auto_macros" ? "dashboard_choose_auto_macros" : "dashboard_choose_card");
+                    color: Theme.text;
+                    font-size: 18px;
+                    font-weight: 600;
+                    horizontal-stretch: 1;
+                }
+                PillButton { min-width: 68px; label: root.loc("close"); clicked => { root.close(); root.touch-keyboard-open = false; } }
+            }
+            if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
+                spacing: 8px;
+                search-entry := KioskSearch {
+                    horizontal-stretch: 1;
+                    placeholder-text: root.loc("dashboard_search");
+                    text <=> root.dashboard-picker-search;
+                    edited(search) => { root.dashboard-filter(search); }
+                    activated => { root.touch-keyboard-open = true; }
+                    accepted => { root.hide-keyboard(); }
+                }
+            }
+            if root.wallpaper-picker-loading && root.dashboard-picker-kind == "wallpaper" : VerticalLayout {
+                vertical-stretch: 1;
+                alignment: center;
+                spacing: 12px;
+                HorizontalLayout { alignment: center; LoadingSpinner { size: 40px; } }
+                Text { text: root.loc("dashboard_wallpaper_loading"); color: Theme.muted; font-size: 13px; horizontal-alignment: center; }
+            }
+            if root.dashboard-picker-kind == "wallpaper" && !root.wallpaper-picker-loading : Scroller {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    alignment: start;
+                    wallpaper-grid := Rectangle {
+                        property <length> gap: 10px;
+                        property <int> columns: max(2, floor((self.width + self.gap) / (200px + self.gap)));
+                        property <length> tile-width: (self.width - (self.columns - 1) * self.gap) / self.columns;
+                        property <length> tile-height: self.tile-width * 0.62;
+                        height: ceil(root.dashboard-picker-items.length / self.columns) * (self.tile-height + self.gap);
+                        for item[i] in root.dashboard-picker-items : Rectangle {
+                            x: mod(i, wallpaper-grid.columns) * (wallpaper-grid.tile-width + wallpaper-grid.gap);
+                            y: floor(i / wallpaper-grid.columns) * (wallpaper-grid.tile-height + wallpaper-grid.gap);
+                            width: wallpaper-grid.tile-width;
+                            height: wallpaper-grid.tile-height;
+                            border-radius: 14px;
+                            background: Theme.raised;
+                            clip: true;
+                            if item.name != "" : Image {
+                                width: parent.width;
+                                height: parent.height;
+                                source: item.thumbnail;
+                                image-fit: cover;
+                            }
+                            if item.name != "" && item.loading : LoadingSpinner {
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2 - 15px;
+                            }
+                            if item.name == "" : Image {
+                                width: 32px;
+                                height: 32px;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2 - 10px;
+                                source: @image-url("../icons/mdi/close.svg");
+                                colorize: Theme.muted;
+                            }
+                            Rectangle {
+                                y: parent.height - self.height;
+                                height: 30px;
+                                background: Theme.surface.with-alpha(0.82);
+                                Text {
+                                    x: 10px;
+                                    width: parent.width - 20px;
+                                    text: item.name == "" ? root.loc("dashboard_wallpaper_none") : item.name;
+                                    color: Theme.text;
+                                    font-size: 12px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+                            Rectangle {
+                                border-radius: 14px;
+                                border-width: item.selected ? 3px : wallpaper-tap.pressed ? 2px : 0px;
+                                border-color: item.selected ? Theme.primary : Theme.outline;
+                                background: wallpaper-tap.pressed ? Theme.background.with-alpha(0.3) : transparent;
+                            }
+                            if item.selected : Rectangle {
+                                x: parent.width - self.width - 8px;
+                                y: 8px;
+                                width: 28px;
+                                height: 28px;
+                                border-radius: 14px;
+                                background: Theme.primary;
+                                Image { width: 18px; height: 18px; source: @image-url("../icons/mdi/check.svg"); colorize: Theme.on-primary; }
+                            }
+                            wallpaper-tap := TouchArea { clicked => { root.dashboard-select-option(item.name); } }
+                        }
+                    }
+                }
+            }
+            if root.dashboard-picker-kind != "wallpaper" : Scroller {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    alignment: start;
+                    spacing: 8px;
+                    for item in root.dashboard-picker-items : ListTile {
+                        property <bool> multi: root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros";
+                        title: self.multi ? item.name : root.card-name(item.name);
+                        highlighted: item.selected;
+                        trailing: "check";
+                        checked: item.selected;
+                        clicked => { root.dashboard-select-option(item.name); }
+                    }
+                }
+            }
+            if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
+                Text { text: root.loc("dashboard_selection_limit"); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
+                PillButton { label: root.loc("apply"); selected: true; min-width: 90px; clicked => { root.dashboard-apply-picker(); } }
+            }
+        }
+    }
+}
