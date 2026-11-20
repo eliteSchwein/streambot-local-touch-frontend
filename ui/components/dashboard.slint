@@ -118,25 +118,79 @@ export component DashboardMacroCard inherits GlassCard {
     }
 }
 
-export component MusicIconButton inherits Rectangle {
-    in property <string> glyph: "";
+component MusicIconButton inherits Rectangle {
+    in property <image> icon;
     in property <bool> filled: false;
     in property <bool> selected: false;
     in property <length> diameter: root.filled ? 46px : 40px;
     callback clicked();
     width: root.diameter;
-    height: self.width;
-    border-radius: self.width / 2;
-    background: root.filled || root.selected ? Theme.primary : music-tap.pressed ? Theme.elevated : transparent;
-    Text {
-        text: root.glyph;
-        color: root.filled || root.selected ? Theme.on-primary : Theme.text;
-        font-size: root.width * (root.filled ? 0.48 : 0.47);
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    height: root.diameter;
+    Rectangle {
+        width: root.diameter;
+        height: root.diameter;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: self.width / 2;
+        background: root.filled || root.selected ? Theme.primary : music-tap.pressed ? Theme.elevated : transparent;
+        Image {
+            width: root.diameter * 0.56;
+            height: self.width;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            source: root.icon;
+            colorize: root.filled || root.selected ? Theme.on-primary : Theme.text;
+        }
     }
     music-tap := TouchArea { clicked => { root.clicked(); } }
+}
+
+component MusicTransportControls inherits HorizontalLayout {
+    in property <bool> compact;
+    in property <bool> playing;
+    in property <bool> shuffle;
+    in property <bool> looping;
+    callback action(string);
+
+    property <length> button-diameter: root.compact ? 38px : 48px;
+    property <length> play-diameter: root.compact ? 44px : 64px;
+    height: root.play-diameter;
+    vertical-stretch: 0;
+    alignment: space-around;
+
+    MusicIconButton {
+        height: root.height;
+        diameter: root.button-diameter;
+        icon: @image-url("../icons/mdi/shuffle.svg");
+        selected: root.shuffle;
+        clicked => { root.action("shuffle"); }
+    }
+    MusicIconButton {
+        height: root.height;
+        diameter: root.button-diameter;
+        icon: @image-url("../icons/mdi/skip-previous.svg");
+        clicked => { root.action("back"); }
+    }
+    MusicIconButton {
+        height: root.height;
+        diameter: root.play-diameter;
+        icon: root.playing ? @image-url("../icons/mdi/pause.svg") : @image-url("../icons/mdi/play.svg");
+        filled: true;
+        clicked => { root.action(root.playing ? "pause" : "play"); }
+    }
+    MusicIconButton {
+        height: root.height;
+        diameter: root.button-diameter;
+        icon: @image-url("../icons/mdi/skip-next.svg");
+        clicked => { root.action("next"); }
+    }
+    MusicIconButton {
+        height: root.height;
+        diameter: root.button-diameter;
+        icon: @image-url("../icons/mdi/repeat.svg");
+        selected: root.looping;
+        clicked => { root.action("loop"); }
+    }
 }
 
 // Cava bars, centered and bottom-aligned; they scale with the available height.
@@ -205,13 +259,12 @@ export component DashboardMusicCard inherits GlassCard {
             bar-width: 10px;
             gap: 6px;
         }
-        HorizontalLayout {
-            alignment: space-around;
-            MusicIconButton { diameter: 38px; glyph: "⤨"; selected: root.shuffle; clicked => { root.action("shuffle"); } }
-            MusicIconButton { diameter: 38px; glyph: "◀"; clicked => { root.action("back"); } }
-            MusicIconButton { diameter: 44px; glyph: root.playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.action(root.playing ? "pause" : "play"); } }
-            MusicIconButton { diameter: 38px; glyph: "▶"; clicked => { root.action("next"); } }
-            MusicIconButton { diameter: 38px; glyph: "↻"; selected: root.looping; clicked => { root.action("loop"); } }
+        MusicTransportControls {
+            compact: true;
+            playing: root.playing;
+            shuffle: root.shuffle;
+            looping: root.looping;
+            action(name) => { root.action(name); }
         }
         HorizontalLayout {
             spacing: 8px;
@@ -272,14 +325,11 @@ export component DashboardMusicCard inherits GlassCard {
                 Text { text: root.duration; color: Theme.muted; font-size: 11px; }
             }
         }
-        HorizontalLayout {
-            vertical-stretch: 0;
-            alignment: space-around;
-            MusicIconButton { diameter: 48px; glyph: "⤨"; selected: root.shuffle; clicked => { root.action("shuffle"); } }
-            MusicIconButton { diameter: 48px; glyph: "◀"; clicked => { root.action("back"); } }
-            MusicIconButton { diameter: 64px; glyph: root.playing ? "Ⅱ" : "▶"; filled: true; clicked => { root.action(root.playing ? "pause" : "play"); } }
-            MusicIconButton { diameter: 48px; glyph: "▶"; clicked => { root.action("next"); } }
-            MusicIconButton { diameter: 48px; glyph: "↻"; selected: root.looping; clicked => { root.action("loop"); } }
+        MusicTransportControls {
+            playing: root.playing;
+            shuffle: root.shuffle;
+            looping: root.looping;
+            action(name) => { root.action(name); }
         }
         HorizontalLayout {
             vertical-stretch: 0;
@@ -351,7 +401,7 @@ export component DashboardInteractionsCard inherits GlassCard {
                         }
                         VerticalLayout {
                             alignment: center;
-                            MusicIconButton { width: 34px; height: 34px; glyph: "×"; clicked => { root.remove(item.uuid); } }
+                            MusicIconButton { diameter: 34px; icon: @image-url("../icons/mdi/close.svg"); clicked => { root.remove(item.uuid); } }
                         }
                     }
                 }

@@ -176,6 +176,72 @@ fn page_buttons_stay_centered_with_battery_and_edit_controls() {
 }
 
 #[test]
+fn dashboard_playback_controls_share_a_center_line() {
+    let window = MinimalSoftwareWindow::new(Default::default());
+    slint::platform::set_platform(Box::new(TestDisplay {
+        window: window.clone(),
+        started: Instant::now(),
+        elapsed_offset: Rc::new(Cell::new(Duration::ZERO)),
+    }))
+    .unwrap();
+    let app = App::new().unwrap();
+    app.show().unwrap();
+    window.set_size(PhysicalSize::new(800, 480));
+    app.set_connection("Connected".into());
+    app.set_cava_bars(ModelRc::default());
+    app.set_music_shuffle(true);
+    app.set_music_loop(true);
+    let (action_tx, action_rx) = std::sync::mpsc::channel();
+    app.on_music_action(move |action| action_tx.send(action).unwrap());
+
+    let primary = Rgb8Pixel {
+        r: 0xa8,
+        g: 0xc7,
+        b: 0xfa,
+    };
+    let icon_color = Rgb8Pixel {
+        r: 0x06,
+        g: 0x2e,
+        b: 0x6f,
+    };
+    let mut buffer = vec![Rgb8Pixel::default(); 800 * 480];
+    for lower_slot in ["", "interactions"] {
+        app.set_right_slot_1(lower_slot.into());
+        for (playing, expected_action) in [(false, "play"), (true, "pause")] {
+            app.set_music_playing(playing);
+            window.draw_if_needed(|r| {
+                r.render(&mut buffer, 800);
+            });
+            let center_y = |columns: std::ops::Range<usize>, color| {
+                let mut rows = buffer[..428 * 800]
+                    .chunks_exact(800)
+                    .enumerate()
+                    .filter(|(_, row)| row[columns.clone()].contains(&color))
+                    .map(|(y, _)| y);
+                let top = rows.next().unwrap();
+                let bottom = rows.last().unwrap_or(top);
+                (top + bottom) / 2
+            };
+            let center = center_y(549..646, primary);
+            assert!(center.abs_diff(center_y(423..499, primary)) <= 1);
+            assert!(center.abs_diff(center_y(696..775, primary)) <= 1);
+            assert!(center.abs_diff(center_y(549..646, icon_color)) <= 1);
+
+            let position = LogicalPosition::new(597., center as f32);
+            app.window().dispatch_event(WindowEvent::PointerPressed {
+                position,
+                button: PointerEventButton::Left,
+            });
+            app.window().dispatch_event(WindowEvent::PointerReleased {
+                position,
+                button: PointerEventButton::Left,
+            });
+            assert_eq!(action_rx.try_recv().unwrap(), expected_action);
+        }
+    }
+}
+
+#[test]
 fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     let window = MinimalSoftwareWindow::new(Default::default());
     let elapsed_offset = Rc::new(Cell::new(Duration::ZERO));
