@@ -1,5 +1,5 @@
 import { Theme } from "theme.slint";
-import { ActionRow, AudioEntry, AutoMacroEntry, BluetoothRow, ChannelPointRow, DashboardMacroEntry, DiagnosticRow, EthernetRow, InteractionEntry, PickerEntry, ProcessUsage, RendererInfo, SavedWifiRow, SystemStats, SystemStorage, UpdateEntry, WifiRow } from "types.slint";
+import { ActionRow, AudioEntry, AutoMacroEntry, BatteryDetails, BluetoothRow, ChannelPointRow, DashboardMacroEntry, DiagnosticRow, EthernetRow, InteractionEntry, PickerEntry, ProcessUsage, RendererInfo, SavedWifiRow, SystemStats, SystemStorage, UpdateEntry, WifiRow } from "types.slint";
 import { DashboardPage, DashboardFeedback } from "pages/dashboard.slint";
 import { AudioPage } from "pages/audio.slint";
 import { ControlsPage } from "pages/controls.slint";
@@ -12,10 +12,11 @@ import { AudioRoutingDialog, VolumeOsd } from "components/audio-overlays.slint";
 import { DashboardPicker } from "components/dashboard-picker.slint";
 import { TouchKeyboard } from "components/touch-keyboard.slint";
 import { PowerMenu } from "components/power-menu.slint";
+import { BatteryDialog } from "components/battery-dialog.slint";
 
 // Re-exported so the generated Rust API keeps these names.
 export { Theme } from "theme.slint";
-export { DiagnosticRow, ProcessUsage, RendererInfo } from "types.slint";
+export { BatteryDetails, DiagnosticRow, ProcessUsage, RendererInfo } from "types.slint";
 export { EthernetRow, WifiRow, SavedWifiRow, BluetoothRow, ActionRow, ChannelPointRow, SystemStats, StorageEntry, SystemStorage, UpdateEntry, AudioLink, AudioEntry, InteractionEntry, DashboardMacroEntry, AutoMacroEntry, PickerEntry } from "types.slint";
 
 export component App inherits Window {
@@ -78,6 +79,24 @@ export component App inherits Window {
     in-out property <string> edit-right-0: "music";
     in-out property <string> edit-right-1: "";
     in-out property <bool> power-menu-open: false;
+    in-out property <bool> power-details-open;
+    in property <int> battery-percent: -1;
+    in property <bool> battery-charging;
+    in property <BatteryDetails> battery-details: { state: 0, minutes: 0, watts: -1, health: -1 };
+    in property <[float]> battery-history;
+    in property <[string]> power-profiles;
+    in property <string> active-power-profile;
+    in-out property <bool> power-profile-busy;
+    in property <bool> power-profile-failed;
+    in property <string> power-profile-error;
+    callback power-details-visibility(bool);
+    callback choose-power-profile(string);
+    changed power-menu-open => {
+        if root.power-menu-open { root.power-details-open = false; }
+    }
+    changed power-details-open => {
+        root.power-details-visibility(root.power-details-open);
+    }
     in-out property <bool> network-drawer-open: false;
     property <string> wifi-name;
     in-out property <string> drawer-network-error;
@@ -446,6 +465,9 @@ export component App inherits Window {
             connected: !root.connection-overlay-shown;
             dev-page-enabled: root.dev-page-enabled;
             dashboard-editing: root.dashboard-editing;
+            battery-percent: root.battery-percent;
+            battery-charging: root.battery-charging;
+            power-profiles-available: root.power-profiles.length > 0;
             navigate(target) => {
                 root.go-to(target);
                 if target == 3 && root.connection == "Connected" { root.update-refresh(); }
@@ -454,6 +476,7 @@ export component App inherits Window {
             open-wallpaper-picker => { root.dashboard-open-picker("wallpaper"); }
             reset-dashboard => { root.dashboard-editor-reset(); }
             open-power-menu => { root.power-menu-open = true; }
+            open-power-details => { root.power-details-open = true; }
             loc(key) => { return root.loc(key); }
         }
     }
@@ -556,6 +579,23 @@ export component App inherits Window {
         close => { root.osd-visible = false; }
         osd-item: root.osd-item;
         change-volume(item, value, mute) => { root.change-volume(item, value, mute); }
+        loc(key) => { return root.loc(key); }
+    }
+
+    if root.power-details-open && !root.power-menu-open : BatteryDialog {
+        width: parent.width;
+        height: parent.height;
+        close => { root.power-details-open = false; }
+        animated: root.gpu-effects;
+        percent: root.battery-percent;
+        battery: root.battery-details;
+        history: root.battery-history;
+        profiles: root.power-profiles;
+        active-profile: root.active-power-profile;
+        profile-busy: root.power-profile-busy;
+        profile-failed: root.power-profile-failed;
+        profile-error: root.power-profile-error;
+        choose-profile(profile) => { root.choose-power-profile(profile); }
         loc(key) => { return root.loc(key); }
     }
 

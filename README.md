@@ -28,6 +28,10 @@ Use the bottom navigation to switch between the dashboard, audio, macros, system
 
 Tap or pull down the top grip to manage Ethernet, Wi-Fi and Bluetooth or scan the Commander QR code. The power menu is accessible from the bottom bar and from the kiosk's hardware power key. Physical audio controls use `pactl`. The connection drawer talks directly to NetworkManager and BlueZ over system D-Bus; it does not invoke `nmcli` or `bluetoothctl`. Those daemons must be running, and the kiosk user must have system-bus access under the host's D-Bus policy. Bluetooth pairing registers a temporary `NoInputNoOutput` agent for the device selected in the drawer.
 
+Tap the battery indicator at the left of the bottom bar to open **Battery and power**. The dialog shows the current charge, estimated time remaining or time until full, battery power, and charge history for the last 24 hours where data is available. It uses saved UPower history for a single system battery and supplements it with readings collected while Touch is running. On devices without a battery, **Power profile** appears at the same spot when profiles are available.
+
+The dialog lists the profiles provided by `power-profiles-daemon` and highlights the active profile. Switching requires the daemon and Polkit permission. The kiosk installer grants profile switching to the configured kiosk user.
+
 ## Debian package
 
 Build on the Debian release and architecture that will run the kiosk. Install the native build dependencies and build the package.

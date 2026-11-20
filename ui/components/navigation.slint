@@ -55,12 +55,28 @@ export component BottomNavigation inherits Rectangle {
     in property <bool> connected;
     in property <bool> dev-page-enabled;
     in property <bool> dashboard-editing;
+    in property <int> battery-percent: -1;
+    in property <bool> battery-charging;
+    in property <bool> power-profiles-available;
     callback navigate(int);
     callback toggle-dashboard-editor();
     callback open-wallpaper-picker();
     callback reset-dashboard();
     callback open-power-menu();
+    callback open-power-details();
     pure callback loc(string) -> string;
+
+    property <bool> show-power-details: root.battery-percent >= 0 || root.power-profiles-available;
+    property <length> side-margin: 10px;
+    property <length> battery-width: 80px;
+    property <length> edit-width: 40px;
+    property <length> edit-x: root.side-margin + (root.show-power-details ? root.battery-width + 4px : 0px);
+    property <int> page-count: root.dev-page-enabled ? 6 : 5;
+    property <length> page-spacing: 10px;
+    // Reserve equal space on both sides so the page buttons stay centered at narrow widths.
+    property <length> page-button-width: clamp(
+        (root.width - 2 * (root.edit-x + root.edit-width + 8px) - (root.page-count - 1) * root.page-spacing) / root.page-count,
+        0px, 72px);
 
     height: 52px;
     background: Theme.surface;
@@ -81,13 +97,14 @@ export component BottomNavigation inherits Rectangle {
         height: 42px;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        spacing: 10px;
-        NavItem { label: root.loc("page_home"); icon: @image-url("../icons/mdi/home.svg"); active-icon: @image-url("../icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.navigate(0); } }
-        NavItem { label: root.loc("audio"); icon: @image-url("../icons/mdi/volume-high.svg"); active-icon: @image-url("../icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.navigate(1); } }
-        NavItem { label: root.loc("page_controls"); icon: @image-url("../icons/mdi/tune.svg"); active-icon: @image-url("../icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.navigate(2); } }
-        NavItem { label: root.loc("page_system"); icon: @image-url("../icons/mdi/server.svg"); active-icon: @image-url("../icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.navigate(3); } }
-        NavItem { label: root.loc("page_speedtest"); icon: @image-url("../icons/mdi/speedometer.svg"); active-icon: @image-url("../icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.navigate(4); } }
+        spacing: root.page-spacing;
+        NavItem { width: root.page-button-width; label: root.loc("page_home"); icon: @image-url("../icons/mdi/home.svg"); active-icon: @image-url("../icons/mdi-selected/home.svg"); active: root.page == 0; clicked => { root.navigate(0); } }
+        NavItem { width: root.page-button-width; label: root.loc("audio"); icon: @image-url("../icons/mdi/volume-high.svg"); active-icon: @image-url("../icons/mdi-selected/volume-high.svg"); active: root.page == 1; clicked => { root.navigate(1); } }
+        NavItem { width: root.page-button-width; label: root.loc("page_controls"); icon: @image-url("../icons/mdi/tune.svg"); active-icon: @image-url("../icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.navigate(2); } }
+        NavItem { width: root.page-button-width; label: root.loc("page_system"); icon: @image-url("../icons/mdi/server.svg"); active-icon: @image-url("../icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.navigate(3); } }
+        NavItem { width: root.page-button-width; label: root.loc("page_speedtest"); icon: @image-url("../icons/mdi/speedometer.svg"); active-icon: @image-url("../icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.navigate(4); } }
         if root.dev-page-enabled : NavItem {
+            width: root.page-button-width;
             label: root.loc("page_dev");
             icon: @image-url("../icons/mdi/code-tags.svg");
             active-icon: @image-url("../icons/mdi-selected/code-tags.svg");
@@ -96,9 +113,9 @@ export component BottomNavigation inherits Rectangle {
         }
     }
     if root.page == 0 && (root.connected || root.dashboard-editing) : Rectangle {
-        width: 40px;
+        width: root.edit-width;
         height: 40px;
-        x: 10px;
+        x: root.edit-x;
         y: (parent.height - self.height) / 2;
         border-radius: 20px;
         background: root.dashboard-editing ? Theme.primary : transparent;
@@ -110,6 +127,64 @@ export component BottomNavigation inherits Rectangle {
             vertical-alignment: center;
         }
         TouchArea { clicked => { root.toggle-dashboard-editor(); } }
+    }
+    if root.show-power-details : Rectangle {
+        width: root.battery-width;
+        height: 40px;
+        x: root.side-margin;
+        y: (parent.height - self.height) / 2;
+        accessible-role: button;
+        accessible-label: root.battery-percent < 0 ? root.loc("power_profiles")
+            : root.loc("battery") + " " + root.battery-percent + "%"
+                + (root.battery-charging ? " · " + root.loc("battery_charging") : "");
+        accessible-action-default => { root.open-power-details(); }
+        if root.battery-percent < 0 : Text {
+            text: root.loc("power_profiles");
+            color: Theme.text;
+            font-size: 12px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if root.battery-percent >= 0 : HorizontalLayout {
+            spacing: 5px;
+            alignment: center;
+            Rectangle {
+                width: 23px;
+                Rectangle {
+                    width: 20px;
+                    height: 12px;
+                    x: 0px;
+                    y: (parent.height - self.height) / 2;
+                    border-width: 1px;
+                    border-radius: 2px;
+                    border-color: Theme.muted;
+                    Rectangle {
+                        x: 2px;
+                        y: 2px;
+                        width: (parent.width - 4px) * clamp(root.battery-percent, 0, 100) / 100;
+                        height: parent.height - 4px;
+                        background: root.battery-charging ? Theme.success : Theme.text;
+                    }
+                }
+                Rectangle {
+                    x: 20px;
+                    width: 2px;
+                    height: 6px;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: 1px;
+                    background: Theme.muted;
+                }
+            }
+            Text {
+                text: (root.battery-charging ? "⚡ " : "") + root.battery-percent + "%";
+                font-size: 12px;
+                font-weight: 600;
+                color: Theme.text;
+                vertical-alignment: center;
+            }
+        }
+        TouchArea { clicked => { root.open-power-details(); } }
     }
     Rectangle {
         width: 40px;

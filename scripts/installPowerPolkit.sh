@@ -31,7 +31,7 @@ sudo install -d -m 0755 /etc/polkit-1/rules.d
 sudo tee "$RULE_FILE" >/dev/null <<EOF
 // Streambot Touch kiosk power permissions.
 //
-// Limited to power-off and reboot via systemd-logind.
+// Allow device power actions and profile switching for the kiosk user.
 
 polkit.addRule(function(action, subject) {
     if (subject.user !== "${TARGET_USER}") {
@@ -42,7 +42,9 @@ polkit.addRule(function(action, subject) {
         "org.freedesktop.login1.power-off",
         "org.freedesktop.login1.power-off-multiple-sessions",
         "org.freedesktop.login1.reboot",
-        "org.freedesktop.login1.reboot-multiple-sessions"
+        "org.freedesktop.login1.reboot-multiple-sessions",
+        "org.freedesktop.UPower.PowerProfiles.switch-profile",
+        "net.hadess.PowerProfiles.switch-profile"
     ];
 
     if (allowedActions.indexOf(action.id) !== -1) {

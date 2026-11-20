@@ -14,6 +14,7 @@ mod i18n;
 mod native_ui_test;
 mod network;
 mod notifications;
+mod power;
 mod state;
 mod theme;
 mod ui_bridge;
@@ -46,6 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
 
     ui_handlers::install(&ui, command_tx);
+    power::install(&ui, rt.handle());
 
     let (music_visible_tx, music_visible) = watch::channel(ui.get_music_visible());
     ui.on_music_visible_changed(move |visible| {

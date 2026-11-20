@@ -1,0 +1,186 @@
+import { Theme } from "../theme.slint";
+import { BatteryDetails } from "../types.slint";
+import { DialogScrim, Md3Button, PillButton, Scroller } from "common.slint";
+
+export component BatteryDialog inherits DialogScrim {
+    in property <int> percent: -1;
+    in property <BatteryDetails> battery;
+    in property <[float]> history;
+    in property <[string]> profiles;
+    in property <string> active-profile;
+    in property <bool> profile-busy;
+    in property <bool> profile-failed;
+    in property <string> profile-error;
+    callback close();
+    callback choose-profile(string);
+    pure callback loc(string) -> string;
+
+    pure function state-label() -> string {
+        return root.loc(root.battery.state == 1 ? "battery_charging"
+            : root.battery.state == 2 ? "battery_discharging"
+            : root.battery.state == 3 ? "battery_empty"
+            : root.battery.state == 4 ? "battery_full"
+            : root.battery.state == 5 ? "battery_not_charging"
+            : root.battery.state == 6 ? "battery_pending_discharge"
+            : "battery_state_unknown");
+    }
+
+    pure function estimate() -> string {
+        let minutes = root.battery.minutes;
+        if minutes <= 0 { return "—"; }
+        return (minutes >= 60 ? floor(minutes / 60) + " h " : "") + mod(minutes, 60) + " min";
+    }
+
+    pure function capacity-label(value: float) -> string {
+        return value <= 0 ? "—" : round(value * 10) / 10 + " " + root.battery.capacity-unit;
+    }
+
+    dim: 0.6;
+    TouchArea { clicked => { root.close(); } }
+    Rectangle {
+        opacity: root.progress;
+        transform-scale: 0.94 + 0.06 * root.progress;
+        width: min(parent.width - 40px, 520px);
+        height: min(parent.height - 24px, root.percent >= 0 ? 420px : 265px);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 22px;
+        background: Theme.surface;
+        TouchArea {}
+        VerticalLayout {
+            padding: 18px;
+            spacing: 12px;
+            Text { text: root.loc("battery_and_power"); font-size: 22px; font-weight: 600; color: Theme.text; }
+            Scroller {
+                VerticalLayout {
+                    alignment: start;
+                    spacing: 12px;
+                    if root.percent < 0 : Text {
+                        text: root.loc("battery_unavailable");
+                        color: Theme.muted;
+                        font-size: 13px;
+                    }
+                    if root.percent >= 0 : HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout {
+                            alignment: start;
+                            horizontal-stretch: 1;
+                            Text { text: root.percent + "%"; font-size: 32px; font-weight: 600; color: Theme.text; }
+                            Text { text: root.state-label(); font-size: 13px; color: Theme.muted; }
+                            Text {
+                                text: root.loc("battery_health") + " · "
+                                    + (root.battery.health < 0 ? "—" : root.battery.health + "%");
+                                font-size: 13px;
+                                color: Theme.text;
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            spacing: 5px;
+                            Text {
+                                text: root.loc(root.battery.state == 1 ? "battery_time_to_full" : "battery_time_remaining")
+                                    + " · " + root.estimate();
+                                color: Theme.text;
+                                font-size: 13px;
+                            }
+                            Text {
+                                text: root.loc("battery_power") + " · "
+                                    + (root.battery.watts < 0 ? "—" : round(root.battery.watts * 10) / 10 + " W");
+                                color: Theme.muted;
+                                font-size: 13px;
+                            }
+                            Text {
+                                text: root.loc("battery_full_capacity") + " · " + root.capacity-label(root.battery.full-capacity);
+                                color: Theme.muted;
+                                font-size: 13px;
+                            }
+                            Text {
+                                text: root.loc("battery_design_capacity") + " · " + root.capacity-label(root.battery.design-capacity);
+                                color: Theme.muted;
+                                font-size: 13px;
+                            }
+                        }
+                    }
+                    if root.percent >= 0 : VerticalLayout {
+                        spacing: 6px;
+                        Text { text: root.loc("battery_history"); font-size: 15px; color: Theme.text; }
+                        if root.history.length == 0 : Text {
+                            text: root.loc("battery_history_unavailable");
+                            color: Theme.muted;
+                            font-size: 12px;
+                        }
+                        if root.history.length > 0 : VerticalLayout {
+                            spacing: 4px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                height: 84px;
+                                VerticalLayout {
+                                    Text { text: "100%"; color: Theme.muted; font-size: 10px; }
+                                    Rectangle { vertical-stretch: 1; }
+                                    Text { text: "0%"; color: Theme.muted; font-size: 10px; }
+                                }
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    border-radius: 6px;
+                                    background: Theme.background;
+                                    HorizontalLayout {
+                                        padding: 4px;
+                                        spacing: 3px;
+                                        for charge in root.history : Rectangle {
+                                            horizontal-stretch: 1;
+                                            if charge >= 0 : Rectangle {
+                                                y: parent.height - self.height;
+                                                height: max(1px, parent.height * charge / 100);
+                                                border-radius: 2px;
+                                                background: Theme.primary;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            HorizontalLayout {
+                                Text { text: root.loc("battery_history_start"); color: Theme.muted; font-size: 10px; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Text { text: root.loc("battery_history_now"); color: Theme.muted; font-size: 10px; }
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        spacing: 8px;
+                        Text { text: root.loc("power_profiles"); font-size: 15px; color: Theme.text; }
+                        if root.profiles.length == 0 : Text {
+                            text: root.loc("power_profiles_unavailable");
+                            font-size: 12px;
+                            color: Theme.muted;
+                        }
+                        if root.profiles.length > 0 : HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            for profile in root.profiles : Md3Button {
+                                accessible-role: button;
+                                accessible-label: self.label;
+                                accessible-action-default => { if self.enabled { root.choose-profile(profile); } }
+                                label: root.loc("power_profile_" + profile);
+                                filled: profile == root.active-profile;
+                                enabled: !root.profile-busy;
+                                clicked => { root.choose-profile(profile); }
+                            }
+                        }
+                        if root.profile-busy || root.profile-failed : Text {
+                            text: root.profile-busy ? root.loc("power_profile_changing")
+                                : root.loc("power_profile_change_failed") + (root.profile-error == "" ? "" : "\n" + root.profile-error);
+                            color: root.profile-failed ? Theme.error : Theme.muted;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+            HorizontalLayout {
+                alignment: end;
+                PillButton { label: root.loc("close"); clicked => { root.close(); } }
+            }
+        }
+    }
+}

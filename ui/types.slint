@@ -35,6 +35,11 @@ export struct RendererInfo { name: string, adapter: string, driver: string }
 
 export struct ProcessUsage { cpu: string, memory: string }
 
+export struct BatteryDetails {
+    state: int, minutes: int, watts: float,
+    health: int, full-capacity: float, design-capacity: float, capacity-unit: string,
+}
+
 export struct AudioLink { id: string, label: string, linked: bool, present: bool, default-output: bool, volume: float }
 
 export struct AudioEntry {

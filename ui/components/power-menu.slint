@@ -45,7 +45,10 @@ export component PowerMenu inherits DialogScrim {
                 }
                 TouchArea { clicked => { root.power-action("restart-backend"); } }
             }
-            HorizontalLayout { Rectangle { horizontal-stretch: 1; background: transparent; } PillButton { min-width: 108px; label: root.loc("cancel"); clicked => { root.close(); } } }
+            HorizontalLayout {
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                PillButton { min-width: 108px; label: root.loc("cancel"); clicked => { root.close(); } }
+            }
         }
     }
 }

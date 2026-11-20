@@ -116,6 +116,66 @@ fn startup_animation_reveals_navigation_when_the_connection_overlay_closes() {
 }
 
 #[test]
+fn page_buttons_stay_centered_with_battery_and_edit_controls() {
+    let window = MinimalSoftwareWindow::new(Default::default());
+    slint::platform::set_platform(Box::new(TestDisplay {
+        window: window.clone(),
+        started: Instant::now(),
+        elapsed_offset: Rc::new(Cell::new(Duration::ZERO)),
+    }))
+    .unwrap();
+    let app = App::new().unwrap();
+    app.show().unwrap();
+    window.set_size(PhysicalSize::new(700, 450));
+    app.set_connection("Connected".into());
+    app.set_battery_percent(68);
+    app.set_dev_page_enabled(true);
+
+    let mut buffer = vec![Rgb8Pixel::default(); 700 * 450];
+    let primary = Rgb8Pixel {
+        r: 0xa8,
+        g: 0xc7,
+        b: 0xfa,
+    };
+    let mut pill_bounds = || {
+        window.draw_if_needed(|r| {
+            r.render(&mut buffer, 700);
+        });
+        let row = &buffer[410 * 700..411 * 700];
+        let left = row.iter().position(|&pixel| pixel == primary).unwrap();
+        let right = row.iter().rposition(|&pixel| pixel == primary).unwrap();
+        (left, right)
+    };
+    let (home_left, _) = pill_bounds();
+    assert!(home_left >= 134, "Home clears the edit button");
+    app.set_page(5);
+    let (_, dev_right) = pill_bounds();
+    assert!(
+        (home_left + dev_right).abs_diff(699) <= 1,
+        "the page buttons are centered"
+    );
+    app.set_page(0);
+
+    for event in [
+        WindowEvent::PointerPressed {
+            position: LogicalPosition::new(114., 424.),
+            button: PointerEventButton::Left,
+        },
+        WindowEvent::PointerReleased {
+            position: LogicalPosition::new(114., 424.),
+            button: PointerEventButton::Left,
+        },
+    ] {
+        app.window().dispatch_event(event);
+    }
+    assert!(
+        app.get_dashboard_editing(),
+        "the edit button sits beside the battery"
+    );
+    assert!(!app.get_power_details_open());
+}
+
+#[test]
 fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     let window = MinimalSoftwareWindow::new(Default::default());
     let elapsed_offset = Rc::new(Cell::new(Duration::ZERO));
@@ -467,6 +527,62 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     release(770., 471.);
     assert!(app.get_power_menu_open());
     app.set_power_menu_open(false);
+
+    app.set_battery_percent(68);
+    app.set_battery_charging(true);
+    app.set_battery_details(BatteryDetails {
+        state: 1,
+        minutes: 72,
+        watts: 12.5,
+        health: 85,
+        full_capacity: 48.2,
+        design_capacity: 56.7,
+        capacity_unit: "Wh".into(),
+    });
+    let mut history = vec![-1.0; 24];
+    history[21..].copy_from_slice(&[52.0, 64.0, 68.0]);
+    app.set_battery_history(ModelRc::new(VecModel::from(history)));
+    app.set_power_profiles(ModelRc::new(VecModel::from(vec![
+        "power-saver".into(),
+        "balanced".into(),
+    ])));
+    app.set_active_power_profile("balanced".into());
+    let (profile_tx, profile_rx) = std::sync::mpsc::channel();
+    app.on_choose_power_profile(move |profile| profile_tx.send(profile).unwrap());
+    press(50., 453.);
+    release(50., 453.);
+    assert!(
+        app.get_power_details_open(),
+        "tapping the battery opens its own dialog"
+    );
+    assert!(!app.get_power_menu_open());
+    window.draw_if_needed(|r| {
+        r.render(&mut buffer, 800);
+    });
+    press(200., 359.);
+    release(200., 359.);
+    assert_eq!(profile_rx.try_recv().unwrap(), "power-saver");
+    press(600., 412.);
+    release(600., 412.);
+    assert!(!app.get_power_details_open());
+    app.set_battery_percent(-1);
+    press(770., 471.);
+    release(770., 471.);
+    press(250., 380.);
+    release(250., 380.);
+    assert!(
+        !app.get_power_details_open(),
+        "the Power menu has no battery shortcut"
+    );
+    app.set_power_menu_open(false);
+    press(50., 453.);
+    release(50., 453.);
+    assert!(
+        app.get_power_details_open(),
+        "power profiles remain accessible without a battery"
+    );
+    assert!(!app.get_power_menu_open());
+    app.set_power_details_open(false);
 
     app.set_page(1);
     app.set_routing("".into());
