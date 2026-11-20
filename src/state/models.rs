@@ -1,7 +1,7 @@
 use crate::state::presentation::string_field;
-use crate::{App, AutoMacroEntry, DashboardMacroEntry, InteractionEntry};
+use crate::{App, AutoMacroEntry, DashboardMacroEntry, DashboardMacroSelection, InteractionEntry};
 use serde_json::Value;
-use slint::{Model, SharedString, VecModel};
+use slint::{Model, ModelRc, SharedString, VecModel};
 
 pub(crate) fn interaction_rows(items: &[Value]) -> slint::ModelRc<InteractionEntry> {
     let rows: Vec<InteractionEntry> = items
@@ -47,31 +47,8 @@ pub(crate) fn interaction_rows(items: &[Value]) -> slint::ModelRc<InteractionEnt
 }
 
 pub(crate) fn auto_macro_rows(items: &[Value]) -> slint::ModelRc<AutoMacroEntry> {
-    auto_macro_rows_for(
-        items,
-        &crate::config::dashboard::selected_names("auto_macro_names"),
-    )
-}
-
-pub(crate) fn auto_macro_rows_for(
-    items: &[Value],
-    selected: &[String],
-) -> slint::ModelRc<AutoMacroEntry> {
-    let visible = if selected.is_empty() {
-        items.iter().take(4).collect::<Vec<_>>()
-    } else {
-        selected
-            .iter()
-            .filter_map(|name| {
-                items
-                    .iter()
-                    .find(|item| item["name"].as_str() == Some(name))
-            })
-            .collect()
-    };
-    let rows: Vec<AutoMacroEntry> = visible
-        .into_iter()
-        .take(4)
+    let rows: Vec<AutoMacroEntry> = items
+        .iter()
         .map(|item| {
             let enabled = item
                 .get("enabled")
@@ -126,22 +103,36 @@ pub(crate) fn dashboard_macros(app: &App, names: Vec<SharedString>) {
 }
 
 pub(crate) fn macro_run_state(app: &App, name: &str, ticket: i32, state: &str) {
-    let model = app.get_dashboard_macro_list();
-    let Some(rows) = model
-        .as_any()
-        .downcast_ref::<VecModel<DashboardMacroEntry>>()
-    else {
-        return;
-    };
-    if let Some((index, mut row)) = rows
-        .iter()
-        .enumerate()
-        .find(|(_, row)| row.name.as_str() == name)
-    {
+    let mut entries: Vec<_> = app.get_dashboard_macro_list().iter().collect();
+    if let Some(row) = entries.iter_mut().find(|row| row.name.as_str() == name) {
         if state == "loading" || row.ticket == ticket {
             row.ticket = ticket;
             row.state = state.into();
-            rows.set_row_data(index, row);
+            // Rebind the per-card selections, including every card that displays this macro.
+            app.set_dashboard_macro_list(ModelRc::new(VecModel::from(entries)));
         }
     }
+}
+
+pub(crate) fn selected_macro_rows<T: Clone + 'static>(
+    source: ModelRc<T>,
+    selection: DashboardMacroSelection,
+    limit: i32,
+    name: impl Fn(&T) -> &SharedString,
+    show_defaults: bool,
+) -> ModelRc<T> {
+    let limit = limit.max(0) as usize;
+    let rows: Vec<T> = if selection.configured {
+        selection
+            .names
+            .iter()
+            .filter_map(|selected| source.iter().find(|entry| name(entry) == &selected))
+            .take(limit)
+            .collect()
+    } else if show_defaults {
+        source.iter().take(limit).collect()
+    } else {
+        Vec::new()
+    };
+    ModelRc::new(VecModel::from(rows))
 }

@@ -14,6 +14,13 @@ fn send(tx: &mpsc::UnboundedSender<(String, Value)>, method: &str, params: Value
 }
 
 pub(crate) fn install(ui: &App, command_tx: mpsc::UnboundedSender<(String, Value)>) {
+    ui.on_dashboard_macro_limit(|stacked| crate::config::dashboard::macro_limit(stacked) as i32);
+    ui.on_dashboard_manual_rows(|source, selection, limit| {
+        crate::state::models::selected_macro_rows(source, selection, limit, |row| &row.name, false)
+    });
+    ui.on_dashboard_automatic_rows(|source, selection, limit| {
+        crate::state::models::selected_macro_rows(source, selection, limit, |row| &row.name, true)
+    });
     ui.on_locale_text(|language, key| crate::i18n::text(&language, &key).into());
     ui.on_fill_text(|text, token, value| text.replace(token.as_str(), value.as_str()).into());
     ui.on_startup_stage(|language, stage| crate::i18n::stage(&language, &stage).into());

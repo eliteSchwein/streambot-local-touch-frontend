@@ -242,6 +242,107 @@ fn dashboard_playback_controls_share_a_center_line() {
 }
 
 #[test]
+fn dashboard_macro_cards_keep_separate_selections_and_use_the_available_height() {
+    let window = MinimalSoftwareWindow::new(Default::default());
+    slint::platform::set_platform(Box::new(TestDisplay {
+        window: window.clone(),
+        started: Instant::now(),
+        elapsed_offset: Rc::new(Cell::new(Duration::ZERO)),
+    }))
+    .unwrap();
+    let app = App::new().unwrap();
+    app.show().unwrap();
+    window.set_size(PhysicalSize::new(800, 480));
+    let (tx, _rx) = mpsc::unbounded_channel();
+    ui_handlers::install(&app, tx);
+    let store = Arc::new(Mutex::new(Store::default()));
+    dashboard_editor::install(&app, store.clone());
+    app.set_connection("Connected".into());
+
+    let names: Vec<_> = (1..=10).map(|index| format!("Macro {index}")).collect();
+    {
+        let mut store = store.lock().unwrap();
+        let manual = names
+            .iter()
+            .map(|name| (name.clone(), json!({})))
+            .collect::<serde_json::Map<_, _>>();
+        notifications::apply(
+            &app,
+            &mut store,
+            "notify_macro_update",
+            &json!({"macros": manual}),
+        );
+        let automatic = names
+            .iter()
+            .map(|name| json!({"name": name, "enabled": true}))
+            .collect::<Vec<_>>();
+        notifications::apply(
+            &app,
+            &mut store,
+            "notify_auto_macros_update",
+            &json!(automatic),
+        );
+    }
+    let (action_tx, action_rx) = std::sync::mpsc::channel();
+    let manual = action_tx.clone();
+    app.on_trigger_macro(move |name| manual.send(name).unwrap());
+    app.on_toggle_auto_macro(move |name, _| action_tx.send(name).unwrap());
+    let mut buffer = vec![Rgb8Pixel::default(); 800 * 480];
+
+    for (kind, control_x) in [("macros", 125.), ("auto_macros", 350.)] {
+        app.set_dashboard_editing(true);
+        app.invoke_dashboard_editor_reset();
+        for (slot, card) in [
+            ("slot:left-0", kind),
+            ("slot:left-1", ""),
+            ("slot:right-0", kind),
+            ("slot:right-1", "interactions"),
+        ] {
+            app.invoke_dashboard_open_picker(slot.into());
+            app.invoke_dashboard_select_option(card.into());
+        }
+        assert_eq!(app.get_edit_left_0(), kind);
+        assert_eq!(app.get_edit_right_0(), kind);
+
+        for (slot, limit, choices) in [
+            ("entries:left-0", 9, &names[..]),
+            ("entries:right-0", 4, &names[5..]),
+        ] {
+            app.invoke_dashboard_open_picker(slot.into());
+            assert_eq!(app.get_dashboard_picker_limit(), limit);
+            for name in choices {
+                app.invoke_dashboard_select_option(name.as_str().into());
+            }
+            app.invoke_dashboard_apply_picker();
+        }
+        let selections = app.get_dashboard_macro_selections();
+        assert_eq!(selections.row_data(0).unwrap().names.row_count(), 9);
+        let right: Vec<_> = selections.row_data(2).unwrap().names.iter().collect();
+        assert_eq!(right, ["Macro 6", "Macro 7", "Macro 8", "Macro 9"]);
+
+        app.set_left_slot_0(kind.into());
+        app.set_left_slot_1("".into());
+        app.set_right_slot_0(kind.into());
+        app.set_right_slot_1("interactions".into());
+        app.set_dashboard_editing(false);
+        slint::platform::update_timers_and_animations();
+        window.draw_if_needed(|renderer| {
+            renderer.render(&mut buffer, 800);
+        });
+        let position = LogicalPosition::new(control_x, 384.);
+        app.window().dispatch_event(WindowEvent::PointerPressed {
+            position,
+            button: PointerEventButton::Left,
+        });
+        app.window().dispatch_event(WindowEvent::PointerReleased {
+            position,
+            button: PointerEventButton::Left,
+        });
+        assert_eq!(action_rx.try_recv().unwrap(), "Macro 9");
+    }
+}
+
+#[test]
 fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     let window = MinimalSoftwareWindow::new(Default::default());
     let elapsed_offset = Rc::new(Cell::new(Duration::ZERO));
@@ -357,6 +458,10 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     );
     state::models::dashboard_macros(&app, vec!["Start Stream".into()]);
     app.set_left_slot_0("macros".into());
+    dashboard_editor::set_macro_selections(
+        &app,
+        &[Some(vec!["Start Stream".into()]), None, None, None],
+    );
     app.set_dashboard_auto_macros(ModelRc::new(VecModel::from(vec![AutoMacroEntry {
         name: "Studio light".into(),
         enabled: true,

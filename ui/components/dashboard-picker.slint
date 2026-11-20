@@ -10,6 +10,8 @@ export component DashboardPicker inherits DialogScrim {
     in property <string> dashboard-picker-kind;
     in-out property <string> dashboard-picker-search;
     in property <[PickerEntry]> dashboard-picker-items;
+    in property <int> selection-limit;
+    pure callback fill-text(string, string, string) -> string;
     callback dashboard-filter(string);
     callback dashboard-select-option(string);
     callback dashboard-apply-picker();
@@ -153,7 +155,7 @@ export component DashboardPicker inherits DialogScrim {
                 }
             }
             if root.dashboard-picker-kind == "macros" || root.dashboard-picker-kind == "auto_macros" : HorizontalLayout {
-                Text { text: root.loc("dashboard_selection_limit"); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
+                Text { text: root.fill-text(root.loc("dashboard_selection_limit"), "%1", root.selection-limit + ""); color: Theme.muted; font-size: 11px; horizontal-stretch: 1; }
                 PillButton { label: root.loc("apply"); selected: true; min-width: 90px; clicked => { root.dashboard-apply-picker(); } }
             }
         }

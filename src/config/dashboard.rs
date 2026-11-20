@@ -3,78 +3,108 @@ use super::{read_settings, settings_path as path, write_settings};
 use serde_json::{json, Value};
 use std::{fs, io, path::PathBuf};
 
-pub(crate) fn load() -> [String; 4] {
-    let default = || {
-        [
-            "interactions".into(),
-            "auto_macros".into(),
-            "music".into(),
-            "".into(),
-        ]
-    };
-    let Ok(text) = fs::read_to_string(path()) else {
-        return default();
-    };
-    let Ok(data) = serde_json::from_str::<Value>(&text) else {
-        return default();
-    };
-    let Some(columns) = data.pointer("/touch_dashboard/columns") else {
-        return default();
-    };
-    let read = |side: &str, i: usize| -> String {
-        columns
-            .get(side)
-            .and_then(Value::as_array)
-            .and_then(|a| a.get(i))
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_owned()
-    };
-    normalize([
-        read("left", 0),
-        read("left", 1),
-        read("right", 0),
-        read("right", 1),
-    ])
+pub(crate) const SLOT_IDS: [&str; 4] = ["left-0", "left-1", "right-0", "right-1"];
+pub(crate) const FULL_MACRO_LIMIT: usize = 9;
+pub(crate) const STACKED_MACRO_LIMIT: usize = 4;
+pub(crate) type MacroSelections = [Option<Vec<String>>; 4];
+
+#[derive(Clone)]
+pub(crate) struct Layout {
+    pub(crate) slots: [String; 4],
+    pub(crate) selections: MacroSelections,
 }
 
-fn normalize(input: [String; 4]) -> [String; 4] {
-    let allowed = ["interactions", "auto_macros", "macros", "music"];
-    let mut columns = [Vec::<String>::new(), Vec::<String>::new()];
-    for (col, slots) in columns.iter_mut().zip(input.as_chunks::<2>().0) {
-        for slot in slots {
-            if allowed.contains(&slot.as_str()) && !col.contains(slot) {
-                col.push(slot.clone());
-            }
+impl Default for Layout {
+    fn default() -> Self {
+        Self {
+            slots: ["interactions", "auto_macros", "music", ""].map(str::to_owned),
+            selections: Default::default(),
         }
     }
-    let [left, right] = &mut columns;
-    right.retain(|name| !left.contains(name));
-    [
-        columns[0].first().cloned().unwrap_or_default(),
-        columns[0].get(1).cloned().unwrap_or_default(),
-        columns[1].first().cloned().unwrap_or_default(),
-        columns[1].get(1).cloned().unwrap_or_default(),
-    ]
 }
 
-pub(crate) fn selected_names(kind: &str) -> Vec<String> {
-    let Ok(text) = fs::read_to_string(path()) else {
-        return Vec::new();
+pub(crate) fn is_macro_card(kind: &str) -> bool {
+    matches!(kind, "macros" | "auto_macros")
+}
+
+pub(crate) fn macro_limit(stacked: bool) -> usize {
+    if stacked {
+        STACKED_MACRO_LIMIT
+    } else {
+        FULL_MACRO_LIMIT
+    }
+}
+
+pub(crate) fn load() -> Layout {
+    read_settings(&path()).map_or_else(|_| Layout::default(), |settings| layout_from(&settings))
+}
+
+fn layout_from(settings: &Value) -> Layout {
+    let dashboard = &settings["touch_dashboard"];
+    let Some(columns) = dashboard.get("columns") else {
+        return Layout::default();
     };
-    let Ok(data) = serde_json::from_str::<Value>(&text) else {
-        return Vec::new();
+    let slots: [String; 4] = std::array::from_fn(|index| {
+        columns[if index < 2 { "left" } else { "right" }][index % 2]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned()
+    });
+    let selections = std::array::from_fn(|index| {
+        let legacy_key = match slots[index].as_str() {
+            "macros" => "macro_names",
+            "auto_macros" => "auto_macro_names",
+            _ => return None,
+        };
+        let names = |value: &Value| {
+            value.as_array().map(|values| {
+                let mut names = Vec::new();
+                for name in values.iter().filter_map(Value::as_str) {
+                    if names.len() == FULL_MACRO_LIMIT {
+                        break;
+                    }
+                    if !names.iter().any(|entry| entry == name) {
+                        names.push(name.to_owned());
+                    }
+                }
+                names
+            })
+        };
+        if let Some(per_slot) = dashboard.get("slot_macro_names") {
+            names(&per_slot[SLOT_IDS[index]])
+        } else {
+            // Legacy empty Auto Macro lists show the first available entries.
+            names(&dashboard[legacy_key]).filter(|names| !names.is_empty())
+        }
+    });
+    normalize(Layout { slots, selections })
+}
+
+fn normalize(layout: Layout) -> Layout {
+    let mut result = Layout {
+        slots: Default::default(),
+        selections: Default::default(),
     };
-    data.pointer(&format!("/touch_dashboard/{kind}"))
-        .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .take(4)
-                .collect()
-        })
-        .unwrap_or_default()
+    let mut counts = [0; 2];
+    for (index, (kind, selection)) in layout.slots.into_iter().zip(layout.selections).enumerate() {
+        let macro_card = is_macro_card(&kind);
+        if !macro_card
+            && (!matches!(kind.as_str(), "interactions" | "music") || result.slots.contains(&kind))
+        {
+            continue;
+        }
+        let column = index / 2;
+        let target = column * 2 + counts[column];
+        counts[column] += 1;
+        result.slots[target] = kind;
+        if macro_card {
+            result.selections[target] = selection.map(|mut names| {
+                names.truncate(FULL_MACRO_LIMIT);
+                names
+            });
+        }
+    }
+    result
 }
 
 pub(crate) fn wallpaper() -> String {
@@ -149,14 +179,9 @@ pub(crate) fn wallpaper_files(keep_scanning: impl Fn() -> bool) -> Vec<String> {
     results
 }
 
-pub(crate) fn save_full(
-    input: [String; 4],
-    macros: &[String],
-    auto_macros: &[String],
-    wallpaper: &str,
-) -> io::Result<[String; 4]> {
+pub(crate) fn save_full(layout: Layout, wallpaper: &str) -> io::Result<Layout> {
     // Writes all editor values in a single atomic rename, preserving unrelated settings.
-    let normalized = normalize(input);
+    let normalized = normalize(layout);
     let target = path();
     let mut data = read_settings(&target)?;
     if !wallpaper.is_empty() && wallpaper_path(wallpaper).is_none() {
@@ -165,22 +190,78 @@ pub(crate) fn save_full(
             "Wallpaper is missing or path is unsafe",
         ));
     }
-    let left: Vec<_> = normalized[0..2]
-        .iter()
-        .filter(|s| !s.is_empty())
-        .cloned()
-        .collect();
-    let right: Vec<_> = normalized[2..4]
-        .iter()
-        .filter(|s| !s.is_empty())
-        .cloned()
-        .collect();
-    data["touch_dashboard"] = json!({"version": 1, "columns": {"left": left, "right": right},
-        "macro_names": macros.iter().take(4).collect::<Vec<_>>(),
-        "auto_macro_names": auto_macros.iter().take(4).collect::<Vec<_>>()});
+    data["touch_dashboard"] = layout_json(&normalized);
     data["touch_wallpaper"] = json!(wallpaper);
     write_settings(&target, &data)?;
     Ok(normalized)
+}
+
+fn layout_json(layout: &Layout) -> Value {
+    let column = |range: std::ops::Range<usize>| {
+        layout.slots[range]
+            .iter()
+            .filter(|kind| !kind.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let per_slot: serde_json::Map<String, Value> = SLOT_IDS
+        .iter()
+        .zip(&layout.selections)
+        .filter_map(|(id, names)| Some((id.to_string(), json!(names.as_ref()?))))
+        .collect();
+    let legacy_names = |kind: &str| {
+        // Older clients can read the first configured card of each type.
+        layout
+            .slots
+            .iter()
+            .position(|slot| slot == kind)
+            .and_then(|index| layout.selections[index].as_ref())
+            .into_iter()
+            .flatten()
+            .take(STACKED_MACRO_LIMIT)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    json!({
+        "version": 1,
+        "columns": {"left": column(0..2), "right": column(2..4)},
+        "slot_macro_names": per_slot,
+        "macro_names": legacy_names("macros"),
+        "auto_macro_names": legacy_names("auto_macros"),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_legacy_selections_and_round_trips_independent_cards() {
+        let legacy = json!({"touch_dashboard": {
+            "columns": {"left": ["macros"], "right": ["auto_macros"]},
+            "macro_names": ["Start"],
+            "auto_macro_names": []
+        }});
+        let layout = layout_from(&legacy);
+        assert_eq!(layout.selections[0], Some(vec!["Start".into()]));
+        assert_eq!(layout.selections[2], None);
+
+        let layout = normalize(Layout {
+            slots: ["", "macros", "macros", "auto_macros"].map(str::to_owned),
+            selections: [
+                None,
+                Some((1..=9).map(|index| format!("Macro {index}")).collect()),
+                Some(vec!["Other".into()]),
+                Some(Vec::new()),
+            ],
+        });
+        let saved = layout_json(&layout);
+        assert_eq!(saved["macro_names"].as_array().unwrap().len(), 4);
+        let loaded = layout_from(&json!({"touch_dashboard": saved}));
+        assert_eq!(loaded.slots, ["macros", "", "macros", "auto_macros"]);
+        assert_eq!(loaded.selections, layout.selections);
+        assert_eq!(loaded.selections[0].as_ref().unwrap().len(), 9);
+    }
 }
 
 pub(crate) fn language() -> String {

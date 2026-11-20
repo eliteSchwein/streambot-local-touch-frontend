@@ -1,5 +1,9 @@
-//! Dashboard editor: card selection, four-item macro pickers, wallpapers and persistence.
-use crate::{config::dashboard, state::store::Store, App, PickerEntry};
+//! Dashboard editor: card selection, per-slot macro pickers, wallpapers and persistence.
+use crate::{
+    config::dashboard::{self, Layout, MacroSelections},
+    state::store::Store,
+    App, DashboardMacroSelection, PickerEntry,
+};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::{
     cell::RefCell,
@@ -11,8 +15,8 @@ use std::{
 struct Editor {
     kind: String,
     search: String,
-    draft_macros: Vec<String>,
-    draft_auto_macros: Vec<String>,
+    selections: MacroSelections,
+    picker_slot: Option<usize>,
     picker_selection: Vec<String>,
     draft_wallpaper: String,
 }
@@ -40,38 +44,29 @@ fn set_draft_slots(ui: &App, slots: &[String; 4]) {
     ui.set_edit_right_1(slots[3].clone().into());
 }
 
-fn summaries(ui: &App, draft: &Editor) {
-    ui.set_dashboard_selected_macros(draft.draft_macros.len() as i32);
-    ui.set_dashboard_selected_auto_macros(draft.draft_auto_macros.len() as i32);
-    ui.set_wallpaper_label(
-        draft
-            .draft_wallpaper
-            .rsplit('/')
-            .next()
-            .unwrap_or("")
-            .into(),
-    );
+pub(super) fn set_macro_selections(ui: &App, selections: &MacroSelections) {
+    let model: Vec<DashboardMacroSelection> = selections
+        .iter()
+        .map(|selection| {
+            let names = selection
+                .iter()
+                .flatten()
+                .map(|name| SharedString::from(name.as_str()))
+                .collect::<Vec<_>>();
+            DashboardMacroSelection {
+                configured: selection.is_some(),
+                names: ModelRc::new(VecModel::from(names)),
+            }
+        })
+        .collect();
+    ui.set_dashboard_macro_selections(ModelRc::new(VecModel::from(model)));
+}
+
+fn set_wallpaper_label(ui: &App, wallpaper: &str) {
+    ui.set_wallpaper_label(wallpaper.rsplit('/').next().unwrap_or("").into());
 }
 
 pub(crate) use crate::wallpaper::set as set_wallpaper_image;
-
-/// The dashboard doubles as the editor, so the macro cards show the draft selection.
-fn preview(ui: &App, draft: &Editor, store: &Arc<Mutex<Store>>) {
-    let Ok(guard) = store.lock() else {
-        return;
-    };
-    let names: Vec<SharedString> = draft
-        .draft_macros
-        .iter()
-        .filter(|name| guard.macros.contains(name))
-        .map(|s| SharedString::from(s.as_str()))
-        .collect();
-    crate::state::models::dashboard_macros(ui, names);
-    ui.set_dashboard_auto_macros(crate::state::models::auto_macro_rows_for(
-        &guard.auto_macros,
-        &draft.draft_auto_macros,
-    ));
-}
 
 fn candidates(kind: &str, store: &Arc<Mutex<Store>>) -> Vec<String> {
     if kind.starts_with("slot:") {
@@ -129,18 +124,20 @@ fn display(ui: &App, editor: &Editor, store: &Arc<Mutex<Store>>) {
 }
 
 fn slot_index(kind: &str) -> Option<usize> {
-    match kind {
-        "slot:left-0" => Some(0),
-        "slot:left-1" => Some(1),
-        "slot:right-0" => Some(2),
-        "slot:right-1" => Some(3),
-        _ => None,
-    }
+    let id = kind
+        .strip_prefix("slot:")
+        .or_else(|| kind.strip_prefix("entries:"))?;
+    dashboard::SLOT_IDS.iter().position(|slot| *slot == id)
+}
+
+fn selection_limit(ui: &App, index: usize) -> usize {
+    dashboard::macro_limit(!slots(ui)[index ^ 1].is_empty())
 }
 
 pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
     let initial = dashboard::load();
-    set_slots(ui, &initial);
+    set_slots(ui, &initial.slots);
+    set_macro_selections(ui, &initial.selections);
     let editor = Rc::new(RefCell::new(Editor::default()));
     let wallpaper_picker = crate::wallpaper::Picker::new();
     let cancel = wallpaper_picker.clone();
@@ -152,35 +149,27 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
             if let Some(ui) = weak.upgrade() {
                 ui.set_feedback("".into());
                 let mut state = draft.borrow_mut();
-                state.draft_macros = dashboard::selected_names("macro_names");
-                state.draft_auto_macros = dashboard::selected_names("auto_macro_names");
+                let layout = dashboard::load();
+                state.selections = layout.selections;
                 state.draft_wallpaper = dashboard::wallpaper();
-                set_draft_slots(&ui, &dashboard::load());
-                summaries(&ui, &state);
+                set_draft_slots(&ui, &layout.slots);
+                set_macro_selections(&ui, &state.selections);
+                set_wallpaper_label(&ui, &state.draft_wallpaper);
             }
         });
     }
     {
         let weak = ui.as_weak();
         let draft = editor.clone();
-        let source = store.clone();
         ui.on_dashboard_editor_reset(move || {
             if let Some(ui) = weak.upgrade() {
-                set_draft_slots(
-                    &ui,
-                    &[
-                        "interactions".into(),
-                        "auto_macros".into(),
-                        "music".into(),
-                        "".into(),
-                    ],
-                );
+                let layout = Layout::default();
+                set_draft_slots(&ui, &layout.slots);
                 let mut state = draft.borrow_mut();
-                state.draft_macros.clear();
-                state.draft_auto_macros.clear();
+                state.selections = layout.selections;
                 state.draft_wallpaper.clear();
-                summaries(&ui, &state);
-                preview(&ui, &state, &source);
+                set_macro_selections(&ui, &state.selections);
+                set_wallpaper_label(&ui, "");
                 set_wallpaper_image(&ui, "");
             }
         });
@@ -191,19 +180,36 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
         let source = store.clone();
         ui.on_dashboard_open_picker(move |kind| {
             if let Some(ui) = weak.upgrade() {
-                let mut state = draft.borrow_mut();
-                state.kind = kind.to_string();
-                state.search.clear();
-                state.picker_selection = if kind == "macros" {
-                    state.draft_macros.clone()
-                } else if kind == "auto_macros" {
-                    state.draft_auto_macros.clone()
+                let (picker_slot, kind) = if kind.starts_with("entries:") {
+                    let Some(index) = slot_index(&kind) else {
+                        return;
+                    };
+                    let card = slots(&ui)[index].clone();
+                    if !dashboard::is_macro_card(&card) {
+                        return;
+                    }
+                    (Some(index), card)
                 } else {
-                    vec![]
+                    (None, kind.to_string())
                 };
+                let mut state = draft.borrow_mut();
+                state.kind = kind;
+                state.search.clear();
+                state.picker_slot = picker_slot;
+                state.picker_selection.clear();
+                if let Some(index) = picker_slot {
+                    let limit = selection_limit(&ui, index);
+                    state.picker_selection = state.selections[index]
+                        .iter()
+                        .flatten()
+                        .take(limit)
+                        .cloned()
+                        .collect();
+                    ui.set_dashboard_picker_limit(limit as i32);
+                }
                 ui.set_dashboard_picker_search("".into());
-                let wallpaper = kind == "wallpaper";
-                ui.set_dashboard_picker_kind(kind);
+                let wallpaper = state.kind == "wallpaper";
+                ui.set_dashboard_picker_kind(state.kind.as_str().into());
                 ui.set_dashboard_picker_open(true);
                 if wallpaper {
                     wallpaper_picker.open(&ui, &state.draft_wallpaper);
@@ -235,27 +241,31 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
                 let name = name.to_string();
                 if let Some(index) = slot_index(&state.kind) {
                     let mut values = slots(&ui);
-                    let selected = name;
-                    // Keep one occurrence per card; Music turns compact when it shares a column.
-                    for (i, value) in values.iter_mut().enumerate() {
-                        if i != index && *value == selected && !selected.is_empty() {
-                            value.clear();
+                    if !dashboard::is_macro_card(&name) && !name.is_empty() {
+                        for (i, value) in values.iter_mut().enumerate() {
+                            if i != index && *value == name {
+                                value.clear();
+                            }
                         }
                     }
-                    values[index] = selected;
+                    if values[index] != name {
+                        state.selections[index] = None;
+                        values[index] = name;
+                    }
                     set_draft_slots(&ui, &values);
+                    set_macro_selections(&ui, &state.selections);
                     ui.set_dashboard_picker_open(false);
                     ui.set_touch_keyboard_open(false);
                 } else if state.kind == "wallpaper" {
                     state.draft_wallpaper = name;
-                    summaries(&ui, &state);
+                    set_wallpaper_label(&ui, &state.draft_wallpaper);
                     set_wallpaper_image(&ui, &state.draft_wallpaper);
                     ui.set_dashboard_picker_open(false);
                     ui.set_touch_keyboard_open(false);
-                } else {
+                } else if let Some(slot) = state.picker_slot {
                     if let Some(index) = state.picker_selection.iter().position(|n| n == &name) {
                         state.picker_selection.remove(index);
-                    } else if state.picker_selection.len() < 4 {
+                    } else if state.picker_selection.len() < selection_limit(&ui, slot) {
                         state.picker_selection.push(name);
                     }
                     display(&ui, &state, &source);
@@ -266,18 +276,21 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
     {
         let weak = ui.as_weak();
         let draft = editor.clone();
-        let source = store.clone();
         ui.on_dashboard_apply_picker(move || {
             if let Some(ui) = weak.upgrade() {
                 let mut state = draft.borrow_mut();
-                let selection = state.picker_selection.clone();
-                if state.kind == "macros" {
-                    state.draft_macros = selection;
-                } else if state.kind == "auto_macros" {
-                    state.draft_auto_macros = selection;
+                if let Some(slot) = state.picker_slot {
+                    let limit = selection_limit(&ui, slot);
+                    let selection: Vec<_> =
+                        state.picker_selection.iter().take(limit).cloned().collect();
+                    let changed = state.selections[slot]
+                        .as_ref()
+                        .is_none_or(|previous| previous.iter().take(limit).ne(selection.iter()));
+                    if changed {
+                        state.selections[slot] = Some(selection);
+                    }
+                    set_macro_selections(&ui, &state.selections);
                 }
-                summaries(&ui, &state);
-                preview(&ui, &state, &source);
                 ui.set_dashboard_picker_open(false);
             }
         });
@@ -285,19 +298,17 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
     {
         let weak = ui.as_weak();
         let draft = editor.clone();
-        let source = store.clone();
         ui.on_dashboard_save(move |a, b, c, d| {
             if let Some(ui) = weak.upgrade() {
                 let state = draft.borrow();
-                match dashboard::save_full(
-                    [a.to_string(), b.to_string(), c.to_string(), d.to_string()],
-                    &state.draft_macros,
-                    &state.draft_auto_macros,
-                    &state.draft_wallpaper,
-                ) {
+                let layout = Layout {
+                    slots: [a.to_string(), b.to_string(), c.to_string(), d.to_string()],
+                    selections: state.selections.clone(),
+                };
+                match dashboard::save_full(layout, &state.draft_wallpaper) {
                     Ok(saved) => {
-                        set_slots(&ui, &saved);
-                        preview(&ui, &state, &source);
+                        set_slots(&ui, &saved.slots);
+                        set_macro_selections(&ui, &saved.selections);
                         ui.set_feedback("".into());
                         ui.set_dashboard_editing(false);
                     }
@@ -311,13 +322,6 @@ pub(crate) fn install(ui: &App, store: Arc<Mutex<Store>>) {
         });
     }
     crate::wallpaper::restore(ui, &dashboard::wallpaper());
-    crate::state::models::dashboard_macros(
-        ui,
-        dashboard::selected_names("macro_names")
-            .into_iter()
-            .map(SharedString::from)
-            .collect(),
-    );
     let weak = ui.as_weak();
     ui.on_power_action(move |action| {
         let result = match action.as_str() {

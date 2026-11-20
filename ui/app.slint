@@ -1,5 +1,5 @@
 import { Theme } from "theme.slint";
-import { ActionRow, AudioEntry, AutoMacroEntry, BatteryDetails, BluetoothRow, ChannelPointRow, DashboardMacroEntry, DiagnosticRow, EthernetRow, InteractionEntry, PickerEntry, ProcessUsage, RendererInfo, SavedWifiRow, SystemStats, SystemStorage, UpdateEntry, WifiRow } from "types.slint";
+import { ActionRow, AudioEntry, AutoMacroEntry, BatteryDetails, BluetoothRow, ChannelPointRow, DashboardMacroEntry, DashboardMacroSelection, DiagnosticRow, EthernetRow, InteractionEntry, PickerEntry, ProcessUsage, RendererInfo, SavedWifiRow, SystemStats, SystemStorage, UpdateEntry, WifiRow } from "types.slint";
 import { DashboardPage, DashboardFeedback } from "pages/dashboard.slint";
 import { AudioPage } from "pages/audio.slint";
 import { ControlsPage } from "pages/controls.slint";
@@ -16,7 +16,7 @@ import { BatteryDialog } from "components/battery-dialog.slint";
 
 // Re-exported so the generated Rust API keeps these names.
 export { Theme } from "theme.slint";
-export { BatteryDetails, DiagnosticRow, ProcessUsage, RendererInfo } from "types.slint";
+export { BatteryDetails, DashboardMacroSelection, DiagnosticRow, ProcessUsage, RendererInfo } from "types.slint";
 export { EthernetRow, WifiRow, SavedWifiRow, BluetoothRow, ActionRow, ChannelPointRow, SystemStats, StorageEntry, SystemStorage, UpdateEntry, AudioLink, AudioEntry, InteractionEntry, DashboardMacroEntry, AutoMacroEntry, PickerEntry } from "types.slint";
 
 export component App inherits Window {
@@ -270,8 +270,14 @@ export component App inherits Window {
     in-out property <string> dashboard-picker-kind: "";
     in-out property <string> dashboard-picker-search: "";
     in-out property <[PickerEntry]> dashboard-picker-items: [];
-    in-out property <int> dashboard-selected-macros;
-    in-out property <int> dashboard-selected-auto-macros;
+    in-out property <int> dashboard-picker-limit: 4;
+    in-out property <[DashboardMacroSelection]> dashboard-macro-selections: [
+        { names: [], configured: false }, { names: [], configured: false },
+        { names: [], configured: false }, { names: [], configured: false },
+    ];
+    pure callback dashboard-macro-limit(bool) -> int;
+    pure callback dashboard-manual-rows([DashboardMacroEntry], DashboardMacroSelection, int) -> [DashboardMacroEntry];
+    pure callback dashboard-automatic-rows([AutoMacroEntry], DashboardMacroSelection, int) -> [AutoMacroEntry];
     in-out property <image> wallpaper-image;
     in-out property <string> wallpaper-label;
     in-out property <[DashboardMacroEntry]> dashboard-macro-list: [];
@@ -345,8 +351,10 @@ export component App inherits Window {
                 view-left-1: root.view-left-1;
                 view-right-0: root.view-right-0;
                 view-right-1: root.view-right-1;
-                dashboard-selected-macros: root.dashboard-selected-macros;
-                dashboard-selected-auto-macros: root.dashboard-selected-auto-macros;
+                macro-selections: root.dashboard-macro-selections;
+                macro-limit(stacked) => { return root.dashboard-macro-limit(stacked); }
+                manual-rows(source, selection, limit) => { return root.dashboard-manual-rows(source, selection, limit); }
+                automatic-rows(source, selection, limit) => { return root.dashboard-automatic-rows(source, selection, limit); }
                 dashboard-macro-list: root.dashboard-macro-list;
                 dashboard-interactions: root.dashboard-interactions;
                 dashboard-auto-macros: root.dashboard-auto-macros;
@@ -538,6 +546,8 @@ export component App inherits Window {
         dashboard-picker-kind: root.dashboard-picker-kind;
         dashboard-picker-search <=> root.dashboard-picker-search;
         dashboard-picker-items: root.dashboard-picker-items;
+        selection-limit: root.dashboard-picker-limit;
+        fill-text(text, marker, value) => { return root.fill-text(text, marker, value); }
         dashboard-filter(query) => { root.dashboard-filter(query); }
         dashboard-select-option(name) => { root.dashboard-select-option(name); }
         dashboard-apply-picker => { root.dashboard-apply-picker(); }

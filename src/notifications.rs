@@ -154,23 +154,14 @@ pub(crate) fn apply(app: &App, guard: &mut Store, method: &str, params: &Value) 
             }
         }
         "notify_macro_update" => {
-            app.set_macros(slint::ModelRc::new(VecModel::from(
-                guard
-                    .macros
-                    .iter()
-                    .filter(|m| presentation::is_manual_macro(m))
-                    .map(|m| SharedString::from(m.as_str()))
-                    .collect::<Vec<_>>(),
-            )));
-            let configured = crate::config::dashboard::selected_names("macro_names");
-            dashboard_macros(
-                app,
-                configured
-                    .iter()
-                    .filter(|name| guard.macros.contains(name))
-                    .map(|name| SharedString::from(name.as_str()))
-                    .collect(),
-            );
+            let names: Vec<SharedString> = guard
+                .macros
+                .iter()
+                .filter(|name| presentation::is_manual_macro(name))
+                .map(|name| SharedString::from(name.as_str()))
+                .collect();
+            app.set_macros(slint::ModelRc::new(VecModel::from(names.clone())));
+            dashboard_macros(app, names);
         }
         "notify_auto_macros_update" => {
             app.set_dashboard_auto_macros(auto_macro_rows(&guard.auto_macros));
