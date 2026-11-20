@@ -757,8 +757,9 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
         "the Power menu has no battery shortcut"
     );
     app.set_power_menu_open(false);
-    press(50., 453.);
-    release(50., 453.);
+    // Without a battery the slot shrinks to the plug icon (x 10..32).
+    press(20., 453.);
+    release(20., 453.);
     assert!(
         app.get_power_details_open(),
         "power profiles remain accessible without a battery"
