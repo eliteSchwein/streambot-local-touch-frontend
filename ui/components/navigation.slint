@@ -68,7 +68,8 @@ export component BottomNavigation inherits Rectangle {
 
     property <bool> show-power-details: root.battery-percent >= 0 || root.power-profiles-available;
     property <length> side-margin: 10px;
-    property <length> battery-width: 80px;
+    // Without a battery only the plug icon is shown, so the slot shrinks to keep the edit pen close.
+    property <length> battery-width: root.battery-percent >= 0 ? 80px : 22px;
     property <length> edit-width: 40px;
     property <length> edit-x: root.side-margin + (root.show-power-details ? root.battery-width + 4px : 0px);
     property <int> page-count: root.dev-page-enabled ? 6 : 5;
