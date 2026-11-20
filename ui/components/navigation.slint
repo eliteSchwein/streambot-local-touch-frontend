@@ -138,13 +138,20 @@ export component BottomNavigation inherits Rectangle {
             : root.loc("battery") + " " + root.battery-percent + "%"
                 + (root.battery-charging ? " · " + root.loc("battery_charging") : "");
         accessible-action-default => { root.open-power-details(); }
-        if root.battery-percent < 0 : Text {
-            text: root.loc("power_profiles");
-            color: Theme.text;
-            font-size: 12px;
-            font-weight: 600;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        // No battery: show a power plug (MDI "power-plug") instead of a text label.
+        if root.battery-percent < 0 : Path {
+            // Viewbox cropped to the glyph bounds so it sits flush left.
+            width: 14px;
+            height: 21px;
+            // Left gap to the bar edge matches the bottom gap.
+            x: (root.height - self.height) / 2 - root.side-margin;
+            y: (parent.height - self.height) / 2;
+            viewbox-x: 6;
+            viewbox-y: 3;
+            viewbox-width: 12;
+            viewbox-height: 18;
+            commands: "M16,7V3H14V7H10V3H8V7C7,7 6,8 6,9V14.5L9.5,18V21H14.5V18L18,14.5V9C18,8 17,7 16,7Z";
+            fill: Theme.text;
         }
         if root.battery-percent >= 0 : HorizontalLayout {
             spacing: 5px;

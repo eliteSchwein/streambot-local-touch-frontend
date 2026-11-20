@@ -71,7 +71,10 @@ install -Dm755 \
 install -Dm644 -t "$PACKAGE_ROOT/usr/share/streambot-touch/matugen" "$PROJECT_ROOT"/assets/matugen/*
 mkdir -p "$OUT_DIR"
 
-OUTPUT="$OUT_DIR/streambot-touch_${VERSION}.${DISTRO}_${ARCH}.deb"
+OUTPUT_BINARY="$OUT_DIR/streambot-touch_${VERSION}.${DISTRO}_${ARCH}"
+OUTPUT="$OUTPUT_BINARY.deb"
+
+install -Dm755 "$BINARY" "$OUTPUT_BINARY"
 
 dpkg-deb \
     --root-owner-group \
@@ -82,6 +85,7 @@ dpkg-deb \
 echo
 echo "Built:"
 echo "$OUTPUT"
+echo "$OUTPUT_BINARY"
 
 echo
 echo "Dependencies:"

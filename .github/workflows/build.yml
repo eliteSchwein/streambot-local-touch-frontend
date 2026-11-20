@@ -16,7 +16,6 @@ jobs:
       matrix:
         runner: [ubuntu-latest, ubuntu-24.04-arm]
         distro:
-          - bookworm
           - trixie
 
     steps:

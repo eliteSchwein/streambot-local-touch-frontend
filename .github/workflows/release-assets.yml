@@ -17,7 +17,6 @@ jobs:
       matrix:
         runner: [ubuntu-latest, ubuntu-24.04-arm]
         distro:
-          - bookworm
           - trixie
 
     steps:
@@ -38,4 +37,7 @@ jobs:
       - name: Upload release asset
         uses: softprops/action-gh-release@v3
         with:
-          files: dist-artifacts/*.deb
+          files: |
+            dist-artifacts/*.deb
+            dist-artifacts/streambot-touch_*_amd64
+            dist-artifacts/streambot-touch_*_arm64
