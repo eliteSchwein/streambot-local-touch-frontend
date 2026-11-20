@@ -29,6 +29,12 @@ export struct UpdateEntry {
 
 export struct SystemMetric { label: string, tint: color, value: float, empty: string }
 
+export struct DiagnosticRow { label: string, value: string }
+
+export struct RendererInfo { name: string, adapter: string, driver: string }
+
+export struct ProcessUsage { cpu: string, memory: string }
+
 export struct AudioLink { id: string, label: string, linked: bool, present: bool, default-output: bool, volume: float }
 
 export struct AudioEntry {

@@ -1,4 +1,8 @@
-use std::{env, fs, path::PathBuf};
+use serde_json::{json, Value};
+use std::{
+    env, fs, io,
+    path::{Path, PathBuf},
+};
 
 pub(crate) fn directory() -> PathBuf {
     env::var_os("XDG_CONFIG_HOME")
@@ -6,6 +10,58 @@ pub(crate) fn directory() -> PathBuf {
         .filter(|p| p.is_absolute())
         .unwrap_or_else(|| PathBuf::from(env::var_os("HOME").unwrap_or_default()).join(".config"))
         .join("streambot")
+}
+
+pub(crate) fn settings_path() -> PathBuf {
+    directory().join("streambot-settings.json")
+}
+
+pub(crate) fn touch_dev_page(path: &Path) -> bool {
+    read_settings(path)
+        .ok()
+        .and_then(|settings| settings["touch_dev_page"].as_bool())
+        .unwrap_or(false)
+}
+
+pub(crate) fn save_touch_dev_page(path: &Path, enabled: bool) -> io::Result<()> {
+    let mut settings = read_settings(path)?;
+    settings["touch_dev_page"] = json!(enabled);
+    write_settings(path, &settings)
+}
+
+fn read_settings(path: &Path) -> io::Result<Value> {
+    let data = match fs::read_to_string(path) {
+        Ok(contents) => serde_json::from_str::<Value>(&contents).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid settings JSON: {e}"),
+            )
+        })?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => json!({}),
+        Err(e) => return Err(e),
+    };
+    if !data.is_object() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid settings root",
+        ));
+    }
+    Ok(data)
+}
+
+fn write_settings(path: &Path, data: &Value) -> io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temp = path.with_extension("json.tmp");
+    fs::write(
+        &temp,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(data).map_err(io::Error::other)?
+        ),
+    )?;
+    fs::rename(temp, path)
 }
 
 #[derive(Clone)]

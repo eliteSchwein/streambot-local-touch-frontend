@@ -1,10 +1,7 @@
 //! Local dashboard configuration compatible with Quickshell Config.qml.
+use super::{read_settings, settings_path as path, write_settings};
 use serde_json::{json, Value};
 use std::{fs, io, path::PathBuf};
-
-fn path() -> PathBuf {
-    super::directory().join("streambot-settings.json")
-}
 
 pub(crate) fn load() -> [String; 4] {
     let default = || {
@@ -160,7 +157,8 @@ pub(crate) fn save_full(
 ) -> io::Result<[String; 4]> {
     // Writes all editor values in a single atomic rename, preserving unrelated settings.
     let normalized = normalize(input);
-    let mut data = read_settings()?;
+    let target = path();
+    let mut data = read_settings(&target)?;
     if !wallpaper.is_empty() && wallpaper_path(wallpaper).is_none() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -181,50 +179,12 @@ pub(crate) fn save_full(
         "macro_names": macros.iter().take(4).collect::<Vec<_>>(),
         "auto_macro_names": auto_macros.iter().take(4).collect::<Vec<_>>()});
     data["touch_wallpaper"] = json!(wallpaper);
-    write_settings(&data)?;
+    write_settings(&target, &data)?;
     Ok(normalized)
 }
 
-fn read_settings() -> io::Result<Value> {
-    let target = path();
-    let data = match fs::read_to_string(&target) {
-        Ok(contents) => serde_json::from_str::<Value>(&contents).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid settings JSON: {e}"),
-            )
-        })?,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => json!({}),
-        Err(e) => return Err(e),
-    };
-    if !data.is_object() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "Invalid settings root",
-        ));
-    }
-    Ok(data)
-}
-
-fn write_settings(data: &Value) -> io::Result<()> {
-    let target = path();
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let temp = target.with_extension("json.tmp");
-    fs::write(
-        &temp,
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(&data).map_err(io::Error::other)?
-        ),
-    )?;
-    fs::rename(&temp, target)?;
-    Ok(())
-}
-
 pub(crate) fn language() -> String {
-    read_settings()
+    read_settings(&path())
         .ok()
         .and_then(|v| v["language"].as_str().map(str::to_owned))
         .filter(|lang| lang == "de")
@@ -232,7 +192,8 @@ pub(crate) fn language() -> String {
 }
 
 pub(crate) fn save_language(lang: &str) -> io::Result<()> {
-    let mut settings = read_settings()?;
+    let target = path();
+    let mut settings = read_settings(&target)?;
     settings["language"] = json!(lang);
-    write_settings(&settings)
+    write_settings(&target, &settings)
 }

@@ -1,0 +1,101 @@
+import { Theme } from "../theme.slint";
+import { DiagnosticRow, ProcessUsage, RendererInfo } from "../types.slint";
+import { GlassCard, Scroller } from "../components/common.slint";
+import { SystemHeading } from "../components/system.slint";
+
+component DiagnosticsCard inherits GlassCard {
+    in property <string> heading;
+    in property <[DiagnosticRow]> rows;
+    pure callback loc(string) -> string;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        alignment: start;
+        SystemHeading { text: root.heading; }
+        for row in root.rows : HorizontalLayout {
+            spacing: 8px;
+            Text {
+                width: 118px;
+                text: root.loc(row.label);
+                color: Theme.muted;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: row.value == "" ? "—" : row.value;
+                color: Theme.text;
+                font-size: 13px;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+export component DevPage inherits Rectangle {
+    in property <bool> active;
+    in property <RendererInfo> renderer-info;
+    in property <[DiagnosticRow]> device-diagnostics;
+    in property <string> window-size;
+    pure callback loc(string) -> string;
+    callback sample-usage(bool) -> ProcessUsage;
+    property <ProcessUsage> usage;
+
+    init => { if root.active { root.usage = root.sample-usage(true); } }
+    changed active => { if root.active { root.usage = root.sample-usage(true); } }
+    Timer {
+        running: root.active;
+        interval: 1s;
+        triggered => { root.usage = root.sample-usage(false); }
+    }
+
+    background: Theme.background;
+    VerticalLayout {
+        padding: 10px;
+        spacing: 8px;
+        Text {
+            text: root.loc("page_dev");
+            font-size: 22px;
+            font-weight: 600;
+            color: Theme.text;
+        }
+        Scroller {
+            VerticalLayout {
+                alignment: start;
+                HorizontalLayout {
+                    spacing: 8px;
+                    VerticalLayout {
+                        width: (root.width - 28px) / 2;
+                        spacing: 8px;
+                        alignment: start;
+                        DiagnosticsCard {
+                            heading: root.loc("dev_rendering");
+                            rows: [
+                                { label: "dev_renderer", value: root.renderer-info.name },
+                                { label: "dev_adapter", value: root.renderer-info.adapter },
+                                { label: "dev_driver", value: root.renderer-info.driver },
+                                { label: "dev_window_size", value: root.window-size },
+                            ];
+                            loc(key) => { return root.loc(key); }
+                        }
+                        DiagnosticsCard {
+                            heading: root.loc("dev_touch_process");
+                            rows: [
+                                { label: "dev_process_cpu", value: root.usage.cpu },
+                                { label: "dev_process_memory", value: root.usage.memory },
+                            ];
+                            loc(key) => { return root.loc(key); }
+                        }
+                    }
+                    DiagnosticsCard {
+                        width: (root.width - 28px) / 2;
+                        heading: root.loc("dev_device_and_software");
+                        rows: root.device-diagnostics;
+                        loc(key) => { return root.loc(key); }
+                    }
+                }
+            }
+        }
+    }
+}

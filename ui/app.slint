@@ -1,10 +1,11 @@
 import { Theme } from "theme.slint";
-import { ActionRow, AudioEntry, AutoMacroEntry, BluetoothRow, ChannelPointRow, DashboardMacroEntry, EthernetRow, InteractionEntry, PickerEntry, SavedWifiRow, SystemStats, SystemStorage, UpdateEntry, WifiRow } from "types.slint";
+import { ActionRow, AudioEntry, AutoMacroEntry, BluetoothRow, ChannelPointRow, DashboardMacroEntry, DiagnosticRow, EthernetRow, InteractionEntry, PickerEntry, ProcessUsage, RendererInfo, SavedWifiRow, SystemStats, SystemStorage, UpdateEntry, WifiRow } from "types.slint";
 import { DashboardPage, DashboardFeedback } from "pages/dashboard.slint";
 import { AudioPage } from "pages/audio.slint";
 import { ControlsPage } from "pages/controls.slint";
 import { SystemPage } from "pages/system.slint";
 import { SpeedtestPage } from "pages/speedtest.slint";
+import { DevPage } from "pages/dev.slint";
 import { ConnectionOverlay, BottomNavigation } from "components/navigation.slint";
 import { NetworkDrawer, WifiPasswordDialog } from "components/network-drawer.slint";
 import { AudioRoutingDialog, VolumeOsd } from "components/audio-overlays.slint";
@@ -14,6 +15,7 @@ import { PowerMenu } from "components/power-menu.slint";
 
 // Re-exported so the generated Rust API keeps these names.
 export { Theme } from "theme.slint";
+export { DiagnosticRow, ProcessUsage, RendererInfo } from "types.slint";
 export { EthernetRow, WifiRow, SavedWifiRow, BluetoothRow, ActionRow, ChannelPointRow, SystemStats, StorageEntry, SystemStorage, UpdateEntry, AudioLink, AudioEntry, InteractionEntry, DashboardMacroEntry, AutoMacroEntry, PickerEntry } from "types.slint";
 
 export component App inherits Window {
@@ -25,6 +27,10 @@ export component App inherits Window {
     background: Theme.background;
 
     in-out property <int> page: 0;
+    in property <bool> dev-page-enabled;
+    in property <RendererInfo> renderer-info;
+    in property <[DiagnosticRow]> device-diagnostics;
+    callback sample-dev-usage(bool) -> ProcessUsage;
     in-out property <string> connection: "Waiting for backend";
     in-out property <string> backend-stage: "";
     in-out property <bool> backend-ready;
@@ -191,7 +197,7 @@ export component App inherits Window {
     // Swipe between pages: the outgoing page stays alive until the swipe ends.
     property <int> previous-page: 0;
     function go-to(target: int) {
-        if target == root.page { return; }
+        if target == root.page || (target == 5 && !root.dev-page-enabled) { return; }
         if root.gpu-effects {
             root.previous-page = root.page;
             root.page-start = animation-tick();
@@ -214,6 +220,11 @@ export component App inherits Window {
         root.touch-keyboard-open = false;
         root.routing = "";
         if root.page == 4 && root.connection == "Connected" { root.speedtest-status(); }
+    }
+    changed dev-page-enabled => {
+        if !root.dev-page-enabled && root.page == 5 {
+            root.go-to(0);
+        }
     }
     property <length> keyboard-height: root.touch-keyboard-symbols
         ? min(300px, root.height * 0.50) : min(250px, root.height * 0.42);
@@ -401,10 +412,22 @@ export component App inherits Window {
                 startup-stage(language, stage) => { return root.startup-stage(language, stage); }
                 loc(key) => { return root.loc(key); }
             }
+            if root.dev-page-enabled && root.page-shown(5) : DevPage {
+                x: root.page-x(5);
+                width: parent.width;
+                height: parent.height;
+                active: root.page == 5;
+                renderer-info: root.renderer-info;
+                device-diagnostics: root.device-diagnostics;
+                window-size: round(root.width / 1px) + " × " + round(root.height / 1px);
+                sample-usage(reset) => { return root.sample-dev-usage(reset); }
+                loc(key) => { return root.loc(key); }
+            }
         }
         BottomNavigation {
             opacity: root.stage(0.12, 0.55);
             page: root.page;
+            dev-page-enabled: root.dev-page-enabled;
             dashboard-editing: root.dashboard-editing;
             navigate(target) => {
                 root.go-to(target);

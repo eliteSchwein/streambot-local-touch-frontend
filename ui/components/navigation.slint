@@ -30,6 +30,7 @@ export component ConnectionOverlay inherits Rectangle {
 
 export component BottomNavigation inherits Rectangle {
     in property <int> page;
+    in property <bool> dev-page-enabled;
     in property <bool> dashboard-editing;
     callback navigate(int);
     callback toggle-dashboard-editor();
@@ -63,6 +64,13 @@ export component BottomNavigation inherits Rectangle {
         NavItem { label: root.loc("page_controls"); icon: @image-url("../icons/mdi/tune.svg"); active-icon: @image-url("../icons/mdi-selected/tune.svg"); active: root.page == 2; clicked => { root.navigate(2); } }
         NavItem { label: root.loc("page_system"); icon: @image-url("../icons/mdi/server.svg"); active-icon: @image-url("../icons/mdi-selected/server.svg"); active: root.page == 3; clicked => { root.navigate(3); } }
         NavItem { label: root.loc("page_speedtest"); icon: @image-url("../icons/mdi/speedometer.svg"); active-icon: @image-url("../icons/mdi-selected/speedometer.svg"); active: root.page == 4; clicked => { root.navigate(4); } }
+        if root.dev-page-enabled : NavItem {
+            label: root.loc("page_dev");
+            icon: @image-url("../icons/mdi/code-tags.svg");
+            active-icon: @image-url("../icons/mdi-selected/code-tags.svg");
+            active: root.page == 5;
+            clicked => { root.navigate(5); }
+        }
     }
     if root.page == 0 : Rectangle {
         width: 40px;

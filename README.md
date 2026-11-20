@@ -20,6 +20,8 @@ The default configuration directory is `~/.config/streambot` or `$XDG_CONFIG_HOM
 
 Slint tries Vulkan first, then OpenGL, and falls back to software rendering when accelerated rendering is unavailable. To force the software renderer, set `SLINT_BACKEND=winit-software` when launching the app.
 
+Press the physical backtick key (usually above Tab) to toggle Dev mode. This saves the new `touch_dev_page` value in `streambot-settings.json` so it takes effect at the next startup too. The Dev tab displays the active renderer, available graphics adapter and driver details, and the desktop environment and Wayland compositor when identified. On Linux it samples the Touch process's CPU and resident RAM once a second while the tab is open. The page works while the Streambot backend is offline.
+
 ## Kiosk controls
 
 Use the bottom navigation to switch between the dashboard, audio, macros, system and speedtest pages. The dashboard editor saves card placement and selected macros. The audio page controls virtual and physical outputs, mute, routing and per-output volume. The system page shows resource usage, folder storage and updates. Update all runs the backend update last.

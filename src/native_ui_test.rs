@@ -2,21 +2,44 @@ use super::*;
 use serde_json::json;
 use slint::platform::{software_renderer::MinimalSoftwareWindow, Platform, WindowAdapter};
 use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::winit_030::{
+    winit::{
+        event::ElementState,
+        keyboard::{KeyCode, ModifiersState, PhysicalKey},
+    },
+    EventResult,
+};
 use slint::{LogicalPosition, Model, ModelRc, PhysicalSize, PlatformError, Rgb8Pixel, VecModel};
+use std::cell::Cell;
 use std::rc::Rc;
+use std::time::Instant;
 
-struct TestDisplay(Rc<MinimalSoftwareWindow>);
+struct TestDisplay {
+    window: Rc<MinimalSoftwareWindow>,
+    started: Instant,
+    elapsed_offset: Rc<Cell<Duration>>,
+}
 
 impl Platform for TestDisplay {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
-        Ok(self.0.clone())
+        Ok(self.window.clone())
+    }
+
+    fn duration_since_start(&self) -> Duration {
+        self.started.elapsed() + self.elapsed_offset.get()
     }
 }
 
 #[test]
 fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     let window = MinimalSoftwareWindow::new(Default::default());
-    slint::platform::set_platform(Box::new(TestDisplay(window.clone()))).unwrap();
+    let elapsed_offset = Rc::new(Cell::new(Duration::ZERO));
+    slint::platform::set_platform(Box::new(TestDisplay {
+        window: window.clone(),
+        started: Instant::now(),
+        elapsed_offset: elapsed_offset.clone(),
+    }))
+    .unwrap();
     let app = App::new().unwrap();
     app.show().unwrap();
     window.set_size(PhysicalSize::new(800, 480));
@@ -216,6 +239,107 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
             position: LogicalPosition::new(x, y),
         })
     };
+    assert!(!app.get_dev_page_enabled());
+    press(605., 450.);
+    release(605., 450.);
+    assert_eq!(app.get_page(), 4);
+
+    app.set_connection("Reconnecting".into());
+    let settings_dir =
+        std::env::temp_dir().join(format!("streambot-dev-test-{}", std::process::id()));
+    std::fs::create_dir(&settings_dir).unwrap();
+    let settings_path = settings_dir.join("streambot-settings.json");
+    std::fs::write(
+        &settings_path,
+        r#"{"language":"de","touch_wallpaper":"example.jpg"}"#,
+    )
+    .unwrap();
+    assert!(!config::touch_dev_page(&settings_path));
+    diagnostics::install(&app, settings_path.clone());
+    let backtick = |modifiers, state, repeat| {
+        diagnostics::handle_dev_key(
+            &app,
+            &settings_path,
+            PhysicalKey::Code(KeyCode::Backquote),
+            modifiers,
+            state,
+            repeat,
+        )
+    };
+    let plain = ModifiersState::empty();
+    assert_eq!(
+        backtick(ModifiersState::SHIFT, ElementState::Pressed, false),
+        EventResult::Propagate
+    );
+    assert!(!app.get_dev_page_enabled());
+    assert_eq!(
+        backtick(plain, ElementState::Pressed, false),
+        EventResult::PreventDefault
+    );
+    assert!(app.get_dev_page_enabled());
+    assert!(config::touch_dev_page(&settings_path));
+    assert_eq!(app.get_page(), 4, "enabling Dev reveals its tab");
+    backtick(plain, ElementState::Pressed, true);
+    backtick(plain, ElementState::Released, false);
+    assert!(
+        app.get_dev_page_enabled(),
+        "repeat and release do not toggle Dev"
+    );
+    assert_eq!(app.get_renderer_info().name, "Slint software");
+    assert!(app
+        .get_device_diagnostics()
+        .iter()
+        .any(|row| row.label == "dev_arch" && row.value == std::env::consts::ARCH));
+    #[cfg(target_os = "linux")]
+    {
+        let first = app.invoke_sample_dev_usage(true);
+        assert!(first.cpu.is_empty());
+        assert!(first.memory.ends_with(" MiB"));
+    }
+    window.draw_if_needed(|r| {
+        r.render(&mut buffer, 800);
+    });
+    let offline = buffer[..800 * 428].to_vec();
+    press(605., 450.);
+    release(605., 450.);
+    assert_eq!(app.get_page(), 5);
+    window.draw_if_needed(|r| {
+        r.render(&mut buffer, 800);
+    });
+    assert_ne!(&buffer[..800 * 428], offline.as_slice());
+    assert_eq!(buffer[440 * 800 + 590], primary, "Dev nav pill is active");
+    #[cfg(target_os = "linux")]
+    {
+        let before_sample = buffer[..800 * 428].to_vec();
+        elapsed_offset.set(Duration::from_millis(1100));
+        slint::platform::update_timers_and_animations();
+        window.draw_if_needed(|r| {
+            r.render(&mut buffer, 800);
+        });
+        assert_ne!(
+            &buffer[..800 * 428],
+            before_sample.as_slice(),
+            "Dev updates process usage while open"
+        );
+    }
+    backtick(plain, ElementState::Pressed, false);
+    slint::platform::update_timers_and_animations();
+    assert!(!app.get_dev_page_enabled());
+    assert_eq!(app.get_page(), 0);
+    assert!(!config::touch_dev_page(&settings_path));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&std::fs::read(&settings_path).unwrap()).unwrap(),
+        json!({"language": "de", "touch_wallpaper": "example.jpg", "touch_dev_page": false})
+    );
+    std::fs::write(&settings_path, "{broken").unwrap();
+    backtick(plain, ElementState::Pressed, false);
+    assert!(!app.get_dev_page_enabled());
+    assert_eq!(std::fs::read_to_string(&settings_path).unwrap(), "{broken");
+    app.set_feedback("".into());
+    std::fs::remove_file(&settings_path).unwrap();
+    std::fs::remove_dir(settings_dir).unwrap();
+    app.set_connection("Connected".into());
+
     let saved = Rc::new(std::cell::Cell::new(false));
     {
         let saved = saved.clone();
@@ -288,11 +412,21 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
             text: Key::LeftArrow.into(),
         });
     }
-    for (key, query) in [("ä", "yäz "), ("x", "yäxz "), ("backspace", "yäz ")] {
+    for (key, query) in [
+        ("ä", "yäz "),
+        ("x", "yäxz "),
+        ("backspace", "yäz "),
+        ("`", "yä`z "),
+        ("backspace", "yäz "),
+    ] {
         app.invoke_keyboard_input(key.into());
         slint::platform::update_timers_and_animations();
         assert_eq!(app.get_search(), query);
     }
+    assert!(
+        !app.get_dev_page_enabled(),
+        "touch keyboard input leaves Dev off"
+    );
     app.set_touch_keyboard_symbols(false);
     app.set_language("en".into());
 

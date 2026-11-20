@@ -7,6 +7,7 @@ mod bluetooth;
 mod channel_points;
 mod config;
 mod dashboard_editor;
+mod diagnostics;
 mod drawer;
 mod i18n;
 #[cfg(test)]
@@ -30,29 +31,11 @@ use tokio::sync::{mpsc, watch};
 
 slint::include_modules!();
 
-/// Page transitions and the startup animation only run on the Vulkan renderer;
-/// OpenGL and software rendering stay static to keep weak devices responsive.
-fn enable_motion_on_vulkan(ui: &App) {
-    let weak = ui.as_weak();
-    let result = ui.window().set_rendering_notifier(move |state, api| {
-        let slint::RenderingState::RenderingSetup = state else {
-            return;
-        };
-        let vulkan = matches!(api, slint::GraphicsAPI::WGPU30 { device, .. }
-            if device.adapter_info().backend == slint::wgpu_30::wgpu::Backend::Vulkan);
-        if let (true, Some(app)) = (vulkan, weak.upgrade()) {
-            // Runs before the first frame is drawn, so the intro starts from blank.
-            app.invoke_start_intro();
-        }
-    });
-    if let Err(error) = result {
-        eprintln!("Rendering notifier unavailable, animations disabled: {error}");
-    }
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Settings::load();
     let ui = App::new()?;
+    let settings_path = config::settings_path();
+    diagnostics::set_enabled(&ui, config::touch_dev_page(&settings_path));
     let store = Arc::new(Mutex::new(Store::default()));
     dashboard_editor::install(&ui, store.clone());
     let _drawer_refresh = drawer::install(&ui, config.rest_port);
@@ -81,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
-    enable_motion_on_vulkan(&ui);
+    diagnostics::install(&ui, settings_path);
     ui.window().set_fullscreen(true);
     ui.run()?;
     rt.shutdown_timeout(Duration::from_millis(250));
