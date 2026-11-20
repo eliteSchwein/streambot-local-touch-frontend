@@ -1,4 +1,4 @@
-use crate::{ui_bridge::ui_event, App, BatteryDetails};
+use crate::{ui_bridge::ui_event, App};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::{collections::HashMap, time::Duration};
 use tokio::{
@@ -29,7 +29,8 @@ struct Profiles {
 
 pub(crate) fn install(app: &App, runtime: &Handle) {
     let (commands, mut requests) = mpsc::channel::<String>(1);
-    let (visibility, mut details_open) = watch::channel(false);
+    let (visibility, mut details_open) = watch::channel(app.get_power_details_open());
+    battery::install(app, details_open.clone());
     app.on_power_details_visibility(move |visible| {
         let _ = visibility.send(visible);
     });
@@ -52,7 +53,6 @@ pub(crate) fn install(app: &App, runtime: &Handle) {
     let weak = app.as_weak();
     runtime.spawn(async move {
         let mut connection: Option<Connection> = None;
-        let mut history = battery::History::default();
         let mut poll = time::interval(Duration::from_secs(5));
         poll.set_missed_tick_behavior(MissedTickBehavior::Skip);
         loop {
@@ -74,43 +74,9 @@ pub(crate) fn install(app: &App, runtime: &Handle) {
                     .await
                     .ok();
             }
-            let (battery, (profiles, error)) = tokio::join!(
-                battery::status(connection.as_ref()),
-                power_profiles(connection.as_ref(), requested.as_deref()),
-            );
-            let visible = *details_open.borrow();
-            let samples = history.update(connection.as_ref(), battery, visible).await;
+            let (profiles, error) = power_profiles(connection.as_ref(), requested.as_deref()).await;
             let changed_profile = requested.is_some();
             ui_event(&weak, move |app| {
-                app.set_battery_percent(battery.map_or(-1, |battery| battery.percent));
-                app.set_battery_charging(battery.is_some_and(|battery| battery.state == 1));
-                app.set_battery_details(battery.map_or(
-                    BatteryDetails {
-                        state: 0,
-                        minutes: 0,
-                        watts: -1.0,
-                        health: -1,
-                        ..Default::default()
-                    },
-                    |battery| {
-                        BatteryDetails {
-                            state: battery.state as i32,
-                            minutes: (battery.seconds_remaining.max(0).saturating_add(59) / 60)
-                                .try_into()
-                                .unwrap_or(0),
-                            watts: battery.watts,
-                            health: battery.capacity.health(),
-                            full_capacity: battery.capacity.full as f32,
-                            design_capacity: battery.capacity.design as f32,
-                            capacity_unit: battery.capacity.unit.into(),
-                        }
-                    },
-                ));
-                if let Some(samples) = samples {
-                    if !app.get_battery_history().iter().eq(samples.iter().copied()) {
-                        app.set_battery_history(ModelRc::new(VecModel::from(samples)));
-                    }
-                }
                 let current = app.get_power_profiles();
                 if current.row_count() != profiles.available.len()
                     || current

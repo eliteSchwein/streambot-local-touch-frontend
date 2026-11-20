@@ -720,6 +720,17 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     app.set_active_power_profile("balanced".into());
     let (profile_tx, profile_rx) = std::sync::mpsc::channel();
     app.on_choose_power_profile(move |profile| profile_tx.send(profile).unwrap());
+    window.draw_if_needed(|r| {
+        r.render(&mut buffer, 800);
+    });
+    let bolt_pixels = (450..458)
+        .flat_map(|y| &buffer[y * 800 + 28..y * 800 + 42])
+        .filter(|&&pixel| pixel == primary)
+        .count();
+    assert!(
+        bolt_pixels >= 14,
+        "the charging bolt has a visible foreground"
+    );
     press(50., 453.);
     release(50., 453.);
     assert!(

@@ -150,34 +150,45 @@ export component BottomNavigation inherits Rectangle {
             spacing: 5px;
             alignment: center;
             Rectangle {
-                width: 23px;
+                width: 27px;
                 Rectangle {
-                    width: 20px;
-                    height: 12px;
+                    width: 24px;
+                    height: 14px;
                     x: 0px;
                     y: (parent.height - self.height) / 2;
                     border-width: 1px;
-                    border-radius: 2px;
-                    border-color: Theme.muted;
+                    border-radius: 3px;
+                    border-color: root.battery-charging ? Theme.primary : Theme.muted;
                     Rectangle {
                         x: 2px;
                         y: 2px;
                         width: (parent.width - 4px) * clamp(root.battery-percent, 0, 100) / 100;
                         height: parent.height - 4px;
-                        background: root.battery-charging ? Theme.success : Theme.text;
+                        border-radius: 1px;
+                        background: root.battery-charging ? Theme.primary.with-alpha(0.22) : Theme.text;
+                    }
+                    if root.battery-charging : Path {
+                        width: 10px;
+                        height: 12px;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        viewbox-width: 10;
+                        viewbox-height: 14;
+                        commands: "M 6.5 0 L 0 8.5 H 4 L 3.5 14 L 10 5.5 H 6 Z";
+                        fill: Theme.primary;
                     }
                 }
                 Rectangle {
-                    x: 20px;
+                    x: 24px;
                     width: 2px;
                     height: 6px;
                     y: (parent.height - self.height) / 2;
                     border-radius: 1px;
-                    background: Theme.muted;
+                    background: root.battery-charging ? Theme.primary : Theme.muted;
                 }
             }
             Text {
-                text: (root.battery-charging ? "⚡ " : "") + root.battery-percent + "%";
+                text: root.battery-percent + "%";
                 font-size: 12px;
                 font-weight: 600;
                 color: Theme.text;

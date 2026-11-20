@@ -1,17 +1,164 @@
 use super::proxy;
+use crate::{ui_bridge::ui_event, App, BatteryDetails};
+use futures_util::StreamExt;
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use std::{
     collections::{HashMap, VecDeque},
     fs,
     path::Path,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use zbus::{Connection, OwnedObjectPath};
+use tokio::{
+    sync::{mpsc, watch},
+    time::{self, Instant},
+};
+use zbus::{proxy::SignalStream, Connection, OwnedObjectPath};
 
 const UPOWER: &str = "org.freedesktop.UPower";
 const DEVICE: &str = "org.freedesktop.UPower.Device";
+const DISPLAY_DEVICE: &str = "/org/freedesktop/UPower/devices/DisplayDevice";
+const FALLBACK_POLL: Duration = Duration::from_secs(1);
+const SIGNAL_POLL: Duration = Duration::from_secs(10);
 const HISTORY_HOURS: usize = 24;
 const SECONDS_PER_HOUR: u64 = 3600;
 const HISTORY_SECONDS: u64 = HISTORY_HOURS as u64 * SECONDS_PER_HOUR;
+
+pub(super) fn install(app: &App, details_open: watch::Receiver<bool>) {
+    let ui = app.as_weak();
+    if let Err(error) = thread::Builder::new()
+        .name("battery-monitor".into())
+        .spawn(move || {
+            match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(runtime) => runtime.block_on(monitor(ui, details_open)),
+                Err(error) => eprintln!("Battery monitor unavailable: {error}"),
+            }
+        })
+    {
+        eprintln!("Battery monitor unavailable: {error}");
+    }
+}
+
+async fn monitor(ui: slint::Weak<App>, mut details_open: watch::Receiver<bool>) {
+    let mut connection: Option<Connection> = None;
+    let mut changes: Option<SignalStream<'static>> = None;
+    let mut battery = None;
+    let mut history = History::default();
+    let mut last_history_fetch: Option<Instant> = None;
+    let (history_ready, mut history_updates) = mpsc::channel(1);
+    let mut poll_at = Instant::now();
+
+    loop {
+        tokio::select! {
+            result = details_open.changed() => {
+                if result.is_err() { break; }
+            },
+            signal = async { changes.as_mut().unwrap().next().await }, if changes.is_some() => {
+                if signal.is_none() { changes = None; }
+            },
+            Some(saved) = history_updates.recv() => {
+                history.saved = saved;
+                if *details_open.borrow() {
+                    publish(&ui, battery, history.snapshot(battery, true));
+                }
+                continue;
+            },
+            _ = time::sleep_until(poll_at) => {},
+        }
+
+        if connection.as_ref().is_none_or(Connection::is_closed) {
+            changes = None;
+            connection = zbus::connection::Builder::system()
+                .method_timeout(FALLBACK_POLL)
+                .build()
+                .await
+                .ok();
+        }
+        if changes.is_none() {
+            if let Some(bus) = &connection {
+                changes = time::timeout(FALLBACK_POLL, display_changes(bus))
+                    .await
+                    .ok()
+                    .and_then(Result::ok);
+            }
+        }
+
+        let (current, from_upower) = status(connection.as_ref()).await;
+        battery = current;
+        let details_visible = *details_open.borrow();
+        publish(&ui, battery, history.snapshot(battery, details_visible));
+        poll_at = Instant::now()
+            + if from_upower && changes.is_some() {
+                SIGNAL_POLL
+            } else {
+                FALLBACK_POLL
+            };
+
+        if details_visible
+            && battery.is_some()
+            && last_history_fetch.is_none_or(|time| time.elapsed() >= Duration::from_secs(60))
+        {
+            if let Some(bus) = connection.clone() {
+                last_history_fetch = Some(Instant::now());
+                let history_ready = history_ready.clone();
+                tokio::spawn(async move {
+                    if let Ok(Some(history)) =
+                        time::timeout(Duration::from_secs(3), upower_history(&bus)).await
+                    {
+                        let _ = history_ready.send(history).await;
+                    }
+                });
+            }
+        }
+    }
+}
+
+async fn display_changes(connection: &Connection) -> zbus::Result<SignalStream<'static>> {
+    proxy(
+        connection,
+        UPOWER,
+        DISPLAY_DEVICE,
+        "org.freedesktop.DBus.Properties",
+    )
+    .await?
+    .receive_signal_with_args("PropertiesChanged", &[(0, DEVICE)])
+    .await
+}
+
+fn publish(ui: &slint::Weak<App>, battery: Option<Battery>, samples: Option<Vec<f32>>) {
+    ui_event(ui, move |app| {
+        app.set_battery_percent(battery.map_or(-1, |battery| battery.percent));
+        app.set_battery_charging(battery.is_some_and(|battery| battery.state == 1));
+        app.set_battery_details(battery.map_or(
+            BatteryDetails {
+                watts: -1.0,
+                health: -1,
+                ..Default::default()
+            },
+            |battery| {
+                BatteryDetails {
+                    state: battery.state as i32,
+                    minutes: (battery.seconds_remaining.max(0).saturating_add(59) / 60)
+                        .try_into()
+                        .unwrap_or(0),
+                    watts: battery.watts,
+                    health: battery.capacity.health(),
+                    full_capacity: battery.capacity.full as f32,
+                    design_capacity: battery.capacity.design as f32,
+                    capacity_unit: battery.capacity.unit.into(),
+                }
+            },
+        ));
+        if let Some(samples) = samples {
+            if !app.get_battery_history().iter().eq(samples.iter().copied()) {
+                app.set_battery_history(ModelRc::new(VecModel::from(samples)));
+            }
+        }
+    });
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct Battery {
@@ -65,7 +212,7 @@ impl Capacity {
     }
 }
 
-pub(super) async fn status(connection: Option<&Connection>) -> Option<Battery> {
+async fn status(connection: Option<&Connection>) -> (Option<Battery>, bool) {
     let sysfs = Path::new("/sys/class/power_supply");
     if let Some(connection) = connection {
         if let Some(mut battery) = upower_battery(connection).await {
@@ -74,21 +221,16 @@ pub(super) async fn status(connection: Option<&Connection>) -> Option<Battery> {
                     battery.capacity = battery.capacity.with_fallback(fallback.capacity);
                 }
             }
-            return Some(battery);
+            return (Some(battery), true);
         }
     }
-    sysfs_battery(sysfs)
+    (sysfs_battery(sysfs), false)
 }
 
 async fn upower_battery(connection: &Connection) -> Option<Battery> {
-    let proxy = proxy(
-        connection,
-        UPOWER,
-        "/org/freedesktop/UPower/devices/DisplayDevice",
-        DEVICE,
-    )
-    .await
-    .ok()?;
+    let proxy = proxy(connection, UPOWER, DISPLAY_DEVICE, DEVICE)
+        .await
+        .ok()?;
     let (present, percentage, state) = tokio::try_join!(
         proxy.get_property::<bool>("IsPresent"),
         proxy.get_property::<f64>("Percentage"),
@@ -262,19 +404,13 @@ fn combined_capacity(packs: &[Capacity]) -> Capacity {
 }
 
 #[derive(Default)]
-pub(super) struct History {
+struct History {
     sampled: VecDeque<(u64, f32)>,
     saved: Vec<(u64, f32)>,
-    last_fetch: Option<Instant>,
 }
 
 impl History {
-    pub(super) async fn update(
-        &mut self,
-        connection: Option<&Connection>,
-        battery: Option<Battery>,
-        visible: bool,
-    ) -> Option<Vec<f32>> {
+    fn snapshot(&mut self, battery: Option<Battery>, visible: bool) -> Option<Vec<f32>> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
         self.sampled
             .retain(|&(timestamp, _)| timestamp <= now && now - timestamp < HISTORY_SECONDS);
@@ -290,19 +426,6 @@ impl History {
         }
         if !visible {
             return None;
-        }
-        if self
-            .last_fetch
-            .is_none_or(|time| time.elapsed() >= Duration::from_secs(60))
-        {
-            self.last_fetch = Some(Instant::now());
-            if let Some(connection) = connection.filter(|_| battery.is_some()) {
-                if let Ok(Some(saved)) =
-                    tokio::time::timeout(Duration::from_secs(3), upower_history(connection)).await
-                {
-                    self.saved = saved;
-                }
-            }
         }
         Some(hourly_samples(
             now,
@@ -380,6 +503,55 @@ fn hourly_samples(now: u64, samples: impl IntoIterator<Item = (u64, f32)>) -> Ve
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct MockBattery(u32);
+
+    #[zbus::interface(name = "org.freedesktop.UPower.Device")]
+    impl MockBattery {
+        #[zbus(property)]
+        fn state(&self) -> u32 {
+            self.0
+        }
+
+        #[zbus(property)]
+        fn set_state(&mut self, state: u32) {
+            self.0 = state;
+        }
+
+        #[zbus(property)]
+        fn is_present(&self) -> bool {
+            true
+        }
+
+        #[zbus(property)]
+        fn percentage(&self) -> f64 {
+            67.0
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "run in an isolated D-Bus session with dbus-run-session"]
+    async fn charging_changes_are_received_without_waiting_for_a_poll() {
+        let _mock = zbus::connection::Builder::session()
+            .serve_at(DISPLAY_DEVICE, MockBattery(2))
+            .name(UPOWER)
+            .build()
+            .await
+            .unwrap();
+        let client = Connection::session().await.unwrap();
+        let mut changes = display_changes(&client).await.unwrap();
+        let device = proxy(&client, UPOWER, DISPLAY_DEVICE, DEVICE)
+            .await
+            .unwrap();
+        device.set_property("State", 1u32).await.unwrap();
+        assert!(time::timeout(Duration::from_secs(1), changes.next())
+            .await
+            .unwrap()
+            .is_some());
+        let battery = upower_battery(&client).await.unwrap();
+        assert_eq!(battery.state, 1);
+        assert_eq!(battery.percent, 67);
+    }
 
     #[test]
     fn battery_uses_internal_packs_and_ignores_peripherals() {
