@@ -31,6 +31,91 @@ impl Platform for TestDisplay {
 }
 
 #[test]
+fn startup_animation_reveals_navigation_when_the_connection_overlay_closes() {
+    let window = MinimalSoftwareWindow::new(Default::default());
+    let elapsed_offset = Rc::new(Cell::new(Duration::ZERO));
+    slint::platform::set_platform(Box::new(TestDisplay {
+        window: window.clone(),
+        started: Instant::now(),
+        elapsed_offset: elapsed_offset.clone(),
+    }))
+    .unwrap();
+    let app = App::new().unwrap();
+    app.show().unwrap();
+    window.set_size(PhysicalSize::new(800, 480));
+    let active_pill = Rgb8Pixel {
+        r: 0xa8,
+        g: 0xc7,
+        b: 0xfa,
+    };
+    let mut buffer = vec![Rgb8Pixel::default(); 800 * 480];
+    let mut render = |advance_ms| {
+        elapsed_offset.set(elapsed_offset.get() + Duration::from_millis(advance_ms));
+        slint::platform::update_timers_and_animations();
+        window.draw_if_needed(|r| {
+            r.render(&mut buffer, 800);
+        });
+        let progress_width = buffer[..428 * 800]
+            .chunks_exact(800)
+            .map(|row| {
+                row[260..540]
+                    .iter()
+                    .filter(|&&pixel| pixel == active_pill)
+                    .count()
+            })
+            .max()
+            .unwrap();
+        (buffer[440 * 800 + 221], progress_width)
+    };
+
+    app.invoke_enable_gpu_effects();
+    assert_eq!(render(0), (active_pill, 0));
+    backend::apply_startup_status(&app, "Loading cache", false);
+    let (boot_nav, early_width) = render(0);
+    assert_eq!(boot_nav, active_pill, "navigation is visible during boot");
+    assert!(early_width > 0);
+    assert_eq!(render(600).1, early_width, "time alone adds no progress");
+
+    backend::apply_startup_status(&app, "starting_audio", false);
+    let middle_width = render(0).1;
+    assert!(middle_width > early_width);
+    backend::apply_startup_status(&app, "unknown-stage", false);
+    assert_eq!(render(0).1, middle_width);
+    backend::apply_startup_status(&app, "loading_cache", false);
+    assert_eq!(
+        render(0).1,
+        middle_width,
+        "older stages do not move the bar backward"
+    );
+
+    backend::apply_startup_status(&app, "updating_event_index", false);
+    assert!(render(0).1 > middle_width);
+    backend::apply_startup_status(&app, "finished", true);
+    assert_eq!(app.get_backend_progress(), 1.0);
+    app.set_connection("Connecting…".into());
+    assert_eq!(render(2000), (active_pill, 0));
+
+    app.set_connection("Connected".into());
+    let first_frame = render(0).0;
+    assert_ne!(first_frame, active_pill, "the reveal starts on connection");
+    assert_eq!(render(1200).0, active_pill);
+
+    app.set_connection("Disconnected — retrying".into());
+    assert_eq!(
+        render(0),
+        (active_pill, 0),
+        "navigation stays available offline and the boot indicator is gone"
+    );
+    app.set_connection("Connected".into());
+    assert_eq!(render(0).0, first_frame, "the reveal restarts on reconnect");
+    assert_eq!(render(1200).0, active_pill);
+
+    app.set_connection("Backend not ready".into());
+    backend::apply_startup_status(&app, "loading_cache", false);
+    assert_eq!(render(0).1, early_width, "a new boot starts a fresh bar");
+}
+
+#[test]
 fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     let window = MinimalSoftwareWindow::new(Default::default());
     let elapsed_offset = Rc::new(Cell::new(Duration::ZERO));
@@ -338,6 +423,28 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
     app.set_feedback("".into());
     std::fs::remove_file(&settings_path).unwrap();
     std::fs::remove_dir(settings_dir).unwrap();
+    app.set_page(0);
+    for (backend_ready, connection) in [
+        (false, "Backend not ready"),
+        (true, "Disconnected — retrying"),
+    ] {
+        app.set_backend_ready(backend_ready);
+        app.set_connection(connection.into());
+        window.draw_if_needed(|r| {
+            r.render(&mut buffer, 800);
+        });
+        let nav_background = buffer[450 * 800 + 9];
+        assert!(
+            (434..474).all(|y| buffer[y * 800 + 10..y * 800 + 50]
+                .iter()
+                .all(|pixel| *pixel == nav_background)),
+            "the edit pen is hidden when the connection is {connection}"
+        );
+        press(30., 471.);
+        release(30., 471.);
+        assert!(!app.get_dashboard_editing());
+    }
+
     app.set_connection("Connected".into());
 
     let saved = Rc::new(std::cell::Cell::new(false));
@@ -349,7 +456,6 @@ fn kiosk_pages_render_and_actions_use_the_displayed_device() {
             weak.unwrap().set_dashboard_editing(false);
         });
     }
-    app.set_page(0);
     press(30., 471.);
     release(30., 471.);
     assert!(app.get_dashboard_editing());

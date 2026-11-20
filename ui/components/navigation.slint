@@ -3,6 +3,7 @@ import { NavItem, PillButton } from "common.slint";
 
 export component ConnectionOverlay inherits Rectangle {
     in property <string> backend-stage;
+    in property <float> progress;
     in property <bool> backend-ready;
     in property <string> language;
     pure callback startup-stage(string, string) -> string;
@@ -25,11 +26,33 @@ export component ConnectionOverlay inherits Rectangle {
             text: root.backend-ready ? root.loc("connect_reconnecting") : root.startup-stage(root.language, root.backend-stage);
             color: Theme.primary; font-size: 12px; horizontal-alignment: center;
         }
+        if !root.backend-ready : HorizontalLayout {
+            alignment: center;
+            Rectangle {
+                width: min(280px, root.width * 0.6);
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.raised;
+                accessible-role: progress-indicator;
+                accessible-label: root.loc("connect_starting_title");
+                accessible-value: root.progress;
+                accessible-value-minimum: 0.0;
+                accessible-value-maximum: 1.0;
+                if root.progress > 0 : Rectangle {
+                    x: 0px;
+                    width: parent.width * clamp(root.progress, 0, 1);
+                    height: parent.height;
+                    border-radius: 3px;
+                    background: Theme.primary;
+                }
+            }
+        }
     }
 }
 
 export component BottomNavigation inherits Rectangle {
     in property <int> page;
+    in property <bool> connected;
     in property <bool> dev-page-enabled;
     in property <bool> dashboard-editing;
     callback navigate(int);
@@ -72,7 +95,7 @@ export component BottomNavigation inherits Rectangle {
             clicked => { root.navigate(5); }
         }
     }
-    if root.page == 0 : Rectangle {
+    if root.page == 0 && (root.connected || root.dashboard-editing) : Rectangle {
         width: 40px;
         height: 40px;
         x: 10px;

@@ -33,6 +33,7 @@ export component App inherits Window {
     callback sample-dev-usage(bool) -> ProcessUsage;
     in-out property <string> connection: "Waiting for backend";
     in-out property <string> backend-stage: "";
+    in-out property <float> backend-progress;
     in-out property <bool> backend-ready;
     pure callback locale-text(string, string) -> string;
     pure callback fill-text(string, string, string) -> string;
@@ -167,13 +168,15 @@ export component App inherits Window {
     }
     // Motion: enabled from Rust only when rendering through Vulkan.
     in-out property <bool> gpu-effects: false;
+    property <bool> connection-overlay-shown: root.connection != "Connected";
     property <bool> intro-running: false;
     property <duration> intro-start;
     property <bool> page-running: false;
     property <duration> page-start;
     // 0 → 1 over the startup animation / a page switch; 1 when idle.
     // animation-tick() is only read while running, so idle frames stay idle.
-    property <float> intro: root.intro-running ? clamp((animation-tick() - root.intro-start) / 1100ms, 0, 1) : 1;
+    property <float> intro: root.intro-running && !root.connection-overlay-shown
+        ? clamp((animation-tick() - root.intro-start) / 1100ms, 0, 1) : 1;
     property <float> page-reveal: root.page-running
         ? root.ease-out(clamp((animation-tick() - root.page-start) / 340ms, 0, 1)) : 1;
     pure function ease-out(t: float) -> float { return 1 - pow(1 - t, 3); }
@@ -181,10 +184,22 @@ export component App inherits Window {
     pure function stage(from: float, to: float) -> float {
         return root.ease-out(clamp((root.intro - from) / (to - from), 0, 1));
     }
-    public function start-intro() {
-        root.gpu-effects = true;
+    function start-intro() {
         root.intro-start = animation-tick();
         root.intro-running = true;
+    }
+    public function enable-gpu-effects() {
+        if root.gpu-effects { return; }
+        root.gpu-effects = true;
+        // The backend may have connected before the renderer draws its first frame.
+        if !root.connection-overlay-shown { root.start-intro(); }
+    }
+    changed connection-overlay-shown => {
+        if root.connection-overlay-shown {
+            root.intro-running = false;
+        } else if root.gpu-effects {
+            root.start-intro();
+        }
     }
     motion-timer := Timer {
         interval: 100ms;
@@ -403,10 +418,11 @@ export component App inherits Window {
                 speedtest-start => { root.speedtest-start(); }
                 loc(key) => { return root.loc(key); }
             }
-            if root.connection != "Connected" : ConnectionOverlay {
+            if root.connection-overlay-shown : ConnectionOverlay {
                 width: parent.width;
                 height: parent.height;
                 backend-stage: root.backend-stage;
+                progress: root.backend-progress;
                 backend-ready: root.backend-ready;
                 language: root.language;
                 startup-stage(language, stage) => { return root.startup-stage(language, stage); }
@@ -427,6 +443,7 @@ export component App inherits Window {
         BottomNavigation {
             opacity: root.stage(0.12, 0.55);
             page: root.page;
+            connected: !root.connection-overlay-shown;
             dev-page-enabled: root.dev-page-enabled;
             dashboard-editing: root.dashboard-editing;
             navigate(target) => {

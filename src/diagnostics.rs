@@ -55,8 +55,7 @@ pub(crate) fn install(app: &App, settings_path: PathBuf) {
                             .into(),
                     });
                     if adapter.backend == Backend::Vulkan {
-                        // Start the intro before the first frame on Vulkan.
-                        app.invoke_start_intro();
+                        app.invoke_enable_gpu_effects();
                     }
                 }
             }

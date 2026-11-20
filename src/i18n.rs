@@ -24,10 +24,7 @@ pub(crate) fn stage(language: &str, stage: &str) -> String {
     if stage.is_empty() {
         return text(language, "connect_starting_stage");
     }
-    let key = format!(
-        "connect_stage_{}",
-        stage.to_ascii_lowercase().replace([' ', '-'], "_")
-    );
+    let key = format!("connect_stage_{}", startup_stage_id(stage));
     let translated = text(language, &key);
     if translated != key {
         return translated;
@@ -42,6 +39,10 @@ pub(crate) fn stage(language: &str, stage: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+pub(crate) fn startup_stage_id(stage: &str) -> String {
+    stage.trim().to_ascii_lowercase().replace([' ', '-'], "_")
 }
 
 #[cfg(test)]

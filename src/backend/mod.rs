@@ -1,8 +1,8 @@
 pub(crate) mod cava;
 
 use crate::{
-    config::Settings, state::presentation::string_field, state::store::Store, ui_bridge::ui_event,
-    App,
+    config::Settings, i18n::startup_stage_id, state::presentation::string_field,
+    state::store::Store, ui_bridge::ui_event, App,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
@@ -16,6 +16,59 @@ use tokio::{
     time,
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
+
+// Milestone order comes from the frontend's startup stage catalog. Some services are optional.
+const STARTUP_STAGES: &[&str] = &[
+    "loading_cache",
+    "loading_variables",
+    "loading_web_components",
+    "loading_integrations",
+    "starting_ollama",
+    "loading_system_components",
+    "starting_twitch_bot",
+    "connecting_obs",
+    "connecting_yolobox",
+    "fetching_game_info",
+    "starting_schedulers",
+    "initializing_macros",
+    "sending_default_wled_colors",
+    "starting_audio",
+    "updating_system_information",
+    "reading_assets_folder",
+    "starting_watchers",
+    "starting_gpio",
+    "starting_neopixel",
+    "starting_tts",
+    "updating_obs_filters",
+    "starting_auto_macros",
+    "loading_scene_rotations",
+    "starting_music_player",
+    "updating_event_index",
+    "finished",
+];
+
+pub(super) fn apply_startup_status(app: &App, stage: &str, ready: bool) {
+    let progress = if ready {
+        1.0
+    } else {
+        let stage_id = startup_stage_id(stage);
+        let milestone = STARTUP_STAGES
+            .iter()
+            .position(|&stage| stage == stage_id)
+            .map_or(0.0, |index| {
+                (index + 1) as f32 / (STARTUP_STAGES.len() + 1) as f32
+            });
+        let previous = if app.get_backend_ready() {
+            0.0
+        } else {
+            app.get_backend_progress()
+        };
+        previous.max(milestone)
+    };
+    app.set_backend_progress(progress);
+    app.set_backend_stage(stage.into());
+    app.set_backend_ready(ready);
+}
 
 pub(crate) const ENDPOINTS: &[&str] = &[
     "notify_interaction",
@@ -152,15 +205,14 @@ pub(crate) async fn run(
             ui_event(&ui, move |app| {
                 app.set_connection("Backend not ready".into());
                 if status.is_some() {
-                    app.set_backend_ready(false);
-                    app.set_backend_stage(stage.into());
+                    apply_startup_status(&app, &stage, false);
                 }
             });
             time::sleep(Duration::from_millis(500)).await;
             continue;
         }
-        ui_event(&ui, |app| {
-            app.set_backend_ready(true);
+        ui_event(&ui, move |app| {
+            apply_startup_status(&app, &stage, true);
             app.set_connection("Connecting…".into());
         });
         match connect_async(config.ws_url()).await {
